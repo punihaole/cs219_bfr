@@ -1,0 +1,7 @@
+1. Copy ccn_exp.py and __init__.py to ~/.core/myservices/ (or modify existing file)
+2. make
+3. bin/ccnud (must be run before the routing daemon)
+4. bin/ccnumrd
+
+Use the apps/bin for testing. Each individual daemon and the shared library (libcon) have some tests executables, but many of these are deprecated.
+Running ccnud -t or ccnumrd -t should work, however.
