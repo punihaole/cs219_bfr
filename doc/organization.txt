@@ -1,0 +1,40 @@
+apps/
+	A directory containing programs that utilize the ccnu and ccnumr daemons. For example, we have programs that test the ability to publish and retrieve content from our local CS. Programs that retrieve and display the summary Bloom filter from the CS, and most importantly an ftp client and server. This directory is further organized into subdirectories:
+	apps/bin - binary executables created by make
+	apps/obj - binary obj files created by make (unlinked binaries)
+	apps/src - source code for the tests and applications
+
+ccnu/
+	Directory containing the ccnu daemon. This daemon is responsible for content management (i.e. storing our published content, fulfilling our interests, etc). This daemon hooks into the ccnumr daemon in order to route interests.
+	subdirectories:
+	ccnu/bin/obj - contains the unlinked binary obj files created by make
+	ccnu/src - source c files for this project
+	ccnu/include - ccnu specific headers
+	ccnu/tests - various tests programs
+
+core_cfg/
+	Contains the scripts to copy into CORE user scripts directory to use with CORE (see README within).
+
+include/
+	Contains the header files needed globally, by both routing daemons and te shared library.
+
+bin/
+	Contains the ccnud and ccnumrd executables. Created by running the make utility withing the master directory.
+
+ccnumr/
+	Contains the ccnumr daemon. This is the cluster-based geo-routing daemon. Organized identically to the ccnu directory.
+
+doc/
+	Contains documentation for this project.
+
+lib/
+	Contains the shared static libraries for this project.
+	libccnu.a - the static lib implementing the api to communicate with ccnud. See include/ccnu.h for the api description.
+	libccnumr.a - the static lib implementing the api to communicate with ccnumrd. See include/ccnumr.h for the api description.
+	libcon.a - contains shared code needed by both daemons. See include/ for the definitions of these apis. Contains apis for manipulating content, content names, hashing algorithms, data structures, bloom filters, logging, etc...
+
+scripts/
+	Contains Python and shell scripts used (mostly) by CORE.
+	Ccnumr.py - implements (part of) the ccnumr api in Python. Incomplete. This allows us to update the ccnumrd's knowledge of a node's location from within a Python script.
+	core_exp_setup.sh - called from CORE startup to initialize our experiment.
+	NodeStart.py - script that spins and continuously updates the routing dameons location knowlege.
