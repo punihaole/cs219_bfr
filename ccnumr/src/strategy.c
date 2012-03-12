@@ -25,6 +25,7 @@
 #include "linked_list.h"
 
 #include "ts.h"
+#include "thread_pool.h"
 
 #include "ccnu.h"
 
@@ -56,6 +57,8 @@ struct strategy {
     stategy_state_t state;
 
     int summary_size; /* num bits in our Bloom filters, calcualted by ccnud */
+
+    thread_pool_t handler_pool;
 };
 
 /* the pending and matching lists keep track of join msgs we have seen.
@@ -119,6 +122,10 @@ int stategy_init()
 
     struct node * my_node = &g_ccnumr.my_node;
     _strategy.summary_size = my_node->filter->vector->num_bits;
+
+    if (tpool_create(&_strategy.handler_pool, DEFAULT_HANDLER_POOL) < 0) {
+        return -1;
+    }
 
     return 0;
 }
@@ -219,16 +226,7 @@ void * strategy_service(void * ignore)
                 if (parse_as_join_msg(msg, jmsg) < 0) {
                     log_print(g_log, "strategy_service: parse_as_join_msg failed.");
                 } else {
-                    pthread_t handler;
-                    if (pthread_create(&handler, NULL, handle_cluster_join_msg, jmsg) < 0) {
-                        log_print(g_log, "strategy_service: failed to create cluster join handler!");
-                    } else {
-                        /* we don't want to wait to join the handler */
-                        if (pthread_detach(handler) < 0) {
-                            log_print(g_log, "strategy_service: failed to detach cluster join handler!");
-                        }
-                    }
-
+                    tpool_add_job(&_strategy.handler_pool, handle_cluster_join_msg, jmsg, TPOOL_NO_RV, NULL, NULL);
                 }
             } else if (msg->hdr.type == MSG_NET_CLUSTER_RESPONSE) {
                 /* we have to service CLUSTER RESPONSES here (not in a separate
@@ -977,5 +975,5 @@ static void * handle_cluster_join_msg(void * arg)
     pthread_mutex_unlock(&pending_joins_lock);
     free(jmsg);
 
-    pthread_exit(NULL);
+    return NULL;
 }

@@ -181,7 +181,7 @@ int ccnudnb_fwd_interest(struct ccnu_interest_pkt * interest)
     net_buffer_putInt(&buf, interest->name->len);
     net_buffer_copyTo(&buf, interest->name->full_name, interest->name->len);
 
-    log_print(g_log, "fwding interest for: %s", interest->name->full_name);
+    //log_print(g_log, "fwding interest for: %s", interest->name->full_name);
 
     int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
 

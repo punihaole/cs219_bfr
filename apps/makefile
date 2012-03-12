@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -g -O2 -Wall -iquote ../include
-CLINK = -pthread -lm -L../lib -lccnu -lcon -lccnumr
+CLINK = -L../lib -lccnu -lcon -lccnumr -pthread -lm 
 SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin

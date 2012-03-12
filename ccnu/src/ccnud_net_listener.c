@@ -24,19 +24,21 @@
 #include "log.h"
 #include "net_buffer.h"
 #include "net_lib.h"
+#include "thread_pool.h"
 
 #include "ccnumr.h"
 
 struct ccnud_net_s {
     int in_sock; /* udp socket */
+    thread_pool_t packet_pipeline;
 };
 
 struct ccnud_net_s _net;
 
-static int handle_interest(struct ccnu_interest_pkt * interest);
-static int handle_data(struct ccnu_data_pkt * data);
+static void * handle_interest(struct ccnu_interest_pkt * interest);
+static void * handle_data(struct ccnu_data_pkt * data);
 
-int ccnudnl_init()
+int ccnudnl_init(int pipeline_size)
 {
     if ((_net.in_sock = broadcast_socket()) == -1) {
         log_print(g_log, "failed to create broadcast socket!");
@@ -55,12 +57,18 @@ int ccnudnl_init()
         return -1;
     }
 
+    if (tpool_create(&_net.packet_pipeline, pipeline_size) < 0) {
+        log_print(g_log, "tpool_create: could not create interest thread pool!");
+        return -1;
+    }
+
     return 0;
 }
 
 int ccnudnl_close()
 {
     close(_net.in_sock);
+    tpool_shutdown(&_net.packet_pipeline);
     return 0;
 }
 
@@ -77,6 +85,13 @@ void * ccnudnl_service(void * arg)
     net_buffer_init(MAX_PACKET_SIZE, &buf);
 	while (1) {
         rcvd = net_buffer_recv(&buf, _net.in_sock, &remote_addr);
+
+        if ((uint32_t) ntohl(remote_addr.sin_addr.s_addr) == g_nodeId) {
+            /* self msg */
+            net_buffer_reset(&buf);
+            continue;
+        }
+
         if (rcvd <= 0) {
             log_print(g_log, "ccnudnl_service: recv failed -- trying to stay alive!");
             sleep(1);
@@ -87,38 +102,39 @@ void * ccnudnl_service(void * arg)
         uint8_t type = net_buffer_getByte(&buf);
 
         if (type == PACKET_TYPE_INTEREST) {
-            struct ccnu_interest_pkt interest;
-            interest.ttl = net_buffer_getByte(&buf);
-            interest.orig_level = net_buffer_getByte(&buf);
-            interest.orig_clusterId = net_buffer_getShort(&buf);
-            interest.dest_level = net_buffer_getByte(&buf);
-            interest.dest_clusterId = net_buffer_getShort(&buf);
-            interest.distance = net_buffer_getLong(&buf);
+            struct ccnu_interest_pkt * interest = malloc(sizeof(struct ccnu_interest_pkt));
+            interest->ttl = net_buffer_getByte(&buf);
+            interest->orig_level = net_buffer_getByte(&buf);
+            interest->orig_clusterId = net_buffer_getShort(&buf);
+            interest->dest_level = net_buffer_getByte(&buf);
+            interest->dest_clusterId = net_buffer_getShort(&buf);
+            interest->distance = net_buffer_getLong(&buf);
             uint32_t name_len = net_buffer_getInt(&buf);
             char str[MAX_NAME_LENGTH];
             if (name_len > MAX_NAME_LENGTH)
                 name_len = MAX_NAME_LENGTH-1;
             net_buffer_copyFrom(&buf, str, name_len);
             str[name_len] = '\0';
-            interest.name = content_name_create(str);
-            handle_interest(&interest);
+            interest->name = content_name_create(str);
+            tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_interest, interest,TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
         } else if (type == PACKET_TYPE_DATA) {
-            struct ccnu_data_pkt data;
-            data.hops = net_buffer_getByte(&buf);
-            data.publisher_id = net_buffer_getInt(&buf);
+            struct ccnu_data_pkt * data = malloc(sizeof(struct ccnu_data_pkt));
+            data->hops = net_buffer_getByte(&buf);
+            data->publisher_id = net_buffer_getInt(&buf);
             int name_len = net_buffer_getInt(&buf);
             char str[MAX_NAME_LENGTH];
             if (name_len > MAX_NAME_LENGTH)
                 name_len = MAX_NAME_LENGTH - 1;
             net_buffer_copyFrom(&buf, str, name_len);
             str[name_len] = '\0';
-            data.name = content_name_create(str);
-            data.timestamp = net_buffer_getInt(&buf);
-            data.payload_len = net_buffer_getInt(&buf);
-            data.payload = malloc(sizeof(uint8_t) * data.payload_len);
-            net_buffer_copyFrom(&buf, data.payload, data.payload_len);
-            if (data.publisher_id != g_nodeId)
-                handle_data(&data);
+            data->name = content_name_create(str);
+            data->timestamp = net_buffer_getInt(&buf);
+            data->payload_len = net_buffer_getInt(&buf);
+            data->payload = malloc(sizeof(uint8_t) * data->payload_len);
+            net_buffer_copyFrom(&buf, data->payload, data->payload_len);
+            if (data->publisher_id != g_nodeId) {
+                tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_data, data, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
+            }
         } else {
             log_print(g_log, "ccnudnl_service: recvd unknown msg type - %u", type);
             sleep(1);
@@ -131,30 +147,27 @@ void * ccnudnl_service(void * arg)
 }
 
 
-static int handle_interest(struct ccnu_interest_pkt * interest)
+static void * handle_interest(struct ccnu_interest_pkt * interest)
 {
     int rv = 0;
 
-    log_print(g_log, "handle_interest: %s from %u:%u->%u:%u",
+    /*log_print(g_log, "handle_interest: %s from %u:%u->%u:%u",
               interest->name->full_name, interest->orig_level, interest->orig_clusterId,
-              interest->dest_level, interest->dest_clusterId);
+              interest->dest_level, interest->dest_clusterId);*/
 
     /* check the CS for data to match interest */
     struct content_obj * content = CS_get(interest->name);
     if (content) {
-        log_print(g_log, "handle_interest: found matching data.");
         ccnudnb_fwd_data(content, 1);
     } else {
         /* fwd interest */
         PENTRY pe = PIT_search(interest->name);
         if (pe) {
-            log_print(g_log, "handle_interest: already saw this interest, refreshing PIT.");
             /* refresh the pit entry */
             PIT_refresh(pe);
             /* we already saw this interest...drop it */
             goto END;
         } else {
-            log_print(g_log, "handle_interest: new interest.");
             /* ask routing daemon if we should forward the interest */
             double last_hop_distance = unpack_ieee754_64(interest->distance);
             int need_fwd = 0;
@@ -178,37 +191,36 @@ static int handle_interest(struct ccnu_interest_pkt * interest)
                               interest->name->full_name);
                     goto END;
                 }
-                log_print(g_log, "handle_interest: fwding interest.");
 
                 /* we fwded the interest, add it to the pit */
                 PIT_add_entry(interest->name);
             } else {
-                log_print(g_log, "handle_interest: dropping interest.");
+                /* drop interest */
             }
         }
     }
 
     END:
 
-    return rv;
+    return NULL;
 }
 
-static int handle_data(struct ccnu_data_pkt * data)
+static void * handle_data(struct ccnu_data_pkt * data)
 {
-    log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
-              data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);
+    /*log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
+              data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);*/
 
     struct content_obj * obj;
     obj = (struct content_obj *) malloc(sizeof(struct content_obj));
 
     obj->publisher = data->publisher_id;
-    obj->name = content_name_create(data->name->full_name);
+    obj->name = data->name;
     obj->timestamp = data->timestamp;
     obj->size = data->payload_len;
     obj->data = data->payload;
 
 	/* update the forwarding table in the routing daemon */
-	ccnumr_sendDistance(obj->name, data->hops);
+	//ccnumr_sendDistance(obj->name, data->hops);
 
     int rv;
     if ((rv = CS_put(obj)) != 0) {
@@ -219,11 +231,10 @@ static int handle_data(struct ccnu_data_pkt * data)
     PENTRY pe = PIT_longest_match(obj->name);
     if (!pe) {
         /* unsolicited data */
-        return 0;
+        return NULL;
     }
 
     if (pe->registered) {
-        log_print(g_log, "handle_data: fullfilling pending Interest.");
         /* we fulfilled a pit, we need to notify the waiter */
         /* no need to lock the pe, the pit_longest_match did it for us */
         *pe->obj = obj; /* hand them the data and wake them up*/
@@ -236,7 +247,7 @@ static int handle_data(struct ccnu_data_pkt * data)
         PIT_release(pe); /* release will unlock the lock */
     }
 
-    return rv;
+    return NULL;
 }
 
 

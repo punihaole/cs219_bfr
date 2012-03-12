@@ -6,6 +6,7 @@
 struct log {
 	FILE * log_fp;
 	char * log_name;
+	int pending_writes;
 };
 
 #define LOG_APPEND    1 /* we append to log file if exists */

@@ -5,7 +5,7 @@
 
 ///Creates the domain socket we listen on.
 ///Returns 0 on success, non-zero otherwise.
-int ccnudl_init();
+int ccnudl_init(int pipeline_size);
 
 ///Closes the domain socket and does other cleanup.
 int ccnudl_close();

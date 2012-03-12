@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <math.h>
 
 #include "bitmap.h"
 
@@ -101,6 +102,39 @@ int bit_diff(struct bitmap * a, struct bitmap * b)
 	}
 	
 	return set;
+}
+
+int bit_allSet(struct bitmap * map)
+{
+	int i;
+	int num_words = ceil((double)map->num_bits / (double)BITS_PER_WORD);
+	for (i = 0; i < num_words - 1; i++) {
+		if (map->map[i] != (unsigned int)-1)
+			return 0;
+	}
+	
+	int bits_valid = map->num_bits % BITS_PER_WORD;
+	int mask = (unsigned int)-1;
+	mask <<= bits_valid;
+	if (bits_valid > 0)
+		mask = ~mask;
+
+	if (map->map[num_words - 1] != mask)
+		return 0;
+
+	return 1;
+}
+
+int bit_allClear(struct bitmap * map)
+{
+	int i;
+	int num_words = ceil((double)map->num_bits / (double)BITS_PER_WORD);
+	for (i = 0; i < num_words; i++) {
+		if (map->map[i] != 0)
+			return 0;
+	}
+
+	return 1;
 }
 
 #ifdef BITMAP_DEBUG

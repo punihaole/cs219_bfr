@@ -14,5 +14,23 @@ typedef unsigned int (*evict_t)(unsigned int *, unsigned int);
 typedef void (*delete_t)(void *);
 typedef int (*compare_t)(const char *, const char *, int len);
 
+/* BLOOM/SUMMARY */
+#define BLOOM_ARGS 5, elfhash, sdbmhash, djbhash, dekhash, bphash
+
+#define HASH(n) (elfhash(n))
+
+/* MISC */
+#ifndef max
+	#define max(a, b) (((a) > (b)) ? (a) : (b))
+#endif
+
+#ifndef min
+	#define min(a, b) (((a) < (b)) ? (a) : (b))
+#endif
+
+#ifndef msleep
+    #define msleep(n) (usleep((n) * 1000))
+#endif
+
 #endif // CONSTANTS_H_INCLUDED
 

@@ -13,16 +13,54 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O2" />
+					<Add option="-iquote src/include" />
+					<Add option="-iquote ../include" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
+					<Add option="-pthread" />
+					<Add option="-lm" />
+					<Add library="../lib/libccnumr.a" />
+					<Add library="../lib/libcon.a" />
 				</Linker>
 			</Target>
 		</Build>
 		<Compiler>
 			<Add option="-Wall" />
 		</Compiler>
-		<Unit filename="main.c">
+		<Unit filename="src/ccnu.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnud.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnud_cs.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnud_listener.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnud_net_broadcaster.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnud_net_listener.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnud_pit.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/include/ccnu_packet.h" />
+		<Unit filename="src/include/ccnud.h" />
+		<Unit filename="src/include/ccnud_constants.h" />
+		<Unit filename="src/include/ccnud_cs.h" />
+		<Unit filename="src/include/ccnud_listener.h" />
+		<Unit filename="src/include/ccnud_net_broadcaster.h" />
+		<Unit filename="src/include/ccnud_net_listener.h" />
+		<Unit filename="src/include/ccnud_pit.h" />
+		<Unit filename="src/tests/ccnu_net_test.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/tests/cs_test.c">
 			<Option compilerVar="CC" />
 		</Unit>
 		<Extensions>

@@ -80,6 +80,8 @@ void content_name_delete(struct content_name * name)
     name = NULL;
 }
 
+#include <syslog.h>
+
 // tricky because we need to extend and copy the old name.
 int content_name_appendComponent(struct content_name * name, char * comp)
 {
@@ -99,13 +101,12 @@ int content_name_appendComponent(struct content_name * name, char * comp)
         return -1;
     }
 
-    char * save = (char * ) realloc(name->full_name, new_len);
-    if (!save)
+    name->full_name = realloc(name->full_name, new_len);
+    if (!name->full_name)
     {
         return -1;
     }
 
-    name->full_name = save;
     name->full_name[old_len] = NAME_COMPONENT_SEPARATOR;
     name->full_name[old_len+1] = '\0'; /* mark where to concat */
     /* append the comp to full name string */

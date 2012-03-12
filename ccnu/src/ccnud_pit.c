@@ -122,6 +122,7 @@ PENTRY PIT_get_handle(struct content_name * name)
     pe->mutex = &g_pit.pit_table[index].mutex;
     pe->cond = &g_pit.pit_table[index].cond;
     pe->obj = &g_pit.pit_table[index].obj;
+    pe->creation = g_pit.pit_table[index].creation;
     g_pit.pit_table[index].name = name;
     pe->index = index;
     g_pit.pit_table[index].registered = pe->registered = 1;
@@ -216,9 +217,11 @@ PENTRY PIT_longest_match(struct content_name * name)
             longest_match = match_len;
             index = i;
         }
+        if (match_len == name->num_components)
+            break;
     }
-    pthread_mutex_lock(&g_pit.pit_table[index].mutex);
     pthread_mutex_unlock(&g_pit.pit_lock);
+    pthread_mutex_lock(&g_pit.pit_table[index].mutex);
 
     if (index != -1) {
         PENTRY pe = (PENTRY) malloc(sizeof(_pit_entry_s));
@@ -237,7 +240,6 @@ void PIT_release(PENTRY _pe)
 {
     pthread_mutex_lock(&g_pit.pit_lock);
         bit_clear(g_pit.pit_table_valid, _pe->index);
-        content_name_delete(g_pit.pit_table[_pe->index].name);
         g_pit.pit_table[_pe->index].name = NULL;
         g_pit.pit_table[_pe->index].obj = NULL;
         g_pit.pit_table[_pe->index].registered = 0;
@@ -251,7 +253,18 @@ void PIT_refresh(PENTRY _pe)
 {
     if (!_pe) return;
 
-    pthread_mutex_lock(&g_pit.pit_lock);
-        ts_fromnow(&g_pit.pit_table[_pe->index].creation);
-    pthread_mutex_unlock(&g_pit.pit_lock);
+    ts_fromnow(&g_pit.pit_table[_pe->index].creation);
 }
+
+//void PIT_print()
+//{
+//    pthread_mutex_lock(&g_pit.pit_lock);
+//        int i;
+//        for (i = 0; i < PIT_SIZE; i++) {
+//            if (bit_test(g_pit.pit_table_valid, i) == 1) {
+//                log_print(g_log, "PIT[%d] = %s", g_pit.pit_table[i].name);
+//                log_print(g_log, "\tCreated: %d", g_pit.pit_table[i].creation.tv_sec);
+//            }
+//        }
+//    pthread_mutex_unlock(&g_pit.pit_lock);
+//}

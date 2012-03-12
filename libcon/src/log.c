@@ -7,6 +7,7 @@
 #include "log.h"
 
 #define HEADER_LEN 256
+#define MAX_PENDING_WRITES 0
 
 int log_init(char * log_name, char * filename, struct log * _log, int mode)
 {
@@ -26,6 +27,7 @@ int log_init(char * log_name, char * filename, struct log * _log, int mode)
 	if (_log->log_fp == NULL) return -1;
 
 	_log->log_name = (char * ) malloc(strlen(log_name));
+	_log->pending_writes = 0;
 	strcpy(_log->log_name, log_name);
 
 	return 0;
@@ -61,6 +63,12 @@ void log_print(struct log * _log, const char * format, ...)
 	va_start(ap, format);
 	vfprintf(_log->log_fp, format, ap);
 	fprintf(_log->log_fp, "\n");
+	_log->pending_writes++;
+
+	if (_log->pending_writes > MAX_PENDING_WRITES) {
+		fflush(_log->log_fp);
+		_log->pending_writes = 0;
+	}
 	va_end(ap);
 }
 
@@ -83,5 +91,6 @@ void log_printnow(struct log * _log, const char * format, ...)
 	vfprintf(_log->log_fp, format, ap);
 	fprintf(_log->log_fp, "\n");
 	fflush(_log->log_fp);
+	_log->pending_writes = 0;
 	va_end(ap);
 }

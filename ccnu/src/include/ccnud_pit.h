@@ -20,6 +20,7 @@ typedef struct {
     struct content_obj ** obj;
     int index;
     int registered;
+    struct timespec creation;
 } _pit_entry_s; /* no touching */
 
 struct pit;
@@ -43,9 +44,15 @@ PENTRY PIT_search(struct content_name * name);
  */
 PENTRY PIT_longest_match(struct content_name * name);
 
+/* returns 1 if the entry is expired */
+int PIT_is_expired(PENTRY _pe);
+
 /* removes an entry from the pit */
 void PIT_release(PENTRY _pe);
 
 void PIT_refresh(PENTRY _pe);
+
+/* Debugging */
+//void PIT_print();
 
 #endif // CCNUD_PIT_H_INCLUDED

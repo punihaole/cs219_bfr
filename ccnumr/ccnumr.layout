@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_layout_file>
+	<ActiveTarget name="Release" />
+	<File name="src/ccnumr.c" open="0" top="0" tabpos="0">
+		<Cursor position="294" topLine="75" />
+	</File>
+	<File name="src/ccnumr_net_listener.c" open="0" top="0" tabpos="0">
+		<Cursor position="0" topLine="101" />
+	</File>
+	<File name="src/ccnumrd.c" open="0" top="0" tabpos="0">
+		<Cursor position="1194" topLine="42" />
+	</File>
+	<File name="src/ccnumrd_main.c" open="0" top="0" tabpos="0">
+		<Cursor position="6943" topLine="211" />
+	</File>
+	<File name="src/tests/ccnumr_test.c" open="0" top="0" tabpos="0">
+		<Cursor position="0" topLine="132" />
+	</File>
+</CodeBlocks_layout_file>

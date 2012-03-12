@@ -8,8 +8,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
-
-#define DEFAULT_INTERVAL 30 /* 30 ms */
+#include <math.h>
 
 #include "ccnud_listener.h"
 #include "ccnud_net_broadcaster.h"
@@ -44,6 +43,8 @@ void print_usage(char * argv_0)
     printf("      -t\tRun networking test (ccnud must be running).\n");
     printf("      -l\tSpecify a log file.\n");
     printf("      -n\tSpecify a node Id.\n");
+    printf("      -p\tSpecify the target false positive rate for the Bloom filter size.\n");
+    printf("      -i\tSpecify the interest pipeline size.\n");
     printf("The ccnud drops all output capability, so test results must be\n");
     printf("grepped from the log file. Running ccnud without the -t flag \n");
     printf("starts the daemon.\n");
@@ -72,6 +73,7 @@ int main(int argc, char *argv[])
     char log_file[256];
     int log_file_set = 0;
     double p = DEFAULT_P;
+    int interest_pipeline = DEFAULT_INTEREST_PIPELINE;
 
     g_nodeId = DEFAULT_NODE_ID;
 
@@ -81,7 +83,7 @@ int main(int argc, char *argv[])
     signal(SIGQUIT, signal_handler);
 
     int c;
-    while ((c = getopt(argc, argv, "-h?tl:n:p:")) != -1) {
+    while ((c = getopt(argc, argv, "-h?tl:n:p:i:")) != -1) {
         switch (c) {
             case 'h':
                 print_usage(argv[0]);
@@ -98,19 +100,19 @@ int main(int argc, char *argv[])
                     printf("Done. Check log for details.\n");
                     exit(EXIT_SUCCESS);
                 } else {
-                    printf("Failed. Check log for details ");
-                    printf("-- make sure another ccnud is running.\n");
+                    fprintf(stderr, "Failed. Check log for details ");
+                    fprintf(stderr, "-- make sure another ccnud is running.\n");
                     exit(EXIT_FAILURE);
                 }
                 break;
             case 'l':
                 strncpy(log_file, optarg, 256);
-                fprintf(stderr, "set log file = %s.\n", log_file);
+                printf("set log file = %s.\n", log_file);
                 log_file_set = 1;
                 break;
             case 'n':
                 g_nodeId = atoi(optarg);
-                fprintf(stderr, "set node ID = %u.\n", g_nodeId);
+                printf("set node ID = %u.\n", g_nodeId);
                 break;
             case 'p':
                 p = atof(optarg);
@@ -118,8 +120,12 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "p must be 0 < p < 1, defaulting to %1.4f\n", DEFAULT_P);
                     p = DEFAULT_P;
                 } else {
-                    fprintf(stderr, "set p to %1.4f...\n", p);
+                    printf("set p to %1.4f...\n", p);
                 }
+                break;
+            case 'i':
+                interest_pipeline = atoi(optarg);
+                fprintf(stderr, "set interest pipeline size to %d.\n", interest_pipeline);
                 break;
             default:
                 print_usage(argv[0]);
@@ -182,12 +188,12 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    if (ccnudl_init() < 0) {
+    if (ccnudl_init(interest_pipeline) < 0) {
         log_print(g_log, "ccnud listener failed to initalize.");
         exit(EXIT_FAILURE);
     }
 
-    if (ccnudnl_init() < 0) {
+    if (ccnudnl_init(interest_pipeline) < 0) {
         log_print(g_log, "ccnud net listener failed to initalize.");
         exit(EXIT_FAILURE);
     }

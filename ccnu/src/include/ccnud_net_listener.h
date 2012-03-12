@@ -7,7 +7,7 @@
 /* Creates the net socket we listen on.
  * Returns 0 on success, non-zero otherwise.
  */
-int ccnudnl_init();
+int ccnudnl_init(int pipeline_size);
 
 /* Closes the net socket and does other cleanup. */
 int ccnudnl_close();

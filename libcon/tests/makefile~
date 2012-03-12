@@ -1,0 +1,56 @@
+CC = gcc
+CFLAGS = -O2 -Wall -iquote ../include
+SRC = src
+OBJ = obj
+
+all: 
+
+clean:
+	rm *.o
+
+output_dir:
+	mkdir -p $(OBJ)
+
+lib: output_dir bitmap.o bloom_filter.o content.o content_name.o hash.o hashtable.o key_list.o linked_list.o log.o net_buffer.o net_lib.o synch_queue.o ts.o
+	ar rc libcon.a $(OBJ)/*.o
+	ranlib libcon.a
+
+bitmap.o: $(SRC)/bitmap.c
+	$(CC) $(CFLAGS) -c $(SRC)/bitmap.c -o $(OBJ)/bitmap.o
+
+bloom_filter.o: $(SRC)/bloom_filter.c bitmap.o hash.o
+	$(CC) $(CFLAGS) -c $(SRC)/bloom_filter.c -o $(OBJ)/bloom_filter.o
+
+content.o: $(SRC)/content.c content_name.o
+	$(CC) $(CFLAGS) -c $(SRC)/content.c -o $(OBJ)/content.o
+
+content_name.o: $(SRC)/content_name.c
+	$(CC) $(CFLAGS) -c $(SRC)/content_name.c -o $(OBJ)/content_name.o
+
+hash.o: $(SRC)/hash.c
+	$(CC) $(CFLAGS) -c $(SRC)/hash.c -o $(OBJ)/hash.o
+
+hashtable.o: $(SRC)/hashtable.c hash.o
+	$(CC) $(CFLAGS) -c $(SRC)/hashtable.c -o $(OBJ)/hashtable.o
+
+key_list.o: $(SRC)/linked_key_list.c
+	$(CC) $(CFLAGS) -c $(SRC)/linked_key_list.c -o $(OBJ)/key_list.o
+
+linked_list.o: $(SRC)/linked_list.c
+	$(CC) $(CFLAGS) -c $(SRC)/linked_list.c -o $(OBJ)/linked_list.o
+
+log.o: $(SRC)/log.c
+	$(CC) $(CFLAGS) -c $(SRC)/log.c -o $(OBJ)/log.o
+
+net_buffer.o: $(SRC)/net_buffer.c net_lib.o
+	$(CC) $(CFLAGS) -c $(SRC)/net_buffer.c -o $(OBJ)/net_buffer.o
+
+net_lib.o: $(SRC)/net_lib.c
+	$(CC) $(CFLAGS) -c $(SRC)/net_lib.c -o $(OBJ)/net_lib.o
+
+synch_queue.o: $(SRC)/synch_queue.c
+	$(CC) $(CFLAGS) -c $(SRC)/synch_queue.c -o $(OBJ)/synch_queue.o
+
+ts.o: $(SRC)/ts.c
+	$(CC) $(CFLAGS) -c $(SRC)/ts.c -o $(OBJ)/ts.o
+

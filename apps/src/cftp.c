@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "ccnu.h"
 #include "content_name.h"
@@ -26,7 +27,6 @@ int main(int argc, char ** argv)
 
 	char * con_name = argv[1];
 	char * filename = argv[2];
-	char str[MAX_NAME_LENGTH];
 	if (strlen(con_name) > MAX_NAME_LENGTH) {
 		printf("Proposed content name > MAX_NAME_LENGTH\n");	
 		exit(EXIT_FAILURE);
@@ -40,7 +40,6 @@ int main(int argc, char ** argv)
 		printf("could not retrieve index segment!\n");
 		exit(EXIT_FAILURE);
 	}
-	content_name_delete(name);
 	uint32_t num_segments_u;
 	uint32_t file_size_u;
 	memcpy(&num_segments_u, index->data, sizeof(uint32_t));
@@ -50,33 +49,20 @@ int main(int argc, char ** argv)
 
 	printf("retrieved index, found %d segments, file size = %d.\n", num_segments, file_size);
 
-	/* inefficient, we allocate file size buffer and write to that first*/
-	char * buffer = malloc(file_size);
-	int i;
-	int bytes_written = 0;
-	for (i = 0; i < num_segments; i++) {
-		sprintf(str, "%s/%d", con_name, i);
-		
-		struct content_name * seg_name = content_name_create(str);
-		struct content_obj * seg;
-		if (ccnu_retrieve(seg_name, &seg) != 0) {
-			printf("could not retrieve segment %s!\n", str);
-			exit(EXIT_FAILURE);
-		}
-		printf("retrieved segment %s, size = %d.\n", str, seg->size);
-		memcpy(buffer+bytes_written, seg->data, seg->size);
-		bytes_written += seg->size;
-	
-		content_name_delete(seg_name);
-		free(seg->data);
-		free(seg);
+	struct content_obj * obj;
+	if (ccnu_retrieveSeq(name, num_segments, file_size, &obj) != 0) {
+		fprintf(stderr, "failed to retrieve segments!\n");
+		exit(EXIT_FAILURE);
 	}
 
-	printf("finished retrieving file, %s.\n", filename);
+	printf("finished retrieving content, %s.\n", obj->name->full_name);
+	printf("\tpublisher = %u\n", obj->publisher);
+	printf("\ttimestamp = %u\n", obj->timestamp);
+	printf("\tsize = %u\n", obj->size);
 	FILE * fp = fopen(filename, "wb");
-	bytes_written = 0;
+	int bytes_written = 0;
 	while (bytes_written < file_size) {
-		int n = fwrite(buffer+bytes_written, 1, file_size - bytes_written, fp);
+		int n = fwrite(obj->data+bytes_written, 1, file_size - bytes_written, fp);
 		bytes_written += n;
 	}
 	fclose(fp);

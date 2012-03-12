@@ -3,23 +3,20 @@
 
 #include "constants.h"
 
-//#define SOCK_PATH "/tmp/ccnumr.sock"
+/* IPC */
 #define SOCK_QUEUE 5
-#define LEVELS 2
-
 #define LISTEN_PORT 9988
-
-#define DEFAULT_CONFIG_FILE "ccnumrd.config"
-
 #define DEFAULT_NODE_ID IP4_to_nodeId()
+
+/* GRID */
 #define DEFAULT_NUM_LEVELS 2
 #define DEFAULT_GRID_WIDTH 1000
 #define DEFAULT_GRID_HEIGHT 1000
 #define DEFAULT_GRID_STARTX 0
 #define DEFAULT_GRID_STARTY 0
 
+/* DISTANCE TABLE */
 #define DEFAULT_DIST_TABLE_SIZE 20
-
 #define MAX_HOPS 10
 
 /* INTERVALS */

@@ -292,7 +292,7 @@ int ccnu_retrieve(struct content_name * name, struct content_obj ** content_ptr)
     return rv;
 }
 
-int ccnu_retrieveSeq(struct content_name * baseName, int chunks, struct content_obj ** content_ptr)
+int ccnu_retrieveSeq(struct content_name * baseName, int chunks, int file_len, struct content_obj ** content_ptr)
 {
     if (!content_ptr || !baseName) {
         fprintf(stderr, "ccnu_retrive: content pointer/name invalid! -- IGNORING");
@@ -319,19 +319,35 @@ int ccnu_retrieveSeq(struct content_name * baseName, int chunks, struct content_
         return -1;
     }
 
-    char buf[MAX_NAME_LENGTH + sizeof(uint32_t) + sizeof(uint8_t)];
-
     uint8_t type = MSG_IPC_SEQ_RETRIEVE;
-
-    uint32_t msg_size = baseName->len + 2 * sizeof(uint32_t);
-    memcpy(buf, &type, sizeof(uint8_t));
-    memcpy(buf+sizeof(uint8_t), &msg_size, sizeof(uint32_t));
-    memcpy(buf+sizeof(uint8_t)+sizeof(uint32_t), &baseName->len, sizeof(uint32_t));
-    memcpy(buf+sizeof(uint8_t)+2*sizeof(uint32_t), baseName->full_name, baseName->len);
-    memcpy(buf+sizeof(uint8_t)+3*sizeof(uint32_t), &chunks, sizeof(uint32_t));
-
+    uint32_t msg_size = baseName->len + 4 * sizeof(uint32_t);
     /* send the req */
-    if (send(s, buf, sizeof(uint8_t) + sizeof(uint32_t) + msg_size, 0) == -1) {
+    if (send(s, &type, sizeof(uint8_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &msg_size, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &baseName->len, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, baseName->full_name, baseName->len, 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &chunks, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &file_len, sizeof(uint32_t), 0) == -1) {
         perror("send");
         close (s);
         return -1;
@@ -409,11 +425,18 @@ int ccnu_retrieveSeq(struct content_name * baseName, int chunks, struct content_
     content->size = size;
 
     data = (uint8_t * ) malloc(size);
-    if (recv(s, data, size, 0) < size) {
-        perror("recv");
-        rv = -1;
-        goto END_RETRIEVE;
+    int total = 0;
+    int left = size;
+    int n = -1;
+
+    while (total < size) {
+        n = recv(s, data+total, left, 0);
+        if (n == -1) break;
+        total += n;
+        left -= n;
+        fprintf(stderr, "rcvd %d bytes, total = %d, left = %d", n, total, left);
     }
+
     content->data = data;
 
     END_RETRIEVE:

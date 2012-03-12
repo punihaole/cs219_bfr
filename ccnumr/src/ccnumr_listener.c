@@ -369,7 +369,6 @@ static void * dest_query_response(void * arg)
     str[name_len] = '\0';
 
     name = content_name_create(str);
-    log_print(g_log, "dest_query_response: for %s", name->full_name);
 
     pthread_mutex_lock(&g_ccnumr.ccnumr_lock);
         unsigned orig_level = g_ccnumr.num_levels;
@@ -391,6 +390,9 @@ static void * dest_query_response(void * arg)
 
         grid_distance(dest_level, dest_clusterId, g_ccnumr.x, g_ccnumr.y, &distance);
     pthread_mutex_unlock(&g_ccnumr.ccnumr_lock);
+
+    log_print(g_log, "dest_query_response: for %s - %u:%u -> %u:%u",
+              name->full_name, orig_level, orig_clusterId, dest_level, dest_clusterId);
 
     /* send the response */
     if (send(sock2, &orig_level, sizeof(unsigned), 0) == -1) {

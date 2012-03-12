@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O2 -Wall -iquote ../include
+CFLAGS = -O2 -Wall -iquote ../include -iquote src/include
 CLINK = -pthread -lm -L../lib -lcon -lccnumr
 SRC = src
 TEST_SRC = src/tests

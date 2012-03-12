@@ -3,6 +3,9 @@
 
 #include "constants.h"
 
+/* STRATEGY */
+#define DEFAULT_HANDLER_POOL 5
+
 /* IPC */
 #define SOCK_QUEUE 5
 #define LISTEN_PORT 9988
@@ -30,23 +33,5 @@
 #define DEFAULT_BLOOM_INTERVAL_SEC 60
 #define DEFAULT_BACKOFF_INTERVAL_MS 33
 #define RESPONSE_MAX_WAIT_TIME_MS 100
-
-/* BLOOM/SUMMARY */
-#define BLOOM_ARGS 5, elfhash, sdbmhash, djbhash, dekhash, bphash
-
-#define HASH(n) (elfhash(n))
-
-/* MISC */
-#ifndef max
-	#define max(a, b) (((a) > (b)) ? (a) : (b))
-#endif
-
-#ifndef min
-	#define min(a, b) (((a) < (b)) ? (a) : (b))
-#endif
-
-#ifndef msleep
-    #define msleep(n) (usleep((n) * 1000))
-#endif
 
 #endif // CRUSTD_CONSTANTS_H_INCLUDED

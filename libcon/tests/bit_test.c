@@ -5,6 +5,51 @@
 
 int main()
 {
+	struct bitmap * map = bit_create(1000);
+	map->num_bits = 20;
+	int i;	
+	for (i = 0; i < 20; i++)
+		bit_find(map);
+	if ((bit_allSet(map) == 1) && (bit_allClear(map) == 0))
+		printf("success\n");
+	else
+		printf("failed %x\n", map->map[map->num_words-1]);
+
+	map->num_bits = 21;
+	printf("allSet = %d\n", bit_allSet(map));
+
+	map = bit_create(16);
+	for (i = 0; i < 16; i++)
+		bit_set(map, i);
+	if ((bit_allSet(map) == 1) && (bit_allClear(map) == 0))
+		printf("success\n");
+	else
+		printf("failed %x\n", map->map[map->num_words-1]);
+
+	map = bit_create(32);
+	for (i = 0; i < 32; i++)
+		bit_set(map, i);
+	if ((bit_allSet(map) == 1) && (bit_allClear(map) == 0))
+		printf("success\n");
+	else
+		printf("failed %x\n", map->map[map->num_words-1]);
+
+	map = bit_create(64);
+	for (i = 0; i < 64; i++)
+		bit_set(map, i);
+	if ((bit_allSet(map) == 1) && (bit_allClear(map) == 0))
+		printf("success\n");
+	else
+		printf("failed %x\n", map->map[map->num_words-1]);
+
+	map = bit_create(99);
+	for (i = 0; i < 99; i++)
+		bit_set(map, i);
+	if ((bit_allSet(map) == 1) && (bit_allClear(map) == 0))
+		printf("success\n");
+	else
+		printf("failed %x\n", map->map[map->num_words-1]);
+
 	struct bitmap * a = bit_create(128);
 	struct bitmap * b = bit_create(128);
 

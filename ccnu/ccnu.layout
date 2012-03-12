@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_layout_file>
+	<ActiveTarget name="Release" />
+	<File name="src/ccnu.c" open="0" top="0" tabpos="0">
+		<Cursor position="699" topLine="15" />
+	</File>
+	<File name="src/ccnud_listener.c" open="1" top="1" tabpos="0">
+		<Cursor position="14162" topLine="462" />
+	</File>
+	<File name="src/include/ccnud_cs.h" open="0" top="0" tabpos="0">
+		<Cursor position="410" topLine="0" />
+	</File>
+	<File name="src/tests/cs_test.c" open="0" top="0" tabpos="0">
+		<Cursor position="685" topLine="6" />
+	</File>
+</CodeBlocks_layout_file>
