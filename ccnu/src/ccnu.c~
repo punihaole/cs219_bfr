@@ -172,6 +172,8 @@ int ccnu_publishSeq(struct content_obj * index_obj, struct linked_list * chunks)
         payload_size = 4*sizeof(uint32_t) + name_len + size;
 
         int offset = 0;
+        memcpy(buf, &type, sizeof(uint8_t));
+        offset += sizeof(uint8_t);
         memcpy(buf+offset, &payload_size, sizeof(uint32_t));
         offset += sizeof(uint32_t);
         memcpy(buf+offset, &publisher, sizeof(uint32_t));

@@ -6,21 +6,21 @@
 #define DEFAULT_P 0.02 /* false positive probability */
 
 /* PIT */
-#define PIT_SIZE 500
-#define PIT_LIFETIME_MS 5000
+#define PIT_SIZE (MAX_INTEREST_PIPELINE * 2)
+#define PIT_LIFETIME_MS 4000
 
 /* NET */
 #define DEFAULT_NODE_ID IP4_to_nodeId()
-#define CCNU_MAX_PACKET_SIZE 1500
+#define CCNU_MAX_PACKET_SIZE (1500 - 8 - 12) /* UDP+IP overhead of 20 bytes */
 #define MAX_TTL 6
 #define LISTEN_PORT 8282
 #define SOCK_QUEUE 5
 
 #define INTEREST_FLOWS 3
-#define DEFAULT_INTEREST_PIPELINE 20
-#define MAX_INTEREST_PIPELINE 350
+#define DEFAULT_INTEREST_PIPELINE 18
+#define MAX_INTEREST_PIPELINE 500
 #define INTEREST_TIMEOUT_MS 1000 /* ms */
-#define INTEREST_MAX_ATTEMPTS 10
+#define INTEREST_MAX_ATTEMPTS 5
 #define MAX_HOPS 3 /*number of hops taken in cluster fwding */
 
 #define INTEREST_MAX_PATHS 5 /* number of paths 1 interest can take */

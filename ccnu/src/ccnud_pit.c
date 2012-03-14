@@ -15,7 +15,8 @@ struct pit_entry {
     pthread_cond_t cond; /* sleeps on this condition until we rcv the data */
     struct content_name * name;
     struct content_obj * obj;
-    struct timespec creation;
+    struct timespec expires;
+    struct timespec created;
     int registered; /* set to 1 if a thread is waiting on this pit entry */
 };
 
@@ -74,11 +75,11 @@ static int evict()
 
         /* candidate for evicition */
         if (!oldest_age) {
-            oldest_age = &g_pit.pit_table[i].creation;
+            oldest_age = &g_pit.pit_table[i].expires;
             oldest = i;
         } else {
-            if (ts_compare(oldest_age, &g_pit.pit_table[i].creation)) {
-                oldest_age = &g_pit.pit_table[i].creation;
+            if (ts_compare(oldest_age, &g_pit.pit_table[i].expires)) {
+                oldest_age = &g_pit.pit_table[i].expires;
                 oldest = i;
             }
         }
@@ -114,7 +115,6 @@ PENTRY PIT_get_handle(struct content_name * name)
             g_pit.pit_table[index].name = NULL;
         }
     }
-    ts_fromnow(&g_pit.pit_table[index].creation);
 
     pthread_mutex_unlock(&g_pit.pit_lock);
 
@@ -122,7 +122,11 @@ PENTRY PIT_get_handle(struct content_name * name)
     pe->mutex = &g_pit.pit_table[index].mutex;
     pe->cond = &g_pit.pit_table[index].cond;
     pe->obj = &g_pit.pit_table[index].obj;
-    pe->creation = g_pit.pit_table[index].creation;
+
+    ts_fromnow(&g_pit.pit_table[index].created);
+    g_pit.pit_table[index].expires = g_pit.pit_table[index].created;
+    ts_addms(&g_pit.pit_table[index].expires, g_pit.pit_lifetime_ms);
+    pe->expires = g_pit.pit_table[index].expires;
     g_pit.pit_table[index].name = name;
     pe->index = index;
     g_pit.pit_table[index].registered = pe->registered = 1;
@@ -154,7 +158,8 @@ int PIT_add_entry(struct content_name * name)
             g_pit.pit_table[index].name = NULL;
         }
     }
-    ts_fromnow(&g_pit.pit_table[index].creation);
+    ts_fromnow(&g_pit.pit_table[index].expires);
+    ts_addms(&g_pit.pit_table[index].expires, g_pit.pit_lifetime_ms);
 
     pthread_mutex_unlock(&g_pit.pit_lock);
 
@@ -181,11 +186,8 @@ PENTRY PIT_search(struct content_name * name)
 
     struct timespec now;
     ts_fromnow(&now);
-    struct timespec expire;
-    memcpy(&expire, &g_pit.pit_table[i].creation, sizeof(struct timespec));
-    ts_addms(&expire, g_pit.pit_lifetime_ms);
 
-    if (match && ts_compare(&expire, &now)) {
+    if (match && ts_compare(&g_pit.pit_table[i].expires, &now)) {
         PENTRY pe = (PENTRY) malloc(sizeof(_pit_entry_s));
         pe->mutex = &g_pit.pit_table[i].mutex;
         pe->cond = &g_pit.pit_table[i].cond;
@@ -230,6 +232,7 @@ PENTRY PIT_longest_match(struct content_name * name)
         pe->obj = &g_pit.pit_table[index].obj;
         pe->index = i;
         pe->registered = g_pit.pit_table[index].registered;
+        pe->expires = g_pit.pit_table[index].expires;
         return pe;
     } else {
         return NULL;
@@ -253,18 +256,41 @@ void PIT_refresh(PENTRY _pe)
 {
     if (!_pe) return;
 
-    ts_fromnow(&g_pit.pit_table[_pe->index].creation);
+    ts_fromnow(&g_pit.pit_table[_pe->index].expires);
+    ts_addms(&g_pit.pit_table[_pe->index].expires, g_pit.pit_lifetime_ms);
+    _pe->expires = g_pit.pit_table[_pe->index].expires;
 }
 
-//void PIT_print()
-//{
-//    pthread_mutex_lock(&g_pit.pit_lock);
-//        int i;
-//        for (i = 0; i < PIT_SIZE; i++) {
-//            if (bit_test(g_pit.pit_table_valid, i) == 1) {
-//                log_print(g_log, "PIT[%d] = %s", g_pit.pit_table[i].name);
-//                log_print(g_log, "\tCreated: %d", g_pit.pit_table[i].creation.tv_sec);
-//            }
-//        }
-//    pthread_mutex_unlock(&g_pit.pit_lock);
-//}
+int PIT_is_expired(PENTRY _pe)
+{
+    struct timespec now;
+    ts_fromnow(&now);
+
+    if (ts_compare(&g_pit.pit_table[_pe->index].expires, &now) > 0) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+long PIT_age(PENTRY _pe)
+{
+    struct timespec now;
+    ts_fromnow(&now);
+
+    long sec = g_pit.pit_table[_pe->index].created.tv_sec;
+    return now.tv_sec - sec;
+}
+
+void PIT_print()
+{
+    pthread_mutex_lock(&g_pit.pit_lock);
+        int i;
+        for (i = 0; i < PIT_SIZE; i++) {
+            if (bit_test(g_pit.pit_table_valid, i) == 1) {
+                log_print(g_log, "PIT[%d] = %s", i, g_pit.pit_table[i].name->full_name);
+                log_print(g_log, "\tExpires: %d", g_pit.pit_table[i].expires.tv_sec);
+            }
+        }
+    pthread_mutex_unlock(&g_pit.pit_lock);
+}

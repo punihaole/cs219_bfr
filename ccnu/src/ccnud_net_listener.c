@@ -31,6 +31,8 @@
 struct ccnud_net_s {
     int in_sock; /* udp socket */
     thread_pool_t packet_pipeline;
+    pthread_mutex_t segments_lock;
+    struct linked_list * segments;
 };
 
 struct ccnud_net_s _net;
@@ -61,6 +63,9 @@ int ccnudnl_init(int pipeline_size)
         log_print(g_log, "tpool_create: could not create interest thread pool!");
         return -1;
     }
+
+    pthread_mutex_init(&_net.segments_lock, NULL);
+    _net.segments = linked_list_init(NULL);
 
     return 0;
 }
@@ -146,6 +151,31 @@ void * ccnudnl_service(void * arg)
 	return NULL;
 }
 
+#ifdef CCNU_USE_SLIDING_WINDOW
+static _segment_q_t * match_segment(struct content_name * name)
+{
+    struct content_name * base = content_name_create(name->full_name);
+    content_name_removeComponent(base, base->num_components - 1);
+    int i = 0;
+    int found = 0;
+    _segment_q_t * seg = NULL;
+    pthread_mutex_lock(&_net.segments_lock);
+    for (i = 0; i < _net.segments->len; i++) {
+        seg = linked_list_get(_net.segments, i);
+        if (strcmp(base->full_name, seg->base->full_name) == 0) {
+            found = 1;
+            break;
+        }
+    }
+    if (found)
+        pthread_mutex_lock(&seg->mutex);
+    pthread_mutex_unlock(&_net.segments_lock);
+    content_name_delete(base);
+
+    if (found) return seg;
+    return NULL;
+}
+#endif
 
 static void * handle_interest(struct ccnu_interest_pkt * interest)
 {
@@ -234,13 +264,35 @@ static void * handle_data(struct ccnu_data_pkt * data)
         return NULL;
     }
 
+    PIT_refresh(pe);
+
     if (pe->registered) {
         /* we fulfilled a pit, we need to notify the waiter */
         /* no need to lock the pe, the pit_longest_match did it for us */
         *pe->obj = obj; /* hand them the data and wake them up*/
+
+        #ifdef CCNU_USE_SLIDING_WINDOW
+        _segment_q_t * seg = match_segment(obj->name);
+        if (seg) {
+            /* already locked */
+            pthread_mutex_unlock(pe->mutex);
+            linked_list_append(seg->rcv_chunks, pe);
+            seg->rcv_window++;
+            if (seg->rcv_window == seg->max_window) {
+                seg->rcv_window = 0;
+                pthread_cond_signal(&seg->cond);
+            }
+            pthread_mutex_unlock(&seg->mutex);
+        } else {
+            pthread_cond_signal(pe->cond);
+            pthread_mutex_unlock(pe->mutex);
+        }
+        #else
         pthread_cond_signal(pe->cond);
         pthread_mutex_unlock(pe->mutex);
-        free(pe); /* we're done with the handle */
+        free(pe);
+        #endif
+
     } else {
         /* we matched an interest rcvd over the net */
         rv = ccnudnb_fwd_data(obj, data->hops + 1);
@@ -250,4 +302,29 @@ static void * handle_data(struct ccnu_data_pkt * data)
     return NULL;
 }
 
+#ifdef CCNU_USE_SLIDING_WINDOW
+void ccnudnl_reg_segment(_segment_q_t * seg)
+{
+    pthread_mutex_lock(&_net.segments_lock);
+        linked_list_append(_net.segments, seg);
+    pthread_mutex_unlock(&_net.segments_lock);
+}
 
+void ccnudnl_unreg_segment(_segment_q_t * seg)
+{
+    pthread_mutex_lock(&_net.segments_lock);
+    int i;
+    int found = 0;
+    for (i = 0; i < _net.segments->len; i++) {
+        _segment_q_t * s = linked_list_get(_net.segments, i);
+        if (s == seg) {
+            found = 1;
+            break;
+        }
+    }
+
+    if (found)
+        linked_list_remove(_net.segments, i);
+    pthread_mutex_unlock(&_net.segments_lock);
+}
+#endif

@@ -12,11 +12,13 @@
 #include "content.h"
 #include "bloom_filter.h"
 #include "content_name.h"
+#include "linked_list.h"
 
 #define MSG_IPC_PUBLISH        1
-#define MSG_IPC_RETRIEVE       2
-#define MSG_IPC_SEQ_RETRIEVE   3
-#define MSG_IPC_CS_SUMMARY_REQ 4
+#define MSG_IPC_SEQ_PUBLISH    2
+#define MSG_IPC_RETRIEVE       3
+#define MSG_IPC_SEQ_RETRIEVE   4
+#define MSG_IPC_CS_SUMMARY_REQ 5
 
 inline void ccnu_did2sockpath(uint32_t daemonId, char * str, int size);
 
@@ -37,6 +39,19 @@ int ccnu_max_payload_size(struct content_name * name);
  * returns 0 on success
  **/
 int ccnu_publish(struct content_obj * content);
+
+/**
+ * ccnu_publishSeq
+ *      Publish a piece of segmented piece of content. The index_obj stores 
+ *      application specific metadata for the segment. The chunks list is a
+ *      list of chunks making up the segment.
+ *      The name of the index_obj is a prefix, which all the chunks should
+ *      share (although we don't check this right now!). The chunks have
+ *      an additional conent name component which is the sequence number.
+ *      i.e. /prefix/0, /prefix/1, ... /prefix/N 
+ * returns 0 on success
+ **/
+int ccnu_publishSeq(struct content_obj * index_obj, struct linked_list * chunks);
 
 /**
  * ccnu_retrieve

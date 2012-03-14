@@ -20,8 +20,19 @@ typedef struct {
     struct content_obj ** obj;
     int index;
     int registered;
-    struct timespec creation;
+    struct timespec expires;
 } _pit_entry_s; /* no touching */
+
+#ifdef CCNU_USE_SLIDING_WINDOW
+typedef struct {
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    int rcv_window;
+    int max_window;
+    struct linked_list * rcv_chunks;
+    struct content_name * base;
+} _segment_q_t;
+#endif
 
 struct pit;
 
@@ -47,12 +58,14 @@ PENTRY PIT_longest_match(struct content_name * name);
 /* returns 1 if the entry is expired */
 int PIT_is_expired(PENTRY _pe);
 
+long PIT_age(PENTRY _pe);
+
 /* removes an entry from the pit */
 void PIT_release(PENTRY _pe);
 
 void PIT_refresh(PENTRY _pe);
 
 /* Debugging */
-//void PIT_print();
+void PIT_print();
 
 #endif // CCNUD_PIT_H_INCLUDED

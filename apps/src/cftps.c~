@@ -66,7 +66,7 @@ int main(int argc, char ** argv)
 
 	char buffer[2048];
 	int n;
-	int chunk_id = 0;
+	int segment = 0;
 	int bytes_to_read;
 	struct linked_list * chunks = linked_list_init(NULL);
 	while (fileLen > 0) {
@@ -76,8 +76,8 @@ int main(int argc, char ** argv)
 			bytes_to_read = fileLen;
 		}
 		n = fread(buffer, 1, bytes_to_read, fp);
-		sprintf(str, "%s/%d", con_name, chunk_id);
-		printf("Creating chunk %d (name = %s), size = %d\n", chunk_id, str, n);
+		sprintf(str, "%s/%d", con_name, segment);
+		printf("Creating chunk %d (name = %s), size = %d\n", segment, str, n);
 		struct content_obj * chunk = malloc(sizeof(struct content_obj));
 		chunk->name = content_name_create(str);
 		chunk->size = n;
@@ -88,7 +88,7 @@ int main(int argc, char ** argv)
 		linked_list_append(chunks, chunk);
 
 		fileLen -= n;
-		chunk_id++;
+		segment++;
 	}
 
 	if (ccnu_publishSeq(&index, chunks) != 0) {
