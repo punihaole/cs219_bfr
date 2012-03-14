@@ -488,10 +488,22 @@ static int bloom()
             if (!bit_test(g_ccnumr.is_cluster_head, i - 1)) {
                 /* send our aggegated filter up the chain if we are not the next head */
                 create_bloom_msg(&msg, level, clusterId, level-1, parent_clusterId, distance, _cluster->agg_filter);
+                broadcast_bloom_msg(&msg);
+
+                //Send to neighboring cluster Ids
+                unsigned neighbors[3];
+                grid_3neighbors(level, clusterId, neighbors);
+                int k;
+                for (k = 0; k < 3; k++) {
+                    if (grid_distance(level, neighbors[k], g_ccnumr.x, g_ccnumr.y, &distance) != 0) {
+                        log_print(g_log, "bloom: failed to calculate distance to %u:%u",
+                                  level, neighbors[k]);
+                        continue;
+                    }
+                    create_bloom_msg(&msg, level, neighbors[k], level, parent_clusterId, distance, _cluster->agg_filter);
+                    broadcast_bloom_msg(&msg);
+                }
             }
-            ///@TODO send bloom msg to neighboring cluster heads
-            //create_bloom_msg(&msg, level, clusterId, level, neigh_clusterId, distance, filter);
-            broadcast_bloom_msg(&msg);
         } else {
             /* I am not the cluster head */
             struct bloom_msg msg;

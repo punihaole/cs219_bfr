@@ -131,6 +131,7 @@ struct content_obj * CS_get(struct content_name * name)
 
     if (!is_num(last_component)) {
         segment = (struct CS_segment * ) hash_get(_cs.table, name->full_name);
+        if (!segment) return NULL;
         return segment->index_chunk;
     } else {
         int chunk = atoi(last_component);
@@ -150,7 +151,7 @@ struct content_obj * CS_getSegment(struct content_name * prefix)
     struct CS_segment * segment;
     segment = (struct CS_segment * ) hash_get(_cs.table, prefix->full_name);
 
-    if (!segment) {
+    if (!segment || !segment->num_chunks) {
         return NULL;
     }
 

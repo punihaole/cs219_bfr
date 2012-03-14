@@ -146,3 +146,39 @@ int grid_dimensions(unsigned int level,
 
     return 0;
 }
+
+int grid_3neighbors(unsigned level, unsigned clusterId, unsigned neighborIds[])
+{
+    if (level == 0 || level > g_grid.levels) return -1;
+    if (!neighborIds) return -1;
+
+    if ((clusterId == 0) || (clusterId % 2) == 0) {
+        /* right neighbor */
+        neighborIds[0] = clusterId + 1;
+
+        if ((clusterId == 0) || ((int)floor((double)clusterId / pow(2.0, (double)level)) % 2) == 0) {
+            /* above and above left */
+            neighborIds[1] = clusterId + (int)pow(2.0, (double) level);
+            neighborIds[2] = clusterId + 1 + (int)pow(2.0, (double) level);
+        } else {
+            /* below and below left */
+            neighborIds[1] = clusterId - (int)pow(2.0, (double) level);
+            neighborIds[2] = clusterId + 1 - (int)pow(2.0, (double) level);
+        }
+    } else {
+        /* left neighbor */
+        neighborIds[0] = clusterId - 1;
+
+        if (((int)floor((double)clusterId / pow(2.0, (double)level)) % 2) == 0) {
+            /* above and above left */
+            neighborIds[1] = clusterId + (int)pow(2.0, (double) level);
+            neighborIds[2] = clusterId - 1 + (int)pow(2.0, (double) level);
+        } else {
+            /* below and below left */
+            neighborIds[1] = clusterId - (int)pow(2.0, (double) level);
+            neighborIds[2] = clusterId - 1 - (int)pow(2.0, (double) level);
+        }
+    }
+
+    return 0;
+}

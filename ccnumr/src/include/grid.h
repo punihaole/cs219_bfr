@@ -77,4 +77,11 @@ int grid_distance(unsigned int level, unsigned int clusterId,
 int grid_dimensions(unsigned int level,
                     double * width, double * height);
 
+/**
+ * grid_3neighbors
+ * Calculates our 3 neighbors in our sub-quadrant at whatever level.
+ * neighborIds is a list of unsigned ints of size 3!
+ **/
+int grid_3neighbors(unsigned level, unsigned clusterId, unsigned neighborIds[]);
+
 #endif // GRID_H_INCLUDED

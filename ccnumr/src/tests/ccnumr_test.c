@@ -20,6 +20,7 @@
 #include "bloom_filter.h"
 #include "linked_list.h"
 
+int neighborTest();
 int gridTest_2level();
 int netTest_lib();
 int bit_test1();
@@ -29,6 +30,12 @@ int bloom_vector_test();
 
 int test_suite()
 {
+    if (neighborTest() != 0) {
+        fprintf(stderr,"Failed.\n");
+    } else {
+        fprintf(stderr,"Success.\n");
+    }
+
     if (gridTest_2level() != 0) {
         fprintf(stderr,"Failed.\n");
     } else {
@@ -64,6 +71,34 @@ int test_suite()
     } else {
         fprintf(stderr,"Success.\n");
     }
+
+    return 0;
+}
+
+int neighborTest()
+{
+    fprintf(stderr,"Neighbor Test . . . ");
+    grid_init(3, 1000, 1000);
+    unsigned neighbors[3];
+    int i, j;
+
+    for (i = 0; i < 4; i++) {
+        grid_3neighbors(1, i, neighbors);
+        for (j = 0; j < 3; j++)
+            if (!((neighbors[j] != i) && (neighbors[j] >= 0) && (neighbors[j] < 4)))
+                return -1;
+    }
+
+/* Uncomment this fi you want to check by inspection...but it seems correct
+    for (i = 0; i < 16; i++) {
+        grid_3neighbors(2, i, neighbors);
+        printf("%d: ", i);
+        for (j = 0; j < 3; j++)
+            printf("%d ", neighbors[j]);
+
+        printf("\n");
+    }
+*/
 
     return 0;
 }
