@@ -500,7 +500,7 @@ static int bloom()
                                   level, neighbors[k]);
                         continue;
                     }
-                    create_bloom_msg(&msg, level, neighbors[k], level, parent_clusterId, distance, _cluster->agg_filter);
+                    create_bloom_msg(&msg, level, clusterId, level, neighbors[k], distance, _cluster->agg_filter);
                     broadcast_bloom_msg(&msg);
                 }
             }
@@ -512,6 +512,21 @@ static int bloom()
             /* we're sending a bloom msg to our own cluster head */
             create_bloom_msg(&msg, level, clusterId, level, clusterId, distance, filter);
             broadcast_bloom_msg(&msg);
+
+            //Send to neighboring cluster Ids
+            unsigned neighbors[3];
+            grid_3neighbors(level, clusterId, neighbors);
+            int k;
+            for (k = 0; k < 3; k++) {
+                if (grid_distance(level, neighbors[k], g_ccnumr.x, g_ccnumr.y, &distance) != 0) {
+                    log_print(g_log, "bloom: failed to calculate distance to %u:%u",
+                              level, neighbors[k]);
+                    continue;
+                }
+                create_bloom_msg(&msg, level, clusterId, level, neighbors[k], distance, filter);
+                broadcast_bloom_msg(&msg);
+            }
+
             break;
         }
     }
