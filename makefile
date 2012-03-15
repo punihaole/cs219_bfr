@@ -1,7 +1,11 @@
 LIB_DIR = lib
 BIN_DIR = bin
 
-all: $(LIB_DIR)/libcon.a $(LIB_DIR)/libccnumr.a $(LIB_DIR)/libccnu.a $(BIN_DIR)/ccnumrd $(BIN_DIR)/ccnud apps
+all: output_dirs $(LIB_DIR)/libcon.a $(LIB_DIR)/libccnumr.a $(LIB_DIR)/libccnu.a $(BIN_DIR)/ccnumrd $(BIN_DIR)/ccnud apps
+
+output_dirs:
+	mkdir -p $(LIB_DIR)
+	mkdir -p $(BIN_DIR)
 
 clean:
 	cd libcon && echo "cleaning libcon\n" && make clean;\
