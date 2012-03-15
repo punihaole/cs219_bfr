@@ -5,17 +5,17 @@ SRC = src
 TEST_SRC = src/tests
 OBJ = bin/obj
 
-all: output_dir cluster.o ccnumr.o ccnumr_listener.o ccnumr_net_listener.o ccnumrd.o distance_table.o grid.o ccnumrd_main.o strategy.o ccnumr_test.o daemon lib
+all: output_dir $(OBJ)/cluster.o $(OBJ)/ccnumr.o $(OBJ)/ccnumr_listener.o $(OBJ)/ccnumr_net_listener.o $(OBJ)/ccnumrd.o $(OBJ)/distance_table.o $(OBJ)/grid.o $(OBJ)/ccnumrd_main.o $(OBJ)/strategy.o $(OBJ)/ccnumr_test.o daemon lib
 
 output_dir:
 	mkdir -p $(OBJ)
 
-lib: output_dir ccnumr.o
+lib: output_dir $(OBJ)/ccnumr.o
 	ar rc libccnumr.a $(OBJ)/ccnumr.o ../lib/libcon.a
 	ranlib libccnumr.a
 
-daemon: output_dir cluster.o ccnumr.o ccnumr_listener.o ccnumr_net_listener.o ccnumrd.o distance_table.o grid.o ccnumrd_main.o strategy.o ccnumr_test.o
-	$(CC) $(CLAGS) $(OBJ)/*.o $(CLINK) -o ccnumrd
+daemon: output_dir $(OBJ)/cluster.o $(OBJ)/ccnumr.o $(OBJ)/ccnumr_listener.o $(OBJ)/ccnumr_net_listener.o $(OBJ)/ccnumrd.o $(OBJ)/distance_table.o $(OBJ)/grid.o $(OBJ)/ccnumrd_main.o $(OBJ)/strategy.o $(OBJ)/ccnumr_test.o
+	$(CC) $(CFLAGS) $(OBJ)/*.o $(CLINK) -o ccnumrd
 	
 clean:
 	rm -f $(SRC)/*~
@@ -23,32 +23,32 @@ clean:
 	rm -f ccnumrd
 	rm -f libccnumr.a
 
-ccnumr.o: $(SRC)/ccnumr.c
+$(OBJ)/ccnumr.o: $(SRC)/ccnumr.c
 	$(CC) $(CFLAGS) -c $(SRC)/ccnumr.c -o $(OBJ)/ccnumr.o
 
-ccnumr_listener.o: $(SRC)/ccnumr_listener.c grid.o ccnumr.o
+$(OBJ)/ccnumr_listener.o: $(SRC)/ccnumr_listener.c $(OBJ)/grid.o $(OBJ)/ccnumr.o
 	$(CC) $(CFLAGS) -c $(SRC)/ccnumr_listener.c -o $(OBJ)/ccnumr_listener.o
 
-ccnumr_net_listener.o: $(SRC)/ccnumr_net_listener.c ccnumr.o
+$(OBJ)/ccnumr_net_listener.o: $(SRC)/ccnumr_net_listener.c $(OBJ)/ccnumr.o
 	$(CC) $(CFLAGS) -c $(SRC)/ccnumr_net_listener.c -o $(OBJ)/ccnumr_net_listener.o
 
-ccnumrd.o: $(SRC)/ccnumrd.c ccnumr.o grid.o ccnumr_listener.o ccnumr_net_listener.o strategy.o
+$(OBJ)/ccnumrd.o: $(SRC)/ccnumrd.c $(OBJ)/ccnumr.o $(OBJ)/grid.o $(OBJ)/ccnumr_listener.o $(OBJ)/ccnumr_net_listener.o $(OBJ)/strategy.o
 	$(CC) $(CFLAGS) -c $(SRC)/ccnumrd.c -o $(OBJ)/ccnumrd.o
 
-grid.o: $(SRC)/grid.c
+$(OBJ)/grid.o: $(SRC)/grid.c
 	$(CC) $(CFLAGS) -c $(SRC)/grid.c -o $(OBJ)/grid.o
 
-ccnumrd_main.o: $(SRC)/ccnumrd_main.c ccnumr.o ccnumrd.o ccnumr_listener.o ccnumr_net_listener.o ccnumr_test.o strategy.o
+$(OBJ)/ccnumrd_main.o: $(SRC)/ccnumrd_main.c $(OBJ)/ccnumr.o $(OBJ)/ccnumrd.o $(OBJ)/ccnumr_listener.o $(OBJ)/ccnumr_net_listener.o $(OBJ)/ccnumr_test.o $(OBJ)/strategy.o
 	$(CC) $(CFLAGS) -c $(SRC)/ccnumrd_main.c -o $(OBJ)/ccnumrd_main.o
 
-strategy.o: $(SRC)/strategy.c ccnumr.o
+$(OBJ)/strategy.o: $(SRC)/strategy.c $(OBJ)/ccnumr.o
 	$(CC) $(CFLAGS) -c $(SRC)/strategy.c -o $(OBJ)/strategy.o
 
-ccnumr_test.o: $(TEST_SRC)/ccnumr_test.c ccnumr.o
+$(OBJ)/ccnumr_test.o: $(TEST_SRC)/ccnumr_test.c $(OBJ)/ccnumr.o
 	$(CC) $(CFLAGS) -c $(TEST_SRC)/ccnumr_test.c -o $(OBJ)/ccnumr_test.o
 
-cluster.o: $(SRC)/cluster.c ccnumrd.o
+$(OBJ)/cluster.o: $(SRC)/cluster.c $(OBJ)/ccnumrd.o
 	$(CC) $(CFLAGS) -c $(SRC)/cluster.c -o $(OBJ)/cluster.o
 
-distance_table.o: $(SRC)/distance_table.c
+$(OBJ)/distance_table.o: $(SRC)/distance_table.c
 	$(CC) $(CFLAGS) -c $(SRC)/distance_table.c -o $(OBJ)/distance_table.o

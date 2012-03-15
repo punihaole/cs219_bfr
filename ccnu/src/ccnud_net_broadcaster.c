@@ -10,19 +10,19 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 
+#include "ccnud_net_broadcaster.h"
+
 #include "ccnud.h"
 #include "ccnu_packet.h"
-#include "ccnud_net_broadcaster.h"
-#include "ccnud_net_listener.h"
-#include "synch_queue.h"
 #include "ccnud_constants.h"
-
-#include "net_buffer.h"
-#include "net_lib.h"
-#include "log.h"
+#include "ccnud_pit.h"
 
 #include "ccnumr.h"
 
+#include "log.h"
+#include "net_buffer.h"
+#include "net_lib.h"
+#include "synch_queue.h"
 #include "ts.h"
 
 extern struct log * g_log;
