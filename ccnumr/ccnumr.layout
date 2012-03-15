@@ -4,14 +4,20 @@
 	<File name="src/ccnumr.c" open="0" top="0" tabpos="0">
 		<Cursor position="294" topLine="75" />
 	</File>
-	<File name="src/ccnumr_net_listener.c" open="0" top="0" tabpos="0">
-		<Cursor position="0" topLine="101" />
+	<File name="src/ccnumr_net_listener.c" open="1" top="0" tabpos="1">
+		<Cursor position="271" topLine="41" />
 	</File>
 	<File name="src/ccnumrd.c" open="0" top="0" tabpos="0">
 		<Cursor position="1194" topLine="42" />
 	</File>
 	<File name="src/ccnumrd_main.c" open="0" top="0" tabpos="0">
 		<Cursor position="6943" topLine="211" />
+	</File>
+	<File name="src/grid.c" open="0" top="0" tabpos="0">
+		<Cursor position="4047" topLine="131" />
+	</File>
+	<File name="src/strategy.c" open="1" top="1" tabpos="2">
+		<Cursor position="19378" topLine="510" />
 	</File>
 	<File name="src/tests/ccnumr_test.c" open="0" top="0" tabpos="0">
 		<Cursor position="0" topLine="132" />

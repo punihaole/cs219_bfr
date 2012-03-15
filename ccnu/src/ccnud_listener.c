@@ -723,6 +723,7 @@ static int retrieve_segment(struct segment * seg)
     strncpy(str, seg->name->full_name, seg->name->len);
 
 #ifdef CCNU_USE_SLIDING_WINDOW
+///@TODO FIX THIS
     int i;
     int current_chunk = 0;
     int csthresh = max_window_size;

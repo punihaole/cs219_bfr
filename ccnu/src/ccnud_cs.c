@@ -131,15 +131,26 @@ struct content_obj * CS_get(struct content_name * name)
 
     if (!is_num(last_component)) {
         segment = (struct CS_segment * ) hash_get(_cs.table, name->full_name);
-        if (!segment) return NULL;
+        if (!segment) {
+            //log_print(g_log, "CS: could not find %s", name->full_name);
+            return NULL;
+        }
+        //log_print(g_log, "CS: returning %s", name->full_name);
         return segment->index_chunk;
     } else {
         int chunk = atoi(last_component);
         char prefix[MAX_NAME_LENGTH];
         strncpy(prefix, name->full_name, name->len - 1 - strlen(last_component));
-        prefix[name->len - strlen(last_component)] = '\0';
+        prefix[name->len - 1 - strlen(last_component)] = '\0';
         segment = (struct CS_segment * ) hash_get(_cs.table, prefix);
-        if (segment->num_chunks <= chunk) return NULL;
+        if (!segment) {
+            //log_print(g_log, "CS: could not find segment %s", prefix);
+            return NULL;
+        }
+        if (segment->num_chunks <= chunk) {
+            //log_print(g_log, "CS: could not find chunk %d in segment %s", chunk, prefix);
+            return NULL;
+        }
         return segment->chunks[chunk];
     }
 }
