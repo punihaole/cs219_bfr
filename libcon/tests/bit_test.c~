@@ -15,6 +15,9 @@ int main()
 	else
 		printf("failed %x\n", map->map[map->num_words-1]);
 
+	map->num_bits = 21;
+	printf("allSet = %d\n", bit_allSet(map));
+
 	map = bit_create(16);
 	for (i = 0; i < 16; i++)
 		bit_set(map, i);
@@ -115,4 +118,6 @@ int main()
 	b->map[3] = 0x00000000;
 
 	printf("diff = %d\n", bit_diff(a, b));
+
+	printf("num_set = %d\n", bit_numSet(a));
 }

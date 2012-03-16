@@ -3,6 +3,7 @@
 
 #include <pthread.h>
 
+#include "ccnud_constants.h"
 #include "content.h"
 #include "content_name.h"
 #include "linked_list.h"
@@ -20,7 +21,7 @@ typedef struct {
     struct content_obj ** obj;
     int index;
     int registered;
-    struct timespec expires;
+    struct timespec * expires;
 } _pit_entry_s; /* no touching */
 
 #ifdef CCNU_USE_SLIDING_WINDOW
@@ -28,7 +29,7 @@ typedef struct {
     pthread_mutex_t mutex;
     pthread_cond_t cond;
     int rcv_window;
-    int max_window;
+    int * max_window;
     struct linked_list * rcv_chunks;
     struct content_name * base;
 } _segment_q_t;

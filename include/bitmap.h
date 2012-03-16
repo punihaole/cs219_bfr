@@ -39,6 +39,9 @@ int bit_find(struct bitmap * map);
 /// Calculates the number of bits differing in 2 bitmap or -1 on failure.
 int bit_diff(struct bitmap * a, struct bitmap * b);
 
+/// Calculates the number of bits set in the bitmap
+int bit_numSet(struct bitmap * map);
+
 /// Returns 1 if all the bits are set
 int bit_allSet(struct bitmap * map);
 

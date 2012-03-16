@@ -3,19 +3,17 @@ CFLAGS = -O2 -Wall -iquote ../include
 SRC = src
 OBJ = obj
 
-libcon: output_dir $(OBJ)/bitmap.o $(OBJ)/bloom_filter.o $(OBJ)/content.o $(OBJ)/content_name.o $(OBJ)/hash.o $(OBJ)/hashtable.o $(OBJ)/key_list.o $(OBJ)/linked_list.o $(OBJ)/log.o $(OBJ)/net_buffer.o $(OBJ)/net_lib.o $(OBJ)/synch_queue.o $(OBJ)/thread_pool.o $(OBJ)/ts.o lib
+libcon.a: $(OBJ) $(OBJ)/bitmap.o $(OBJ)/bloom_filter.o $(OBJ)/content.o $(OBJ)/content_name.o $(OBJ)/hash.o $(OBJ)/hashtable.o $(OBJ)/key_list.o $(OBJ)/linked_list.o $(OBJ)/log.o $(OBJ)/net_buffer.o $(OBJ)/net_lib.o $(OBJ)/synch_queue.o $(OBJ)/thread_pool.o $(OBJ)/ts.o lib
+	ar rc libcon.a $(OBJ)/*.o
+	ranlib libcon.a
 
 clean:
 	rm -f $(SRC)/*~
 	rm -rf $(OBJ)
 	rm -f libcon.a
 
-output_dir:
+$(OBJ):
 	mkdir -p $(OBJ)
-
-lib: output_dir $(OBJ)/bitmap.o $(OBJ)/bloom_filter.o $(OBJ)/content.o $(OBJ)/content_name.o $(OBJ)/hash.o $(OBJ)/hashtable.o $(OBJ)/key_list.o $(OBJ)/linked_list.o $(OBJ)/log.o $(OBJ)/net_buffer.o $(OBJ)/net_lib.o $(OBJ)/synch_queue.o $(OBJ)/thread_pool.o $(OBJ)/ts.o
-	ar rc libcon.a $(OBJ)/*.o
-	ranlib libcon.a
 
 $(OBJ)/bitmap.o: $(SRC)/bitmap.c
 	$(CC) $(CFLAGS) -c $(SRC)/bitmap.c -o $(OBJ)/bitmap.o
@@ -47,7 +45,7 @@ $(OBJ)/log.o: $(SRC)/log.c
 $(OBJ)/net_buffer.o: $(SRC)/net_buffer.c $(OBJ)/net_lib.o
 	$(CC) $(CFLAGS) -c $(SRC)/net_buffer.c -o $(OBJ)/net_buffer.o
 
-net_lib.o: $(SRC)/net_lib.c
+$(OBJ)/net_lib.o: $(SRC)/net_lib.c
 	$(CC) $(CFLAGS) -c $(SRC)/net_lib.c -o $(OBJ)/net_lib.o
 
 $(OBJ)/synch_queue.o: $(SRC)/synch_queue.c

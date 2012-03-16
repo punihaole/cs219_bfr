@@ -1,5 +1,6 @@
 #include <sys/time.h>
 #include <time.h>
+#include <math.h>
 
 #include "ts.h"
 
@@ -48,5 +49,15 @@ int ts_compare(struct timespec * a, struct timespec * b)
 		return a->tv_sec - b->tv_sec;
 
 	return a->tv_nsec - b->tv_nsec;
+}
+
+long ts_mselapsed(struct timespec * a, struct timespec * b)
+{
+	long sec_elapsed = abs(a->tv_sec - b->tv_sec);
+	long ns_elapsed = abs(a->tv_nsec - b->tv_nsec);
+
+	long ms_elapsed = ceil(ns_elapsed / 1000000.0) + (sec_elapsed * 1000);
+
+	return ms_elapsed;
 }
 

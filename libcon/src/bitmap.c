@@ -95,12 +95,45 @@ int bit_diff(struct bitmap * a, struct bitmap * b)
 
 	for (i = 0; i < a->num_words; i++) {
 		xor = a->map[i] ^ b->map[i];
-		/* Brian Kernighan's bit count twiddle */
-		for (c = 0; xor; c++)
-			xor &= xor - 1;
-		set += c;
+		
+		#if __x86_64__
+			c =  ((xor & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+			c += (((xor & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 
+				 0x1f;
+			c += ((xor >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+			set += c;
+		#else
+			/* Brian Kernighan's bit count twiddle */
+			for (c = 0; xor; c++)
+				xor &= xor - 1;
+			set += c;
+		#endif
 	}
 	
+	return set;
+}
+
+int bit_numSet(struct bitmap * map)
+{
+	unsigned int set = 0;
+	unsigned int c, v;
+	int i;
+	for (i = 0; i < map->num_words; i++) {
+		#if __x86_64__
+			v = map->map[i];
+			c =  ((v & 0xfff) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+			c += (((v & 0xfff000) >> 12) * 0x1001001001001ULL & 0x84210842108421ULL) % 
+				 0x1f;
+			c += ((v >> 24) * 0x1001001001001ULL & 0x84210842108421ULL) % 0x1f;
+			set += c;
+		#else
+			/* Brian Kernighan's bit count twiddle */
+			for (c = 0; map->map[i]; c++)
+				map->map[i] &= map->map[i] - 1;
+			set += c;
+		#endif
+	}
+
 	return set;
 }
 

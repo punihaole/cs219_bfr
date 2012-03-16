@@ -5,16 +5,16 @@ SRC = src
 TEST_SRC = src/tests
 OBJ = bin/obj
 
-all: output_dir $(OBJ)/cluster.o $(OBJ)/ccnumr.o $(OBJ)/ccnumr_listener.o $(OBJ)/ccnumr_net_listener.o $(OBJ)/ccnumrd.o $(OBJ)/distance_table.o $(OBJ)/grid.o $(OBJ)/ccnumrd_main.o $(OBJ)/strategy.o $(OBJ)/ccnumr_test.o daemon lib
+all: $(OBJ) $(OBJ)/cluster.o $(OBJ)/ccnumr.o $(OBJ)/ccnumr_listener.o $(OBJ)/ccnumr_net_listener.o $(OBJ)/ccnumrd.o $(OBJ)/distance_table.o $(OBJ)/grid.o $(OBJ)/ccnumrd_main.o $(OBJ)/strategy.o $(OBJ)/ccnumr_test.o ccnumrd libccnumr.a
 
-output_dir:
+$(OBJ):
 	mkdir -p $(OBJ)
 
-lib: output_dir $(OBJ)/ccnumr.o
+libccnumr.a: $(OBJ) $(OBJ)/ccnumr.o
 	ar rc libccnumr.a $(OBJ)/ccnumr.o ../lib/libcon.a
 	ranlib libccnumr.a
 
-daemon: output_dir $(OBJ)/cluster.o $(OBJ)/ccnumr.o $(OBJ)/ccnumr_listener.o $(OBJ)/ccnumr_net_listener.o $(OBJ)/ccnumrd.o $(OBJ)/distance_table.o $(OBJ)/grid.o $(OBJ)/ccnumrd_main.o $(OBJ)/strategy.o $(OBJ)/ccnumr_test.o
+ccnumrd: $(OBJ) $(OBJ)/cluster.o $(OBJ)/ccnumr.o $(OBJ)/ccnumr_listener.o $(OBJ)/ccnumr_net_listener.o $(OBJ)/ccnumrd.o $(OBJ)/distance_table.o $(OBJ)/grid.o $(OBJ)/ccnumrd_main.o $(OBJ)/strategy.o $(OBJ)/ccnumr_test.o
 	$(CC) $(CFLAGS) $(OBJ)/*.o $(CLINK) -o ccnumrd
 	
 clean:

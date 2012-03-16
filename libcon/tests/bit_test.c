@@ -118,4 +118,7 @@ int main()
 	b->map[3] = 0x00000000;
 
 	printf("diff = %d\n", bit_diff(a, b));
+
+	printf("num_set = %d\n", bit_numSet(a));
+	printf("num_set = %d\n", bit_numSet(b));
 }

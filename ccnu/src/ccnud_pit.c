@@ -126,7 +126,7 @@ PENTRY PIT_get_handle(struct content_name * name)
     ts_fromnow(&g_pit.pit_table[index].created);
     g_pit.pit_table[index].expires = g_pit.pit_table[index].created;
     ts_addms(&g_pit.pit_table[index].expires, g_pit.pit_lifetime_ms);
-    pe->expires = g_pit.pit_table[index].expires;
+    pe->expires = &g_pit.pit_table[index].expires;
     g_pit.pit_table[index].name = name;
     pe->index = index;
     g_pit.pit_table[index].registered = pe->registered = 1;
@@ -194,7 +194,9 @@ PENTRY PIT_search(struct content_name * name)
         pe->obj = &g_pit.pit_table[i].obj;
         pe->index = i;
         pe->registered = g_pit.pit_table[i].registered;
+        pe->expires = &g_pit.pit_table[i].expires;
         pthread_mutex_unlock(&g_pit.pit_lock);
+        pthread_mutex_lock(&g_pit.pit_table[i].mutex);
         return pe;
     } else {
         pthread_mutex_unlock(&g_pit.pit_lock);
@@ -223,16 +225,16 @@ PENTRY PIT_longest_match(struct content_name * name)
             break;
     }
     pthread_mutex_unlock(&g_pit.pit_lock);
-    pthread_mutex_lock(&g_pit.pit_table[index].mutex);
 
     if (index != -1) {
+        pthread_mutex_lock(&g_pit.pit_table[index].mutex);
         PENTRY pe = (PENTRY) malloc(sizeof(_pit_entry_s));
         pe->mutex = &g_pit.pit_table[index].mutex;
         pe->cond = &g_pit.pit_table[index].cond;
         pe->obj = &g_pit.pit_table[index].obj;
-        pe->index = i;
+        pe->index = index;
         pe->registered = g_pit.pit_table[index].registered;
-        pe->expires = g_pit.pit_table[index].expires;
+        pe->expires = &g_pit.pit_table[index].expires;
         return pe;
     } else {
         return NULL;
@@ -254,11 +256,11 @@ void PIT_release(PENTRY _pe)
 
 void PIT_refresh(PENTRY _pe)
 {
-    if (!_pe) return;
+    if (!_pe || _pe->index < 0) return;
 
-    ts_fromnow(&g_pit.pit_table[_pe->index].expires);
+    ts_fromnow(&g_pit.pit_table[_pe->index].created);
+    memcpy(&g_pit.pit_table[_pe->index].expires, &g_pit.pit_table[_pe->index].created, sizeof(struct timespec));
     ts_addms(&g_pit.pit_table[_pe->index].expires, g_pit.pit_lifetime_ms);
-    _pe->expires = g_pit.pit_table[_pe->index].expires;
 }
 
 int PIT_is_expired(PENTRY _pe)
@@ -278,8 +280,8 @@ long PIT_age(PENTRY _pe)
     struct timespec now;
     ts_fromnow(&now);
 
-    long sec = g_pit.pit_table[_pe->index].created.tv_sec;
-    return now.tv_sec - sec;
+    long ms = ts_mselapsed(&g_pit.pit_table[_pe->index].created, &now);
+    return ms;
 }
 
 void PIT_print()

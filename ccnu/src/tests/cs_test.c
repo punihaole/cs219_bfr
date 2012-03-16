@@ -8,16 +8,6 @@
 #include "content.h"
 #include "hash.h"
 
-static int is_num(char * component)
-{
-    while (*component) {
-        if (!isdigit(*component++)) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
 int cs_test()
 {
 	CS_init(OLDEST, 0.02);
@@ -48,19 +38,13 @@ int cs_test()
 		exit(EXIT_FAILURE);
 	}*/
 
-    struct content_name * name = content_name_create("/music/0");
-    char * last_component = content_name_getComponent(name, name->num_components - 1);
-    if (!is_num(last_component)) {
-        printf("not a num\n");
-        exit(EXIT_SUCCESS);
-    }
-	char prefix[MAX_NAME_LENGTH];
-	printf("name->len = %d, strlen(last_comp) = %d\n", name->len, (int)strlen(last_component));
-    strncpy(prefix, name->full_name, name->len - 1 - strlen(last_component));
-    prefix[name->len - 1 - strlen(last_component)] = '\0';
-    printf("prefix = %s, name = %s\n", prefix, name->full_name);
-    int chunk = atoi(last_component);
-    printf("chunk = %d\n", chunk);
+    struct content_name * name = content_name_create("/music/top/40/ssb/1");
+
+    printf("is segmeneted = %d\n", content_is_segmented(name));
+	char * prefix = content_prefix(name);
+	printf("prefix = %s\n", prefix);
+    int seq_no = content_seq_no(name);
+    printf("chunk = %d\n", seq_no);
 
     exit(EXIT_SUCCESS);
 }

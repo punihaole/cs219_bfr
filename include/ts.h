@@ -22,4 +22,6 @@ void ts_adds(struct timespec * ts, long s);
  */
 int ts_compare(struct timespec * a, struct timespec * b);
 
+long ts_mselapsed(struct timespec * a, struct timespec * b);
+
 #endif //_TS_H_INCLUDED_

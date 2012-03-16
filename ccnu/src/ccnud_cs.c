@@ -1,13 +1,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <ctype.h>
 
 #include "ccnud_cs.h"
 #include "hash.h"
 #include "ccnud_constants.h"
 #include "log.h"
 #include "linked_list.h"
+#include "bitmap.h"
 
 struct CS {
     struct hashtable * table;
@@ -19,6 +19,7 @@ struct CS_segment {
     struct content_obj * index_chunk;
     struct content_obj ** chunks;
     int num_chunks;
+    struct bitmap * valid;
 };
 
 struct CS _cs;
@@ -78,15 +79,51 @@ int CS_init(evict_policy_t ep, double p)
 
 int CS_put(struct content_obj * content)
 {
-    struct CS_segment * segment = malloc(sizeof(struct CS_segment));
-    /* this is a content matching a prefix */
-    char * key = malloc(strlen(content->name->full_name));
-    strcpy(key, content->name->full_name);
-    segment->index_chunk = content;
-    segment->chunks = NULL;
-    segment->num_chunks = 0;
+    if (content_is_segmented(content->name)) {
+        struct CS_segment * segment = NULL;
+        segment = (struct CS_segment * ) hash_get(_cs.table, content_prefix(content->name));
+        if (!segment) {
+            /* don't store segmented chunks we haven't seen ? */
+            return -1;
+        }
+        int seq_no = content_seq_no(content->name);
 
-    hash_put(_cs.table, key, (void * ) segment);
+        if (seq_no >= segment->num_chunks) {
+            segment->chunks = realloc(segment->chunks, sizeof(struct content_obj * ) * (seq_no + 1));
+            segment->num_chunks = seq_no + 1;
+            segment->chunks[seq_no] = content;
+            struct bitmap * larger = bit_create(segment->num_chunks);
+            memcpy(larger->map, segment->valid->map, segment->valid->num_words);
+            bit_destroy(segment->valid);
+            segment->valid = larger;
+            bit_set(larger, seq_no);
+        } else {
+            if (bit_test(segment->valid, seq_no)) {
+                content_obj_destroy(segment->chunks[seq_no]);
+            }
+            segment->chunks[seq_no] = content;
+            bit_set(segment->valid, seq_no);
+        }
+
+    } else {
+        struct CS_segment * segment;
+        segment = (struct CS_segment * ) hash_get(_cs.table, content_prefix(content->name));
+        if (!segment) {
+            segment = malloc(sizeof(struct CS_segment));
+            /* this is a content matching a prefix */
+            char * key = malloc(strlen(content->name->full_name));
+            strcpy(key, content->name->full_name);
+            segment->index_chunk = content;
+            segment->chunks = NULL;
+            segment->num_chunks = -1;
+            segment->valid = bit_create(0);
+            hash_put(_cs.table, key, (void * ) segment);
+        } else {
+            if (segment->index_chunk)
+                content_obj_destroy(segment->index_chunk);
+            segment->index_chunk = content;
+        }
+    }
 
     return 0;
 }
@@ -102,9 +139,11 @@ int CS_putSegment(struct content_obj * prefix_obj, struct linked_list * content_
     segment->index_chunk = prefix_obj;
     segment->num_chunks = content_chunks->len;
     segment->chunks = malloc(sizeof(struct content_obj * ) * segment->num_chunks);
+    segment->valid = bit_create(segment->num_chunks);
 
     int i = 0;
     while (content_chunks->len) {
+        bit_set(segment->valid, i);
         segment->chunks[i++] = linked_list_remove(content_chunks, 0);
     }
 
@@ -112,24 +151,13 @@ int CS_putSegment(struct content_obj * prefix_obj, struct linked_list * content_
     return 0;
 }
 
-static int is_num(char * component)
-{
-    while (*component) {
-        if (!isdigit(*component++)) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
 struct content_obj * CS_get(struct content_name * name)
 {
     if (!name) return NULL;
 
-    char * last_component = content_name_getComponent(name, name->num_components - 1);
     struct CS_segment * segment = NULL;
 
-    if (!is_num(last_component)) {
+    if (!content_is_segmented(name)) {
         segment = (struct CS_segment * ) hash_get(_cs.table, name->full_name);
         if (!segment) {
             //log_print(g_log, "CS: could not find %s", name->full_name);
@@ -138,11 +166,10 @@ struct content_obj * CS_get(struct content_name * name)
         //log_print(g_log, "CS: returning %s", name->full_name);
         return segment->index_chunk;
     } else {
-        int chunk = atoi(last_component);
-        char prefix[MAX_NAME_LENGTH];
-        strncpy(prefix, name->full_name, name->len - 1 - strlen(last_component));
-        prefix[name->len - 1 - strlen(last_component)] = '\0';
+        int chunk = content_seq_no(name);
+        char * prefix = content_prefix(name);
         segment = (struct CS_segment * ) hash_get(_cs.table, prefix);
+        free(prefix);
         if (!segment) {
             //log_print(g_log, "CS: could not find segment %s", prefix);
             return NULL;
@@ -162,7 +189,7 @@ struct content_obj * CS_getSegment(struct content_name * prefix)
     struct CS_segment * segment;
     segment = (struct CS_segment * ) hash_get(_cs.table, prefix->full_name);
 
-    if (!segment || !segment->num_chunks) {
+    if (!segment || segment->num_chunks < 0) {
         return NULL;
     }
 
@@ -204,7 +231,6 @@ int CS_summary(struct bloom ** filter_ptr)
 unsigned int random_evict(unsigned int *candidates, unsigned int len)
 {
     int evict = candidates[rand() % len];
-    log_print(g_log, "CS: evicting %d (criteria: random)", evict);
     return evict;
 }
 
@@ -227,6 +253,5 @@ unsigned int oldest_evict(unsigned int * candidates, unsigned int len)
         }
     }
 
-    log_print(g_log, "CS: evicting %d (criteria: oldest)", candidates[oldest_i]);
     return candidates[oldest_i];
 }

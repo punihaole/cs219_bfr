@@ -5,9 +5,9 @@ SRC = src
 TEST_SRC = src/tests
 OBJ = bin/obj
 
-all: output_dir $(OBJ)/ccnu.o $(OBJ)/ccnud.o $(OBJ)/ccnu_net_test.o $(OBJ)/ccnud_listener.o $(OBJ)/ccnud_net_broadcaster.o $(OBJ)/ccnud_net_listener.o $(OBJ)/ccnud_cs.o $(OBJ)/ccnud_pit.o lib daemon
+all: $(OBJ) $(OBJ)/ccnu.o $(OBJ)/ccnud.o $(OBJ)/ccnu_net_test.o $(OBJ)/ccnud_listener.o $(OBJ)/ccnud_net_broadcaster.o $(OBJ)/ccnud_net_listener.o $(OBJ)/ccnud_cs.o $(OBJ)/ccnud_pit.o libccnu.a ccnud
 
-daemon: output_dir $(OBJ)/ccnud.o
+ccnud: bin/obj $(OBJ)/ccnud.o
 	$(CC) $(CFLAGS) $(OBJ)/*.o $(CLINK) -o ccnud
 	
 clean:
@@ -16,10 +16,10 @@ clean:
 	rm -f ccnud
 	rm -f libccnu.a
 
-output_dir:
+$(OBJ):
 	mkdir -p $(OBJ)
 
-lib: output_dir $(OBJ)/ccnu.o
+libccnu.a: $(OBJ) $(OBJ)/ccnu.o
 	ar rc libccnu.a $(OBJ)/ccnu.o ../lib/libcon.a
 	ranlib libccnu.a
 	cp -p libccnu.a src/tests/libccnu.a

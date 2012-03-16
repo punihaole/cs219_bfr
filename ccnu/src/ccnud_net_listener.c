@@ -13,6 +13,7 @@
 
 #include "ccnu.h"
 #include "ccnud.h"
+#include "ccnud_constants.h"
 #include "ccnud_cs.h"
 #include "ccnud_pit.h"
 #include "ccnud_net_broadcaster.h"
@@ -249,8 +250,10 @@ static void * handle_data(struct ccnu_data_pkt * data)
     obj->size = data->payload_len;
     obj->data = data->payload;
 
-	/* update the forwarding table in the routing daemon */
-	//ccnumr_sendDistance(obj->name, data->hops);
+	/* update the forwarding table in the routing daemon (if prefix) */
+	if (!content_is_segmented(obj->name)) {
+	    ccnumr_sendDistance(obj->name, data->hops);
+	}
 
     int rv;
     if ((rv = CS_put(obj)) != 0) {
@@ -258,19 +261,17 @@ static void * handle_data(struct ccnu_data_pkt * data)
     }
 
     /* check if it fulfills a registered interest */
-    PENTRY pe = PIT_longest_match(obj->name);
+    PENTRY pe = PIT_search(obj->name);
     if (!pe) {
         /* unsolicited data */
         return NULL;
     }
 
     PIT_refresh(pe);
-
     if (pe->registered) {
         /* we fulfilled a pit, we need to notify the waiter */
         /* no need to lock the pe, the pit_longest_match did it for us */
         *pe->obj = obj; /* hand them the data and wake them up*/
-
         #ifdef CCNU_USE_SLIDING_WINDOW
         _segment_q_t * seg = match_segment(obj->name);
         if (seg) {
@@ -278,7 +279,7 @@ static void * handle_data(struct ccnu_data_pkt * data)
             pthread_mutex_unlock(pe->mutex);
             linked_list_append(seg->rcv_chunks, pe);
             seg->rcv_window++;
-            if (seg->rcv_window == seg->max_window) {
+            if (seg->rcv_window >= *seg->max_window / 2) {
                 seg->rcv_window = 0;
                 pthread_cond_signal(&seg->cond);
             }
@@ -286,6 +287,7 @@ static void * handle_data(struct ccnu_data_pkt * data)
         } else {
             pthread_cond_signal(pe->cond);
             pthread_mutex_unlock(pe->mutex);
+            free(pe);
         }
         #else
         pthread_cond_signal(pe->cond);
