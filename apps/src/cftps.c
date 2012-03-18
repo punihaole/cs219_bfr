@@ -86,12 +86,6 @@ int main(int argc, char ** argv)
 		chunk->timestamp = ts.tv_sec;
 		memcpy(chunk->data, buffer, n);
 
-	int i;
-		for (i  = 0; i < n; i++) {
-			printf("%c", chunk->data[i]);
-		}
-	printf("\n");
-	
 		linked_list_append(chunks, chunk);
 
 		fileLen -= n;
