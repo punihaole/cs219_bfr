@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
                 break;
             case 'p':
                 p = atof(optarg);
-                if (p >= 1) {
+                if (p >= 1 || p == 0) {
                     fprintf(stderr, "p must be 0 < p < 1, defaulting to %1.4f\n", DEFAULT_P);
                     p = DEFAULT_P;
                 } else {

@@ -2,7 +2,7 @@
 #define CCNUD_CONSTANTS_H_INCLUDED
 
 /* CS */
-#define CS_SIZE 65536
+#define CS_SIZE 500
 #define DEFAULT_P 0.02 /* false positive probability */
 
 /* PIT */

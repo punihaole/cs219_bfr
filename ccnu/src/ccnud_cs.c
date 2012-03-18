@@ -71,8 +71,7 @@ int CS_init(evict_policy_t ep, double p)
     int rem = _cs.summary_size % 8;
     /* round to nearest 8 since this is the number of bits for bloom filter */
     _cs.summary_size += (8 - rem);
-    _cs.summary_size = (_cs.summary_size >> 3);
-    log_print(g_log, "calculated cs summary Bloom filter size = %d", _cs.summary_size);
+    log_print(g_log, "calculated cs summary Bloom filter size = %d bits", _cs.summary_size);
 
     return 0;
 }
