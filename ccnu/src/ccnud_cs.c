@@ -160,10 +160,8 @@ struct content_obj * CS_get(struct content_name * name)
     if (!content_is_segmented(name)) {
         segment = (struct CS_segment * ) hash_get(_cs.table, name->full_name);
         if (!segment) {
-            //log_print(g_log, "CS: could not find %s", name->full_name);
             return NULL;
         }
-        //log_print(g_log, "CS: returning %s", name->full_name);
         return segment->index_chunk;
     } else {
         int chunk = content_seq_no(name);
@@ -171,11 +169,9 @@ struct content_obj * CS_get(struct content_name * name)
         segment = (struct CS_segment * ) hash_get(_cs.table, prefix);
         free(prefix);
         if (!segment) {
-            //log_print(g_log, "CS: could not find segment %s", prefix);
             return NULL;
         }
         if (segment->num_chunks <= chunk) {
-            //log_print(g_log, "CS: could not find chunk %d in segment %s", chunk, prefix);
             return NULL;
         }
         return segment->chunks[chunk];
@@ -207,6 +203,7 @@ struct content_obj * CS_getSegment(struct content_name * prefix)
         size += chunk->size;
     }
     all->size = size;
+
     return all;
 }
 

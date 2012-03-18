@@ -5,12 +5,12 @@ SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
 
-all: $(BIN_DIR) $(OBJ_DIR) $(BIN_DIR)/consumer_simple $(BIN_DIR)/producer_simple $(BIN_DIR)/getsummary $(BIN_DIR)/cftp $(BIN_DIR)/cftps
+all: $(BIN_DIR) $(OBJ_DIR) $(BIN_DIR)/gchunk $(BIN_DIR)/pchunk $(BIN_DIR)/getsummary $(BIN_DIR)/cftp $(BIN_DIR)/cftps
 
 clean:
 	rm -f $(SRC_DIR)/*~
-	rm -f $(OBJ_DIR)
-	rm -f $(BIN_DIR)
+	rm -rf $(OBJ_DIR)
+	rm -rf $(BIN_DIR)
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
@@ -18,11 +18,11 @@ $(BIN_DIR):
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
 
-$(BIN_DIR)/consumer_simple: $(OBJ_DIR)/consumer_simple.o
-	$(CC) $(CFLAGS) $(OBJ_DIR)/consumer_simple.o $(CLINK) -o $(BIN_DIR)/consumer_simple
+$(BIN_DIR)/gchunk: $(OBJ_DIR)/gchunk.o
+	$(CC) $(CFLAGS) $(OBJ_DIR)/gchunk.o $(CLINK) -o $(BIN_DIR)/gchunk
 
-$(BIN_DIR)/producer_simple: $(OBJ_DIR)/producer_simple.o
-	$(CC) $(CFLAGS) $(OBJ_DIR)/producer_simple.o $(CLINK) -o $(BIN_DIR)/producer_simple
+$(BIN_DIR)/pchunk: $(OBJ_DIR)/pchunk.o
+	$(CC) $(CFLAGS) $(OBJ_DIR)/pchunk.o $(CLINK) -o $(BIN_DIR)/pchunk
 
 $(BIN_DIR)/getsummary: $(OBJ_DIR)/getsummary.o
 	$(CC) $(CFLAGS) $(OBJ_DIR)/getsummary.o $(CLINK) -o $(BIN_DIR)/getsummary

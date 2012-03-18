@@ -78,12 +78,19 @@ int main(int argc, char ** argv)
 		n = fread(buffer, 1, bytes_to_read, fp);
 		sprintf(str, "%s/%d", con_name, chunk_id);
 		printf("Creating chunk %d (name = %s), size = %d\n", chunk_id, str, n);
+	
 		struct content_obj * chunk = malloc(sizeof(struct content_obj));
 		chunk->name = content_name_create(str);
 		chunk->size = n;
 		chunk->data = malloc(n);
 		chunk->timestamp = ts.tv_sec;
 		memcpy(chunk->data, buffer, n);
+
+	int i;
+		for (i  = 0; i < n; i++) {
+			printf("%c", chunk->data[i]);
+		}
+	printf("\n");
 	
 		linked_list_append(chunks, chunk);
 

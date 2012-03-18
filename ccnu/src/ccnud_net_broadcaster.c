@@ -45,7 +45,7 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
     int rv = -1;
 
     struct net_buffer buf;
-    net_buffer_init(MAX_PACKET_SIZE, &buf);
+    net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
     PENTRY pe = NULL;
     uint8_t packet_type = PACKET_TYPE_INTEREST;
 
@@ -169,7 +169,7 @@ int ccnudnb_fwd_interest(struct ccnu_interest_pkt * interest)
     if (!interest || !interest->name) return -1;
 
     struct net_buffer buf;
-    net_buffer_init(MAX_PACKET_SIZE, &buf);
+    net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
 
     net_buffer_putByte(&buf, PACKET_TYPE_INTEREST);
     net_buffer_putByte(&buf, interest->ttl);
@@ -194,7 +194,7 @@ int ccnudnb_fwd_data(struct content_obj * content, int hops_taken)
     if (!content || !content->name || !content->data) return -1;
 
     struct net_buffer buf;
-    net_buffer_init(MAX_PACKET_SIZE, &buf);
+    net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
 
     net_buffer_putByte(&buf, PACKET_TYPE_DATA);
     net_buffer_putByte(&buf, hops_taken);

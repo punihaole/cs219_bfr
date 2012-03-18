@@ -695,9 +695,9 @@ static int broadcast_bloom_msg(struct bloom_msg * msg)
 
     struct net_buffer buf;
     //net_buffer_init(1024, &buf);
-    buf.buf = (uint8_t * ) malloc(MAX_PACKET_SIZE);
+    buf.buf = (uint8_t * ) malloc(BFR_MAX_PACKET_SIZE);
     buf.buf_ptr = buf.buf;
-    buf.size = MAX_PACKET_SIZE;
+    buf.size = BFR_MAX_PACKET_SIZE;
     /* pack the header */
     int rv = 0;
     net_buffer_putByte(&buf, MSG_NET_BLOOMFILTER_UPDATE);

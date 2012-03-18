@@ -453,7 +453,7 @@
 	"ccnumrd.h"
 	"net_lib.h"
 
-1331820668 source:/home/tom/projects/cs219_ccnumr/ccnumr/src/ccnumr_net_listener.c
+1332032603 source:/home/tom/projects/cs219_ccnumr/ccnumr/src/ccnumr_net_listener.c
 	<stdlib.h>
 	<errno.h>
 	<pthread.h>
@@ -469,6 +469,7 @@
 	"ccnumr.h"
 	"ccnumrd.h"
 	"net_lib.h"
+	"net_buffer.h"
 	"ccnumr_net_listener.h"
 	"synch_queue.h"
 	"log.h"
@@ -501,7 +502,7 @@
 	"ccnu.h"
 	"distance_table.h"
 
-1331256147 source:/home/tom/projects/cs219_ccnumr/ccnumr/src/ccnumrd_main.c
+1332014721 source:/home/tom/projects/cs219_ccnumr/ccnumr/src/ccnumrd_main.c
 	<sys/types.h>
 	<sys/stat.h>
 	<errno.h>
@@ -552,7 +553,7 @@
 	<math.h>
 	<stdlib.h>
 
-1331769335 source:/home/tom/projects/cs219_ccnumr/ccnumr/src/strategy.c
+1332032648 source:/home/tom/projects/cs219_ccnumr/ccnumr/src/strategy.c
 	<stdlib.h>
 	<string.h>
 	<stdio.h>

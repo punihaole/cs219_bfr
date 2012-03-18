@@ -777,7 +777,7 @@ static int retrieve_segment(struct segment * seg)
             ccnudnb_fwd_interest(&chunk_window[i].intr);
             tx--;
             current_chunk++;
-            //log_print(g_log, "expressing new interest: %s", chunk_window[i].intr.name->full_name);
+            log_print(g_log, "expressing new interest: %s", chunk_window[i].intr.name->full_name);
         }
 
         pthread_mutex_lock(&seg_q.mutex);
@@ -807,9 +807,10 @@ static int retrieve_segment(struct segment * seg)
                 if (chunk_window[chunk_id].seq_no == 0) {
                     seg->obj->publisher = (*pe->obj)->publisher;
                     seg->obj->timestamp = (*pe->obj)->timestamp;
+                    seg->chunk_size = (*pe->obj)->size;
                 }
                 int offset = chunk_window[chunk_id].seq_no * seg->chunk_size;
-                memcpy(seg->obj->data+offset, (*pe->obj)->data, (*pe->obj)->size);
+                memcpy(&seg->obj->data[offset], (*pe->obj)->data, (*pe->obj)->size);
 
                 struct timespec now;
                 ts_fromnow(&now);
@@ -1103,6 +1104,7 @@ static void * seq_response(void * arg)
         send(sock, &rv, sizeof(uint32_t), 0);
         goto END_SEQ_RESP;
     }
+    int chunk_size = (chunks > 1) ? ccnu_max_payload_size(name) : file_len;
     content_name_removeComponent(name, name->num_components - 1);
 
     completed_jobs_t dld_segments;
@@ -1110,14 +1112,12 @@ static void * seq_response(void * arg)
 	pthread_cond_init(&dld_segments.cond, NULL);
 	dld_segments.completed = linked_list_init(free);
 
-    int chunk_size = ceil((double) file_len / (double)chunks);
     seg.name = name;
     seg.num_chunks = chunks;
     seg.opts = &opts;
-    seg.chunk_size = chunk_size;
+    seg.chunk_size = chunk_size - 1;
     seg.obj = malloc(sizeof(struct content_obj));
     seg.obj->name = name;
-    seg.obj->data = NULL;
     seg.obj->data = malloc(file_len);
     if (!seg.obj->data) {
         log_print(g_log, "retrieve_segment: failed to allocated %d bytes!", file_len);

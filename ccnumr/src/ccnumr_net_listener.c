@@ -14,6 +14,7 @@
 #include "ccnumr.h"
 #include "ccnumrd.h"
 #include "net_lib.h"
+#include "net_buffer.h"
 #include "ccnumr_net_listener.h"
 #include "synch_queue.h"
 
@@ -24,8 +25,6 @@ struct ccnumr_net_s {
 };
 
 struct ccnumr_net_s _net;
-
-int net_sendall(uint8_t * buff, int * len);
 
 int ccnumr_net_listener_init()
 {
@@ -55,75 +54,42 @@ void ccnumr_net_listener_close()
     close(_net.in_sock);
 }
 
-int ccnumr_net_recv(struct ccnumr_msg * msg)
+void * ccnumr_net_listener_service(void * arg)
 {
-    if (!msg) {
-        log_print(g_log, "ccnumr_net_recv: msg not initialized -- IGNORING!");
-        return -1;
-    }
+    prctl(PR_SET_NAME, "bfr_net", 0, 0, 0);
+    struct listener_args * net_args = (struct listener_args * )arg;
 
-    if (msg->payload.data) {
-        log_print(g_log, "ccnumr_net_recv: payload not null, need to reassign ptr.");
-    }
+    log_print(g_log, "bfr_net_listener_service: listening...");
+    struct ccnumr_msg * msg;
 
     int rcvd;
     struct sockaddr_in remote_addr;
-    socklen_t len = sizeof(remote_addr);
-
-    uint8_t buf[MAX_PACKET_SIZE];
-
-    rcvd = recvfrom(_net.in_sock, buf, sizeof(buf),
-                    0, (struct sockaddr * ) &remote_addr, &len);
-
-    /* transfer the header from the in buffer */
-    int offset = 0;
-    uint8_t type = getByte(buf+offset);
-    offset += sizeof(uint8_t);
-    uint32_t nodeId = getInt(buf+offset);
-    offset += sizeof(uint32_t);
-    uint32_t size = getInt(buf+offset);
-    offset += sizeof(uint32_t);
-
-    log_print(g_log, "ccnumr_net_recv: received %d bytes from %s:%d, msg type:%d.", rcvd,
-              inet_ntoa(remote_addr.sin_addr), ntohs(remote_addr.sin_port), type);
-
-    msg->hdr.type = type;
-    msg->hdr.nodeId = nodeId;
-    msg->hdr.payload_size = size;
-
-    int bytes = size * sizeof(uint8_t);
-    msg->payload.data = (uint8_t * ) malloc(bytes);
-
-    /* copy the payload */
-    memcpy(msg->payload.data, buf+offset, bytes);
-
-    return 0;
-}
-
-void * ccnumr_net_listener_service(void * arg)
-{
-    prctl(PR_SET_NAME, "net", 0, 0, 0);
-    struct listener_args * net_args = (struct listener_args * )arg;
-
-    log_print(g_log, "ccnumr_net_listener_service: listening...");
-    struct ccnumr_msg * msg;
-
+    struct net_buffer buf;
+    net_buffer_init(BFR_MAX_PACKET_SIZE, &buf);
 	while (1) {
-	    msg = (struct ccnumr_msg *) malloc(sizeof(struct ccnumr_msg));
-	    msg->payload.data = NULL;
+	    net_buffer_reset(&buf);
+	    rcvd = net_buffer_recv(&buf, _net.in_sock, &remote_addr);
 
-	    if (!msg) {
-            log_print(g_log, "malloc: %s. -- trying to stay alive!", strerror(errno));
-            sleep(5);
+	    if ((uint32_t) ntohl(remote_addr.sin_addr.s_addr) == g_ccnumr.nodeId) {
+            /* self msg */
             continue;
-	    }
-		if (ccnumr_net_recv(msg) < 0) {
-		    log_print(g_log, "ccnumr_net_listener_service: ccnumr_net_recv failed -- trying to stay alive!");
-		    free(msg);
-		    sleep(5);
-		    continue;
-		}
+        }
 
+        if (rcvd <= 0) {
+            log_print(g_log, "ccnudnl_service: recv failed -- trying to stay alive!");
+            sleep(1);
+            continue;
+        }
+
+	    msg = (struct ccnumr_msg *) malloc(sizeof(struct ccnumr_msg));
+	    msg->hdr.type = net_buffer_getByte(&buf);
+	    msg->hdr.nodeId = net_buffer_getInt(&buf);
+	    msg->hdr.payload_size = net_buffer_getInt(&buf);
+	    msg->payload.data = malloc(msg->hdr.payload_size);
+	    net_buffer_copyFrom(&buf, msg->payload.data, msg->hdr.payload_size);
+
+	    log_print(g_log, "rcvd msg of type %d from node %u (IP:port = %s:%d)",
+               msg->hdr.type, msg->hdr.nodeId, inet_ntoa(remote_addr.sin_addr), ntohs(remote_addr.sin_port));
 		synch_enqueue(net_args->queue, (void * ) msg);
 
 		/* notify the daemon to wake up and check the queues */

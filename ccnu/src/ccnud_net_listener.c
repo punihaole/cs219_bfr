@@ -88,20 +88,19 @@ void * ccnudnl_service(void * arg)
     int rcvd;
     struct sockaddr_in remote_addr;
     struct net_buffer buf;
-    net_buffer_init(MAX_PACKET_SIZE, &buf);
+    net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
 	while (1) {
+	    net_buffer_reset(&buf);
         rcvd = net_buffer_recv(&buf, _net.in_sock, &remote_addr);
 
         if ((uint32_t) ntohl(remote_addr.sin_addr.s_addr) == g_nodeId) {
             /* self msg */
-            net_buffer_reset(&buf);
             continue;
         }
 
         if (rcvd <= 0) {
             log_print(g_log, "ccnudnl_service: recv failed -- trying to stay alive!");
             sleep(1);
-            net_buffer_reset(&buf);
             continue;
         }
 
@@ -137,6 +136,7 @@ void * ccnudnl_service(void * arg)
             data->timestamp = net_buffer_getInt(&buf);
             data->payload_len = net_buffer_getInt(&buf);
             data->payload = malloc(sizeof(uint8_t) * data->payload_len);
+
             net_buffer_copyFrom(&buf, data->payload, data->payload_len);
             if (data->publisher_id != g_nodeId) {
                 tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_data, data, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
@@ -145,8 +145,6 @@ void * ccnudnl_service(void * arg)
             log_print(g_log, "ccnudnl_service: recvd unknown msg type - %u", type);
             sleep(1);
         }
-
-        net_buffer_reset(&buf);
 	}
 
 	return NULL;

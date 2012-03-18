@@ -27,7 +27,7 @@
 #define MSG_NET_CLUSTER_RESPONSE   2
 #define MSG_NET_BLOOMFILTER_UPDATE 3
 
-#define MAX_PACKET_SIZE 1024
+#define BFR_MAX_PACKET_SIZE (1500 - 8 - 12) /* UDP+IP overhead of 20 bytes */
 
 #define HDR_SIZE (sizeof(uint8_t) + sizeof(uint32_t) + sizeof(uint32_t))
 struct ccnumr_hdr {
