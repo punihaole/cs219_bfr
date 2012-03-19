@@ -115,7 +115,7 @@ unsigned clus_get_clusterHead(unsigned level)
     if (my_clusterId % 2 == 1)
         my_clusterId--;
 
-    if (((unsigned)(my_clusterId / (floor(4 * (level - 1))))) % 2 == 1)
+    if (((unsigned)(my_clusterId / (floor(4 * (level - 1)))) % 2) == 1)
         head = my_clusterId - (4 * (level - 1));
     else
         head = my_clusterId;

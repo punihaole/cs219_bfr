@@ -46,9 +46,6 @@ class CcnExp(CoreService):
             cfg += "\n".join(map(cls.subnetentry, ifc.addrlist))
             break
 
-		cfg += "\n";
-		cfg += "exec ~/projets/masters/scripts/node_start.py " + repr(node.name) + "\n"		
-
         return cfg
 
     @staticmethod

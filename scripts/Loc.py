@@ -5,10 +5,8 @@
 import sys
 import os
 
-import Loc
-
 def readLoc(FH):
-	line = FH.readline();
+	line = FH.readline()
 	line = line.strip()
 	words = line.split()
 	x = words[0]

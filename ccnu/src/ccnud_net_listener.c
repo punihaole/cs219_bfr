@@ -180,23 +180,26 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
 {
     int rv = 0;
 
-    /*log_print(g_log, "handle_interest: %s from %u:%u->%u:%u",
+    log_print(g_log, "handle_interest: %s from %u:%u->%u:%u",
               interest->name->full_name, interest->orig_level, interest->orig_clusterId,
-              interest->dest_level, interest->dest_clusterId);*/
+              interest->dest_level, interest->dest_clusterId);
 
     /* check the CS for data to match interest */
     struct content_obj * content = CS_get(interest->name);
     if (content) {
+        log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);
         ccnudnb_fwd_data(content, 1);
     } else {
         /* fwd interest */
         PENTRY pe = PIT_search(interest->name);
         if (pe) {
+            log_print(g_log, "handle_interest: %s (refreshed)", interest->name->full_name);
             /* refresh the pit entry */
             PIT_refresh(pe);
             /* we already saw this interest...drop it */
             goto END;
         } else {
+            log_print(g_log, "handle_interest: %s (querying...)", interest->name->full_name);
             /* ask routing daemon if we should forward the interest */
             double last_hop_distance = unpack_ieee754_64(interest->distance);
             int need_fwd = 0;
@@ -216,15 +219,17 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
             if (need_fwd) {
                 interest->ttl--;
                 if ((rv = ccnudnb_fwd_interest(interest)) < 0) {
-                    log_print(g_log, "handle_interest: ccnudnb_fwd_interest failed front name - %s",
+                    log_print(g_log, "handle_interest: ccnudnb_fwd_interest failed name - %s",
                               interest->name->full_name);
                     goto END;
                 }
 
                 /* we fwded the interest, add it to the pit */
                 PIT_add_entry(interest->name);
+                log_print(g_log, "handle_interest: %s (fwded)", interest->name->full_name);
             } else {
                 /* drop interest */
+                log_print(g_log, "handle_interest: %s (dropped)", interest->name->full_name);
             }
         }
     }
@@ -236,8 +241,8 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
 
 static void * handle_data(struct ccnu_data_pkt * data)
 {
-    /*log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
-              data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);*/
+log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
+              data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);
 
     struct content_obj * obj;
     obj = (struct content_obj *) malloc(sizeof(struct content_obj));

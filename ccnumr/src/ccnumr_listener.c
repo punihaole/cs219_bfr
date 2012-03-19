@@ -324,7 +324,7 @@ static void * fwd_query_response(void * arg)
     }
 
     int response = 0;
-    if ((rv == 0) && (abs(myDist) > abs(dist))) {
+    if ((rv == 0) && (abs(myDist) >= abs(dist))) {
         /* respond: don't forward the interest */
         response = 0;
         log_print(g_log, "ccnumr_accept: responded to interest forward query with NO.");

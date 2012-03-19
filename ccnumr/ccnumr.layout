@@ -2,28 +2,28 @@
 <CodeBlocks_layout_file>
 	<ActiveTarget name="Release" />
 	<File name="src/ccnumr.c" open="0" top="0" tabpos="0">
-		<Cursor position="294" topLine="75" />
+		<Cursor position="294" topLine="21" />
 	</File>
-	<File name="src/ccnumr_listener.c" open="1" top="0" tabpos="2">
+	<File name="src/ccnumr_listener.c" open="0" top="0" tabpos="2">
 		<Cursor position="0" topLine="258" />
 	</File>
-	<File name="src/ccnumr_net_listener.c" open="1" top="1" tabpos="1">
-		<Cursor position="2393" topLine="49" />
+	<File name="src/ccnumr_net_listener.c" open="0" top="0" tabpos="1">
+		<Cursor position="1560" topLine="24" />
 	</File>
-	<File name="src/ccnumrd.c" open="1" top="0" tabpos="6">
-		<Cursor position="1194" topLine="197" />
+	<File name="src/ccnumrd.c" open="0" top="0" tabpos="6">
+		<Cursor position="1856" topLine="84" />
 	</File>
-	<File name="src/ccnumrd_main.c" open="1" top="0" tabpos="4">
-		<Cursor position="6393" topLine="199" />
+	<File name="src/ccnumrd_main.c" open="0" top="0" tabpos="4">
+		<Cursor position="5106" topLine="163" />
 	</File>
 	<File name="src/grid.c" open="0" top="0" tabpos="0">
 		<Cursor position="4047" topLine="131" />
 	</File>
-	<File name="src/include/ccnumr_net_listener.h" open="1" top="0" tabpos="5">
+	<File name="src/include/ccnumr_net_listener.h" open="0" top="0" tabpos="5">
 		<Cursor position="493" topLine="0" />
 	</File>
-	<File name="src/strategy.c" open="1" top="0" tabpos="3">
-		<Cursor position="29669" topLine="971" />
+	<File name="src/strategy.c" open="1" top="1" tabpos="0">
+		<Cursor position="3822" topLine="678" />
 	</File>
 	<File name="src/tests/ccnumr_test.c" open="0" top="0" tabpos="0">
 		<Cursor position="0" topLine="132" />

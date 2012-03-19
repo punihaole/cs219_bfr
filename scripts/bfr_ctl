@@ -20,8 +20,10 @@ if [ "$arg" = 'start' ]; then
 	if [ "$(pidof ccnud)" ]; then
 		echo " * ccnud already running"
 	else
+		echo " * Starting ccnud"
 		if [ "$#" -ge '2' ]; then
 			result=`~/projects/cs219_ccnumr/bin/ccnud $2`
+			echo $result
 		else
 			result=`~/projects/cs219_ccnumr/bin/ccnud`
 		fi
@@ -32,6 +34,7 @@ if [ "$arg" = 'start' ]; then
 	if [ "$(pidof ccnumrd)" ]; then
 		echo " * ccnumrd already running"
 	else
+		echo " * Starting ccnumrd"
 		if [ "$#" -ge '3' ]; then
 			result=`~/projects/cs219_ccnumr/bin/ccnumrd $3`
 		else
@@ -48,6 +51,7 @@ elif [ "$arg" = 'restart' ]; then
 	echo " * Starting ccnud"
 	if [ "$#" -ge '2' ]; then
 		result=`~/projects/cs219_ccnumr/bin/ccnud $2`
+		echo $result
 	else
 		result=`~/projects/cs219_ccnumr/bin/ccnud`
 	fi

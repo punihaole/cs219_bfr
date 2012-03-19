@@ -1,11 +1,11 @@
 CC = gcc
 CFLAGS = -O2 -Wall -iquote ../include
-CLINK = -L../lib -lccnu -lcon -lccnumr -pthread -lm 
+CLINK = -L../lib -lccnu -lccnumr -lcon -pthread -lm 
 SRC_DIR = src
 OBJ_DIR = obj
 BIN_DIR = bin
 
-all: $(BIN_DIR) $(OBJ_DIR) $(BIN_DIR)/gchunk $(BIN_DIR)/pchunk $(BIN_DIR)/getsummary $(BIN_DIR)/cftp $(BIN_DIR)/cftps
+all: $(BIN_DIR) $(OBJ_DIR) $(BIN_DIR)/gchunk $(BIN_DIR)/pchunk $(BIN_DIR)/getsummary $(BIN_DIR)/cftp $(BIN_DIR)/cftps $(BIN_DIR)/cloc
 
 clean:
 	rm -f $(SRC_DIR)/*~
@@ -33,6 +33,9 @@ $(BIN_DIR)/cftp: $(OBJ_DIR)/cftp.o
 $(BIN_DIR)/cftps: $(OBJ_DIR)/cftps.o
 	$(CC) $(CFLAGS) $(OBJ_DIR)/cftps.o $(CLINK) -o $(BIN_DIR)/cftps
 
+$(BIN_DIR)/cloc: $(OBJ_DIR)/cloc.o
+	$(CC) $(CFLAGS) $(OBJ_DIR)/cloc.o $(CLINK) -o $(BIN_DIR)/cloc
+
 $(OBJ_DIR)/gchunk.o: $(SRC_DIR)/gchunk.c
 	$(CC) $(CFLAGS) -c $(SRC_DIR)/gchunk.c -o $(OBJ_DIR)/gchunk.o
 
@@ -47,3 +50,6 @@ $(OBJ_DIR)/cftp.o: $(SRC_DIR)/cftp.c
 
 $(OBJ_DIR)/cftps.o: $(SRC_DIR)/cftps.c
 	$(CC) $(CFLAGS) -c $(SRC_DIR)/cftps.c -o $(OBJ_DIR)/cftps.o
+
+$(OBJ_DIR)/cloc.o: $(SRC_DIR)/cloc.c
+	$(CC) $(CFLAGS) -c $(SRC_DIR)/cloc.c -o $(OBJ_DIR)/cloc.o

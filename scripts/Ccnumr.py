@@ -25,7 +25,7 @@ addr = '/tmp/ccnumr_' + repr(getIp()) + '.sock'
 	
 def sendLoc(x, y):
 	sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-	print >>sys.stderr, 'connecting to %s' % addr
+	print 'connecting to %s' % addr
 	try:
 		sock.connect(addr)
 	except socket.error, msg:
@@ -38,6 +38,7 @@ def sendLoc(x, y):
 	buf = struct.pack('dd', x, y)
 	sock.send(buf)
 	rv = sock.recv(4)
+	print "sending <" + repr(x) + "," + repr(y) + ">"
 	sock.close()
 	return rv
 

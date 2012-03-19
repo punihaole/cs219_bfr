@@ -489,6 +489,8 @@ static int bloom()
                 /* send our aggegated filter up the chain if we are not the next head */
                 create_bloom_msg(&msg, level, clusterId, level-1, parent_clusterId, distance, _cluster->agg_filter);
                 broadcast_bloom_msg(&msg);
+                free(msg.vector);
+                msg.vector = NULL;
 
                 //Send to neighboring cluster Ids
                 unsigned neighbors[3];
@@ -502,6 +504,8 @@ static int bloom()
                     }
                     create_bloom_msg(&msg, level, clusterId, level, neighbors[k], distance, _cluster->agg_filter);
                     broadcast_bloom_msg(&msg);
+                    free(msg.vector);
+                    msg.vector = NULL;
                 }
             }
         } else {
@@ -512,6 +516,8 @@ static int bloom()
             /* we're sending a bloom msg to our own cluster head */
             create_bloom_msg(&msg, level, clusterId, level, clusterId, distance, filter);
             broadcast_bloom_msg(&msg);
+            free(msg.vector);
+            msg.vector = NULL;
 
             //Send to neighboring cluster Ids
             unsigned neighbors[3];
@@ -525,6 +531,8 @@ static int bloom()
                 }
                 create_bloom_msg(&msg, level, clusterId, level, neighbors[k], distance, filter);
                 broadcast_bloom_msg(&msg);
+                free(msg.vector);
+                msg.vector = NULL;
             }
 
             break;
@@ -687,7 +695,8 @@ static int broadcast_bloom_msg(struct bloom_msg * msg)
         return -1;
     }
 
-    log_print(g_log, "broadcast_bloom_msg: sending bloom msg.");
+    log_print(g_log, "broadcast_bloom_msg: sending bloom msg %u:%u -> %u:%u (lhd = %5.2f)",
+              msg->origin_level,  msg->origin_clusterId, msg->dest_level, msg->dest_clusterId, msg->lastHopDistance);
 
     int size = BLOOM_MSG_MIN_SIZE;
     int vec_size = (int)ceil((double)msg->vector_bits / 8.0);
@@ -874,7 +883,7 @@ static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
         double prev_distance = unpack_ieee754_64(msg->lastHopDistance);
         /* if we are closer and the prev_distance is not less than 0, i.e. its not
          * a hop count */
-        if (distance <= prev_distance && prev_distance > 0) {
+        if (distance < prev_distance && prev_distance > 0) {
             msg->lastHopDistance = pack_ieee754_64(distance);
             fwd = TRUE;
         }
