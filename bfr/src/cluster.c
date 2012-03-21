@@ -196,11 +196,13 @@ int clus_findCluster(struct content_name * name, unsigned * level, unsigned * cl
 
             log_print(g_log, "cluster = %d, searching aggregate filter", c->id);
             if ((matches = search_bloom(filter, name)) > longest_match) {
+                log_print(g_log, "here1");
                 lm_level = i;
                 lm_clusterId = c->id;
                 longest_match = matches;
                 goto END;
             }
+            log_print(g_log, "here2");
         }
     }
 

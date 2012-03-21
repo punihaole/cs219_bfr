@@ -240,7 +240,7 @@ static void * fwd_query_response(void * arg)
         log_print(g_log, "recv: %s.", strerror(errno));
         goto END_FWD_QRY;
     }
-    
+
     if (name_len > MAX_NAME_LENGTH)
     	name_len = MAX_NAME_LENGTH;
 
@@ -283,7 +283,7 @@ static void * fwd_query_response(void * arg)
 
     log_print(g_log, "bfr_accept: INTEREST_FWD_QUERY (%d, %s, %d, %d, %10.2f).",
            name_len, full_name, dest_level, dest_clusterId, dist);
-    
+
     pthread_mutex_lock(&g_bfr.bfr_lock);
 	double x = g_bfr.x;
    	double y = g_bfr.y;
@@ -315,7 +315,7 @@ static void * fwd_query_response(void * arg)
             log_print(g_log, "bfr_accept: failed to calculate distance, must be invalid parameters.");
         }
     }
-    
+
 	/* try and see if we can update the route with a shorter path */
 	unsigned up_dest_level;
 	unsigned up_dest_clusterId;
@@ -323,14 +323,14 @@ static void * fwd_query_response(void * arg)
 	struct content_name * name = content_name_create(full_name);
 	int found_clus = clus_findCluster(name, &up_dest_level, &up_dest_clusterId);
 	content_name_delete(name);
-	int calc_dist = -1;   
+	int calc_dist = -1;
 	if (found_clus == 0) {
 		double up_distance;
 		calc_dist = grid_distance(up_dest_level, up_dest_clusterId, x, y, &up_distance);
 		if ((calc_dist == 0) && ((up_distance < myDist) || (myDist < 0))) {
 			myDist = up_distance;
 			log_print(g_log, "dest_query_response: updating cluster level and Id = (%u,%u) for content=%s",
-				up_dest_level, up_dest_clusterId, name->full_name);
+				up_dest_level, up_dest_clusterId, full_name);
 			dest_level = up_dest_level;
 			dest_clusterId = up_dest_clusterId;
 		}

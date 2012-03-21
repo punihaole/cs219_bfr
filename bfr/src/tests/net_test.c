@@ -34,7 +34,7 @@ static int send_bloom(struct bloom_msg * msg)
         return -1;
     }
 
-    uint8_t buf[MAX_PACKET_SIZE];
+    uint8_t buf[BFR_MAX_PACKET_SIZE];
 
     int size = 2*sizeof(uint8_t) + 3*sizeof(uint16_t) + sizeof(uint64_t);
     size += ceil(msg->vector_bits / 8.0);
