@@ -412,6 +412,17 @@ static int cluster()
                 break;
             }
         }
+    } else {
+    	struct cluster * _cluster = NULL;
+    	
+    	if (clus_get_cluster(i, clus_get_clusterId(i), &_cluster) < 0) {
+    		_cluster = malloc(sizeof(struct cluster));
+		_cluster->nodes = NULL;
+		_cluster->agg_filter = bloom_create(_strategy.summary_size, BLOOM_ARGS);
+		_cluster->id = clus_get_clusterId(i);
+		_cluster->level = i;
+		clus_add_cluster(_cluster);
+    	}
     }
 
     struct cluster * clus = NULL;
@@ -842,6 +853,8 @@ static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
         clus->level = msg->origin_level;
         clus_add_cluster(clus);
     } else {
+    	bloom_destroy(clus->agg_filter);
+    	clus->agg_filter = filter;
         log_print(g_log, "handle_bloom_msg: previously seen cluster.");
     }
 
@@ -860,12 +873,15 @@ static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
                  * taken negative so we can differentiate */
                 msg->lastHopDistance = pack_ieee754_64(-1 * g_bfr.leaf_head.distance);
                 fwd = TRUE;
+                log_print(g_log, "handle_bloom: fwding bloom msg to cluster head, distance = %5.5", msg->lastHopDistance);
             } else if (abs(lastHop) > g_bfr.leaf_head.distance) {
                 msg->lastHopDistance = pack_ieee754_64(-1 * g_bfr.leaf_head.distance);
                 fwd = TRUE;
+                log_print(g_log, "handle_bloom: fwding bloom msg to cluster head, distance = %5.5", msg->lastHopDistance);
             } else {
                 /* no fwd */
                 fwd = FALSE;
+		log_print(g_log, "handle_bloom: not fwding bloom msg to cluster head");
             }
         }
     } else {
@@ -892,8 +908,9 @@ static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
     pthread_mutex_unlock(&g_bfr.bfr_lock);
 
     if (fwd) {
-        log_print(g_log, "handle_bloom_msg: fwding aggregate filter from %u:%u to my cluster head",
-                  msg->origin_level, msg->origin_clusterId);
+        log_print(g_log, "handle_bloom_msg: fwding aggregate filter from %u:%u to %u:%u (dist = %5.5f)",
+                  msg->origin_level, msg->origin_clusterId, msg->dest_level, msg->dest_clusterId,
+                  unpack_ieee754_64(msg->lastHopDistance));
         broadcast_bloom_msg(msg);
     }
 

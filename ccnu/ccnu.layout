@@ -7,7 +7,7 @@
 	<File name="src/ccnud.c" open="0" top="0" tabpos="3">
 		<Cursor position="3595" topLine="100" />
 	</File>
-	<File name="src/ccnud_cs.c" open="1" top="0" tabpos="2">
+	<File name="src/ccnud_cs.c" open="1" top="0" tabpos="1">
 		<Cursor position="1806" topLine="56" />
 	</File>
 	<File name="src/ccnud_listener.c" open="0" top="0" tabpos="6">
@@ -25,10 +25,10 @@
 	<File name="src/include/ccnu_packet.h" open="0" top="0" tabpos="0">
 		<Cursor position="794" topLine="20" />
 	</File>
-	<File name="src/include/ccnud_constants.h" open="1" top="1" tabpos="4">
-		<Cursor position="82" topLine="0" />
+	<File name="src/include/ccnud_constants.h" open="1" top="0" tabpos="3">
+		<Cursor position="103" topLine="0" />
 	</File>
-	<File name="src/include/ccnud_cs.h" open="1" top="0" tabpos="3">
+	<File name="src/include/ccnud_cs.h" open="1" top="0" tabpos="2">
 		<Cursor position="410" topLine="0" />
 	</File>
 	<File name="src/include/ccnud_net_listener.h" open="0" top="0" tabpos="3">

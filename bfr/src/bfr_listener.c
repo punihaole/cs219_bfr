@@ -121,7 +121,7 @@ int bfr_accept(struct bfr_msg * msg)
         return -1;
     }
 
-    /* these need a response so we 'fork' off a handler */
+    /* these need a response so we schedule a handler from the pool */
     if (hdr->type == MSG_IPC_INTEREST_FWD_QUERY || hdr->type == MSG_IPC_INTEREST_DEST_QUERY) {
         void * handler = NULL;
         switch (hdr->type) {
@@ -229,7 +229,7 @@ static void * fwd_query_response(void * arg)
 
     log_print(g_log, "bfr_accept: rcvd INTEREST_FWD_QUERY");
     int name_len;
-    char full_name[MAX_NAME_LENGTH];
+    char full_name[MAX_NAME_LENGTH + 1];
     unsigned orig_level;
     unsigned orig_clusterId;
     unsigned dest_level;
@@ -240,11 +240,15 @@ static void * fwd_query_response(void * arg)
         log_print(g_log, "recv: %s.", strerror(errno));
         goto END_FWD_QRY;
     }
+    
+    if (name_len > MAX_NAME_LENGTH)
+    	name_len = MAX_NAME_LENGTH;
 
     if (recv(sock2, full_name, name_len, 0) < sizeof(name_len)) {
         log_print(g_log, "recv: %s.", strerror(errno));
         goto END_FWD_QRY;
     }
+    full_name[name_len] = '\0';
 
     if (recv(sock2, &orig_level, sizeof(unsigned), 0) < sizeof(unsigned)) {
         log_print(g_log, "recv: %s.", strerror(errno));
@@ -279,6 +283,11 @@ static void * fwd_query_response(void * arg)
 
     log_print(g_log, "bfr_accept: INTEREST_FWD_QUERY (%d, %s, %d, %d, %10.2f).",
            name_len, full_name, dest_level, dest_clusterId, dist);
+    
+    pthread_mutex_lock(&g_bfr.bfr_lock);
+	double x = g_bfr.x;
+   	double y = g_bfr.y;
+	pthread_mutex_unlock(&g_bfr.bfr_lock);
 
     if (clus_get_clusterId(dest_level) == dest_clusterId) {
         /* this is a intra-cluster message. We use the distance table rather
@@ -302,10 +311,30 @@ static void * fwd_query_response(void * arg)
         }
 
         if ((rv = grid_distance(g_bfr.num_levels, dest_clusterId,
-                                g_bfr.x, g_bfr.y, &myDist))!= 0) {
+                                x, y, &myDist))!= 0) {
             log_print(g_log, "bfr_accept: failed to calculate distance, must be invalid parameters.");
         }
     }
+    
+	/* try and see if we can update the route with a shorter path */
+	unsigned up_dest_level;
+	unsigned up_dest_clusterId;
+
+	struct content_name * name = content_name_create(full_name);
+	int found_clus = clus_findCluster(name, &up_dest_level, &up_dest_clusterId);
+	content_name_delete(name);
+	int calc_dist = -1;   
+	if (found_clus == 0) {
+		double up_distance;
+		calc_dist = grid_distance(up_dest_level, up_dest_clusterId, x, y, &up_distance);
+		if ((calc_dist == 0) && ((up_distance < myDist) || (myDist < 0))) {
+			myDist = up_distance;
+			log_print(g_log, "dest_query_response: updating cluster level and Id = (%u,%u) for content=%s",
+				up_dest_level, up_dest_clusterId, name->full_name);
+			dest_level = up_dest_level;
+			dest_clusterId = up_dest_clusterId;
+		}
+	}
 
     if (send(sock2, &orig_level, sizeof(unsigned), 0) == -1) {
         log_print(g_log, "send: %s.", strerror(errno));
@@ -361,7 +390,7 @@ static void * dest_query_response(void * arg)
     free(arg);
 
     int name_len;
-    char str[MAX_NAME_LENGTH];
+    char str[MAX_NAME_LENGTH + 1];
     struct content_name * name = NULL;
 
     if (recv(sock2, &name_len, sizeof(int), 0) < sizeof(int)) {
@@ -385,7 +414,7 @@ static void * dest_query_response(void * arg)
         unsigned dest_level;
         unsigned dest_clusterId;
         double distance = INFINITY;
-
+		log_print(g_log, "dest_query_response: %s", name->full_name);
         if (clus_findCluster(name, &dest_level, &dest_clusterId) != 0) {
             log_print(g_log, "dest_query_response: failed to find cluster level/Id for content=%s",
                    name->full_name);

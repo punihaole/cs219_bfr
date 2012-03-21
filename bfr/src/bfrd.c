@@ -201,7 +201,7 @@ void bfr_handle_ipc(struct listener_args * ipc_args)
             log_print(g_log, "handle_ipc: updated geo-route position (%10.2f, %10.2f).",
                       g_bfr.x, g_bfr.y);
         } else if (msg->hdr.type == MSG_IPC_DISTANCE_UPDATE) {
-            char name[MAX_NAME_LENGTH];
+            char name[MAX_NAME_LENGTH + 1];
             int name_len = 0;
             int hops = 0;
 
@@ -209,6 +209,7 @@ void bfr_handle_ipc(struct listener_args * ipc_args)
             memcpy(&name_len, msg->payload.data, sizeof(uint32_t));
             offset += sizeof(uint32_t);
             memcpy(name, msg->payload.data+offset, name_len);
+            name[name_len] = '\0';
             offset += name_len;
             memcpy(&hops, msg->payload.data+offset, sizeof(uint32_t));
 

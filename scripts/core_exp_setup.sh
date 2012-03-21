@@ -6,6 +6,7 @@ echo "0" > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
 
 _dir="/home/tom/projects/cs219_bfr"
 
+su tom
 $_dir/bin/ccnud -p 0.01
 sleep 0.5
 $_dir/bin/bfrd -g 500x500
