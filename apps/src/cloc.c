@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "ccnumr.h"
+#include "bfr.h"
 
 void print_usage(char * exec)
 {
@@ -18,7 +18,7 @@ int main(int argc, char ** argv)
 	double x = atof(argv[1]);
 	double y = atof(argv[2]);
 
-	if (ccnumr_sendLoc(x, y) == 0) {
+	if (bfr_sendLoc(x, y) == 0) {
 		exit(EXIT_SUCCESS);		
 	} else {
 		fprintf(stderr, "Failed to send coordinates!\n");

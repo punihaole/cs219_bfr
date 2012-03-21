@@ -6,7 +6,7 @@ import sys
 import time
 
 import Loc
-import Ccnumr
+import Bfr
 
 baseDir = sys.argv[1]
 print "baseDir: " + repr(baseDir)
@@ -23,6 +23,6 @@ while True:
 		x, y = Loc.readLoc(locFH)
 		y = height - y
 		print repr(node) + " sending location update: <" + repr(x) + "," + repr(y) + ">\n"
-		Ccnumr.sendLoc(x, y)
+		Bfr.sendLoc(x, y)
 		locFH.close()
 		time.sleep(10)

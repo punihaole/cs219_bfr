@@ -27,7 +27,7 @@
 #include "net_lib.h"
 #include "thread_pool.h"
 
-#include "ccnumr.h"
+#include "bfr.h"
 
 struct ccnud_net_s {
     int in_sock; /* udp socket */
@@ -180,26 +180,24 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
 {
     int rv = 0;
 
-    log_print(g_log, "handle_interest: %s from %u:%u->%u:%u",
+    /*log_print(g_log, "handle_interest: %s from %u:%u->%u:%u",
               interest->name->full_name, interest->orig_level, interest->orig_clusterId,
-              interest->dest_level, interest->dest_clusterId);
+              interest->dest_level, interest->dest_clusterId);*/
 
     /* check the CS for data to match interest */
     struct content_obj * content = CS_get(interest->name);
     if (content) {
-        log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);
+        /*log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);*/
         ccnudnb_fwd_data(content, 1);
     } else {
         /* fwd interest */
         PENTRY pe = PIT_search(interest->name);
         if (pe) {
-            log_print(g_log, "handle_interest: %s (refreshed)", interest->name->full_name);
             /* refresh the pit entry */
             PIT_refresh(pe);
             /* we already saw this interest...drop it */
             goto END;
         } else {
-            log_print(g_log, "handle_interest: %s (querying...)", interest->name->full_name);
             /* ask routing daemon if we should forward the interest */
             double last_hop_distance = unpack_ieee754_64(interest->distance);
             int need_fwd = 0;
@@ -207,11 +205,11 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
             unsigned orig_clusterId_u = interest->orig_clusterId;
             unsigned dest_level_u = interest->dest_level;
             unsigned dest_clusterId_u = interest->dest_clusterId;
-            if ((rv = ccnumr_sendQry(interest->name,
+            if ((rv = bfr_sendQry(interest->name,
                                     &orig_level_u, &orig_clusterId_u,
                                     &dest_level_u, &dest_clusterId_u,
                                     &last_hop_distance, &need_fwd)) < 0) {
-                log_print(g_log, "handle_interest: ccnumr_sendQry failed for name - %s.",
+                log_print(g_log, "handle_interest: bfr_sendQry failed for name - %s.",
                           interest->name->full_name);
                 goto END;
             }
@@ -226,10 +224,8 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
 
                 /* we fwded the interest, add it to the pit */
                 PIT_add_entry(interest->name);
-                log_print(g_log, "handle_interest: %s (fwded)", interest->name->full_name);
             } else {
                 /* drop interest */
-                log_print(g_log, "handle_interest: %s (dropped)", interest->name->full_name);
             }
         }
     }
@@ -241,8 +237,8 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
 
 static void * handle_data(struct ccnu_data_pkt * data)
 {
-log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
-              data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);
+    /*log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
+              data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);*/
 
     struct content_obj * obj;
     obj = (struct content_obj *) malloc(sizeof(struct content_obj));
@@ -255,7 +251,7 @@ log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %
 
 	/* update the forwarding table in the routing daemon (if prefix) */
 	if (!content_is_segmented(obj->name)) {
-	    ccnumr_sendDistance(obj->name, data->hops);
+	    bfr_sendDistance(obj->name, data->hops);
 	}
 
     int rv;

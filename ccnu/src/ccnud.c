@@ -19,7 +19,7 @@
 #include "net_lib.h"
 #include "log.h"
 
-#include "ccnumr.h"
+#include "bfr.h"
 
 #include "synch_queue.h"
 

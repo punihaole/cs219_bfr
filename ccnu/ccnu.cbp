@@ -20,7 +20,7 @@
 					<Add option="-s" />
 					<Add option="-pthread" />
 					<Add option="-lm" />
-					<Add library="../lib/libccnumr.a" />
+					<Add library="../lib/libbfr.a" />
 					<Add library="../lib/libcon.a" />
 				</Linker>
 			</Target>

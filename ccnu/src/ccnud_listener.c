@@ -19,7 +19,7 @@
 #include <netinet/in.h>
 
 #include "ccnu.h"
-#include "ccnumr.h"
+#include "bfr.h"
 #include "ccnud.h"
 
 #include "ccnud_cs.h"
@@ -70,6 +70,12 @@ int ccnudl_init(int pipeline_size)
 {
     int len;
 
+    _listener.interest_pipe_size = pipeline_size;
+    if (tpool_create(&_listener.interest_pipeline, INTEREST_FLOWS) < 0) {
+        log_print(g_log, "tpool_create: could not create interest thread pool!");
+        return -1;
+    }
+
     if ((_listener.sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
         log_print(g_log, "socket: %s.", strerror(errno));
         return -1;
@@ -92,12 +98,6 @@ int ccnudl_init(int pipeline_size)
 
     if (listen(_listener.sock, SOCK_QUEUE) == -1) {
         log_print(g_log, "listen: %s.", strerror(errno));
-        return -1;
-    }
-
-    _listener.interest_pipe_size = pipeline_size;
-    if (tpool_create(&_listener.interest_pipeline, INTEREST_FLOWS) < 0) {
-        log_print(g_log, "tpool_create: could not create interest thread pool!");
         return -1;
     }
 
@@ -656,7 +656,7 @@ static void * retrieve_response(void * arg)
 //            log_print(g_log, "seq_response: path failed, trying new path for %s.",
 //                      seg->name->full_name);
 //            /* try a new route */
-//            if (ccnumr_sendWhere(seg->name,
+//            if (bfr_sendWhere(seg->name,
 //                                 &seg->opts->orig_level_u, &seg->opts->orig_clusterId_u,
 //                                 &seg->opts->dest_level_u, &seg->opts->dest_clusterId_u,
 //                                 &seg->opts->distance) < 0) {
@@ -777,7 +777,7 @@ static int retrieve_segment(struct segment * seg)
             ccnudnb_fwd_interest(&chunk_window[i].intr);
             tx--;
             current_chunk++;
-            log_print(g_log, "expressing new interest: %s", chunk_window[i].intr.name->full_name);
+            /*log_print(g_log, "expressing new interest: %s", chunk_window[i].intr.name->full_name);*/
         }
 
         pthread_mutex_lock(&seg_q.mutex);
@@ -862,6 +862,8 @@ static int retrieve_segment(struct segment * seg)
         }
         if (cwnd > MAX_INTEREST_PIPELINE)
             cwnd = MAX_INTEREST_PIPELINE;
+
+        /*log_print(g_log, "cwnd = %d, ssthresh = %d", cwnd, ssthresh);*/
     }
 
 #else
@@ -1085,7 +1087,7 @@ static void * seq_response(void * arg)
     ccnudnb_opt_t opts;
     opts.mode = CCNUDNB_USE_ROUTE | CCNUDNB_USE_TIMEOUT;
     opts.timeout_ms = INTEREST_TIMEOUT_MS;
-    if (ccnumr_sendWhere(name,
+    if (bfr_sendWhere(name,
                         &opts.orig_level_u, &opts.orig_clusterId_u,
                         &opts.dest_level_u, &opts.dest_clusterId_u,
                         &opts.distance) < 0) {

@@ -1,0 +1,14 @@
+CC = gcc
+CFLAGS = -O2 -Wall -iquote ../../../include
+CLINK = -lm -lpthread -L../../../lib -lbfr -lcon
+
+all: net_test 
+
+net_test: net_test.o
+	$(CC) $(CFLAGS) net_test.o $(CLINK) -o net_test
+
+clean:
+	rm -f *.o net_test ipc_test join_test *~
+
+net_test.o : net_test.c
+	$(CC) $(CFLAGS) -c net_test.c

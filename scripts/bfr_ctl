@@ -22,23 +22,23 @@ if [ "$arg" = 'start' ]; then
 	else
 		echo " * Starting ccnud"
 		if [ "$#" -ge '2' ]; then
-			result=`~/projects/cs219_ccnumr/bin/ccnud $2`
+			result=`~/projects/cs219_bfr/bin/ccnud $2`
 			echo $result
 		else
-			result=`~/projects/cs219_ccnumr/bin/ccnud`
+			result=`~/projects/cs219_bfr/bin/ccnud`
 		fi
 	fi
 
 	sleep 0.5
 
-	if [ "$(pidof ccnumrd)" ]; then
-		echo " * ccnumrd already running"
+	if [ "$(pidof bfrd)" ]; then
+		echo " * bfrd already running"
 	else
-		echo " * Starting ccnumrd"
+		echo " * Starting bfrd"
 		if [ "$#" -ge '3' ]; then
-			result=`~/projects/cs219_ccnumr/bin/ccnumrd $3`
+			result=`~/projects/cs219_bfr/bin/bfrd $3`
 		else
-			result=`~/projects/cs219_ccnumr/bin/ccnumrd`
+			result=`~/projects/cs219_bfr/bin/bfrd`
 		fi
 	fi
 
@@ -50,29 +50,29 @@ elif [ "$arg" = 'restart' ]; then
 
 	echo " * Starting ccnud"
 	if [ "$#" -ge '2' ]; then
-		result=`~/projects/cs219_ccnumr/bin/ccnud $2`
+		result=`~/projects/cs219_bfr/bin/ccnud $2`
 		echo $result
 	else
-		result=`~/projects/cs219_ccnumr/bin/ccnud`
+		result=`~/projects/cs219_bfr/bin/ccnud`
 	fi
 
-	if [ "$(pidof ccnumrd)" ]; then
-		echo " * Shutting down ccnumrd"
-		killall ccnumrd
+	if [ "$(pidof bfrd)" ]; then
+		echo " * Shutting down bfrd"
+		killall bfrd
 	fi
 
 	sleep 1
-	echo " * Starting ccnumrd"
+	echo " * Starting bfrd"
 
 	if [ "$#" -ge '3' ]; then
-		result=`~/projects/cs219_ccnumr/bin/ccnumrd $3`
+		result=`~/projects/cs219_bfr/bin/bfrd $3`
 	else
-		result=`~/projects/cs219_ccnumr/bin/ccnumrd`
+		result=`~/projects/cs219_bfr/bin/bfrd`
 	fi
 
 elif [ "$arg" = 'stop' ]; then
 	echo " * Shutting down ccnud"
 	killall ccnud
-	echo " * Shutting down ccnumrd"
-	killall ccnumrd
+	echo " * Shutting down bfrd"
+	killall bfrd
 fi

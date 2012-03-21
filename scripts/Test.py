@@ -1,5 +1,5 @@
 #!/usr/bin/python
 
-import Ccnumr
+import Bfr
 
-Ccnumr.sendLoc(99.88, 8.2888)
+Bfr.sendLoc(99.88, 8.2888)

@@ -24,7 +24,7 @@ typedef enum {
 
 #define INTEREST_FLOWS 3
 #define DEFAULT_INTEREST_PIPELINE 50
-#define MAX_INTEREST_PIPELINE ((PIT_SIZE / 2) + 100)
+#define MAX_INTEREST_PIPELINE (PIT_SIZE - 25)
 #define INTEREST_TIMEOUT_MS 1000 /* ms */
 #define INTEREST_MAX_ATTEMPTS 5
 #define MAX_HOPS 3 /*number of hops taken in cluster fwding */

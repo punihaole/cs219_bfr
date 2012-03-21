@@ -17,7 +17,7 @@
 #include "ccnud_constants.h"
 #include "ccnud_pit.h"
 
-#include "ccnumr.h"
+#include "bfr.h"
 
 #include "log.h"
 #include "net_buffer.h"
@@ -81,7 +81,7 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
     }
 
     if (qry) {
-        if (ccnumr_sendWhere(name, &orig_level_u, &orig_clusterId_u,
+        if (bfr_sendWhere(name, &orig_level_u, &orig_clusterId_u,
                             &dest_level_u, &dest_clusterId_u, &distance) < 0) {
             log_print(g_log, "ccnudnb: sendWhere? failed! -- cannot send interest, %s!",
                       name->full_name);
@@ -204,8 +204,6 @@ int ccnudnb_fwd_data(struct content_obj * content, int hops_taken)
     net_buffer_putInt(&buf, content->timestamp);
     net_buffer_putInt(&buf, content->size);
     net_buffer_copyTo(&buf, content->data, content->size);
-
-    log_print(g_log, "fwding data for: %s", content->name->full_name);
 
     int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
 
