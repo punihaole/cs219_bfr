@@ -1,6 +1,0 @@
-#ifndef CRUST_TEST_H_INCLUDED
-#define CRUST_TEST_H_INCLUDED
-
-int test_suite();
-
-#endif // CRUST_TEST_H_INCLUDED
