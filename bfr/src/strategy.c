@@ -48,7 +48,8 @@ struct strategy {
 
     int max_join_attempts;
 
-    struct timespec ts_next_cluster;
+	int num_levels;
+    struct timespec * ts_next_cluster; /* keep a timer for the election at each level */
     struct timespec ts_next_bloom;
 
     struct linked_list * route_msg_q;
@@ -75,7 +76,7 @@ struct linked_list * matching_responses;
 
 static struct strategy _strategy;
 
-static int cluster();
+static int cluster(unsigned level);
 static int bloom();
 
 static long join_period(unsigned level, unsigned clusterId);
@@ -89,18 +90,22 @@ static int create_bloom_msg(struct bloom_msg * msg,
 static int broadcast_bloom_msg(struct bloom_msg * msg);
 static int broadcast_join_msg(struct cluster_join_msg * msg);
 static int broadcast_cluster_msg(struct cluster_msg * msg);
+static int broadcast_pill_msg(struct sleeping_pill_msg * msg);
 
 static int parse_as_bloom_msg(struct bfr_msg * msg, struct bloom_msg * bmsg);
 static int parse_as_cluster_msg(struct bfr_msg * msg, struct cluster_msg * target);
 static int parse_as_join_msg(struct bfr_msg * msg, struct cluster_join_msg * target);
+static int parse_as_pill_msg(struct bfr_msg * msg, struct sleeping_pill_msg * target);
 
 static void filter_msgs(struct linked_list * putIn, uint8_t type);
 
 static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId);
 static void * handle_cluster_join_msg(void * arg);
 
-int stategy_init()
+int stategy_init(unsigned num_levels)
 {
+	if (num_levels == 0)
+		return -1;
     _strategy.cluster_interval_ms = DEFAULT_CLUSTER_INTERVAL_SEC * 1000;
     _strategy.bloom_interval_ms = DEFAULT_BLOOM_INTERVAL_SEC * 1000;
     _strategy.backoff_interval_ms = DEFAULT_BACKOFF_INTERVAL_MS;
@@ -111,6 +116,9 @@ int stategy_init()
     _strategy.cluster_expiration_interval_ms = CLUSTER_HEAD_EXPIRATION_PERIOD_SEC * 1000;
 
     _strategy.route_msg_q = linked_list_init(NULL);
+
+    _strategy.num_levels = num_levels;
+    _strategy.ts_next_cluster = malloc(sizeof(struct timespec) * num_levels);
 
     pthread_mutex_init(&_strategy.lock, NULL);
     pthread_cond_init(&_strategy.cond, NULL);
@@ -134,32 +142,43 @@ void strategy_close()
 {
 }
 
+struct timespec * calc_next_event(struct linked_list * events)
+{
+	struct timespec * ts_earliest = (struct timespec *) linked_list_get(events, 0);
+	struct timespec * ts_event;
+	int i;
+	for (i = 1; i < events->len; i++) {
+		ts_event = (struct timespec *) linked_list_get(events, i);
+		if (ts_compare(ts_event, ts_earliest) < 0) {
+			ts_earliest = ts_event;
+		}
+	}
+	
+	return ts_earliest;
+}
+
 void * strategy_service(void * ignore)
 {
     prctl(PR_SET_NAME, "strategy", 0, 0, 0);
     log_print(g_log, "strategy_service: starting...");
 
-    cluster();
     bloom();
 
     struct bfr_msg * msg = NULL;
     struct timespec * next_event = &_strategy.ts_next_bloom;
-
-    if (ts_compare(&_strategy.ts_next_cluster, &_strategy.ts_next_bloom) < 0) {
-        next_event = &_strategy.ts_next_cluster;
-        time_t rawtime;
-        time(&rawtime);
-        unsigned long diff = next_event->tv_sec - rawtime;
-        log_print(g_log, "strategy_service: scheduled CLUSTER as next event in %u seconds",
-                  diff);
-    } else {
-        next_event = &_strategy.ts_next_bloom;
-        time_t rawtime;
-        time(&rawtime);
-        unsigned long diff = next_event->tv_sec - rawtime;
-        log_print(g_log, "strategy_service: scheduled BLOOM as next event in %u seconds",
-                  diff);
+    struct linked_list * events = linked_list_init(NULL);
+    linked_list_append(events, &_strategy.ts_next_bloom);
+    int i;
+    for (i = 0; i < _strategy.num_levels; i++) {
+    	linked_list_append(events, &_strategy.ts_next_cluster[i]);
+    	cluster(i+1);
     }
+
+    next_event = calc_next_event(events);
+    time_t rawtime;
+	time(&rawtime);
+	unsigned long diff = next_event->tv_sec - rawtime;
+	log_print(g_log, "strategy_service: scheduled next event in %u seconds", diff);
 
     int rv;
     while (1) {
@@ -181,28 +200,21 @@ void * strategy_service(void * ignore)
             struct timespec now;
             ts_fromnow(&now);
 
-            if (ts_compare(&now, &_strategy.ts_next_cluster) > 0) {
-                cluster();
-            }
+            for (i = 1; i < events->len; i++) {
+	            if (ts_compare(&now, &_strategy.ts_next_cluster[i-1]) > 0) {
+    	            cluster(i);
+    	        }
+    	    }
+           
             if (ts_compare(&now, &_strategy.ts_next_bloom) > 0) {
                 bloom();
             }
 
-            if (ts_compare(&_strategy.ts_next_cluster, &_strategy.ts_next_bloom) < 0) {
-                next_event = &_strategy.ts_next_cluster;
-                time_t rawtime;
-                time(&rawtime);
-                unsigned long diff = next_event->tv_sec - rawtime;
-                log_print(g_log, "strategy_service: scheduled CLUSTER as next event in %u seconds",
-                          diff);
-            } else {
-                next_event = &_strategy.ts_next_bloom;
-                time_t rawtime;
-                time(&rawtime);
-                unsigned long diff = next_event->tv_sec - rawtime;
-                log_print(g_log, "strategy_service: scheduled BLOOM as next event in %u seconds",
-                          diff);
-            }
+            next_event = calc_next_event(events);
+			time_t rawtime;
+			time(&rawtime);
+			unsigned long diff = next_event->tv_sec - rawtime;
+			log_print(g_log, "strategy_service: scheduled next event in %u seconds", diff);
 
             /* check if we got any messages as well */
             pthread_mutex_lock(&_strategy.lock);
@@ -265,6 +277,8 @@ void * strategy_service(void * ignore)
                     }
                 }
 
+            } else if (msg->hdr.type == MSG_NET_SLEEPING_PILL) {
+            	/* TODO */
             } else {
                 log_print(g_log, "strategy_service: rcvd msg of type %d. Not our responsiblity!",
                           msg->hdr.type);
@@ -295,11 +309,11 @@ int strategy_passMsg(struct bfr_msg * msg)
 }
 
 /* figures out who our cluster head is */
-static int cluster()
+static int cluster(unsigned level)
 {
     long wait;
     struct cluster_join_msg join;
-    join.cluster_level = g_bfr.num_levels;
+    join.cluster_level = level;
     join.cluster_id = clus_get_clusterId(join.cluster_level);
     uint32_t cluster_head = g_bfr.nodeId; /* we declare ourself a cluster head if no one responds */
     struct linked_list * cluster_responses = linked_list_init((delete_t)bfr_msg_delete);
@@ -366,81 +380,57 @@ static int cluster()
 
     FOUND_CLUSTER_HEAD:
     linked_list_delete(cluster_responses);
-    g_bfr.leaf_head.nodeId = cluster_head;
-    ts_fromnow(&g_bfr.leaf_head.expiration);
-    ts_fromnow(&g_bfr.leaf_head.stale);
-    ts_addms(&g_bfr.leaf_head.expiration,
-             _strategy.cluster_freshness_interval_ms);
-    ts_addms(&g_bfr.leaf_head.stale,
-             _strategy.cluster_freshness_interval_ms);
+    
+    if (level == _strategy.num_levels) {
+		g_bfr.leaf_head.nodeId = cluster_head;
+		ts_fromnow(&g_bfr.leaf_head.expiration);
+		ts_fromnow(&g_bfr.leaf_head.stale);
+		ts_addms(&g_bfr.leaf_head.expiration,
+		         _strategy.cluster_freshness_interval_ms);
+		ts_addms(&g_bfr.leaf_head.stale,
+		         _strategy.cluster_freshness_interval_ms);
 
-    log_print(g_log, "cluster: set leaf cluster head to %u.", cluster_head);
-    log_print(g_log, "cluster: distance from head = %u.", distance);
+		log_print(g_log, "cluster: set leaf cluster head to %u.", cluster_head);
+		log_print(g_log, "cluster: distance from head = %u.", distance);
 
-    g_bfr.leaf_cluster.id = join.cluster_id;
-    g_bfr.leaf_head.nodeId = cluster_head;
-    g_bfr.leaf_head.clusterId = join.cluster_id;
-    g_bfr.leaf_head.distance = distance;
+		g_bfr.leaf_cluster.id = join.cluster_id;
+		g_bfr.leaf_head.nodeId = cluster_head;
+		g_bfr.leaf_head.clusterId = join.cluster_id;
+		g_bfr.leaf_head.distance = distance;
+	} else {
+		struct cluster * _cluster = NULL;
 
-    int i;
-    for (i = 0; i < g_bfr.num_levels; i++)
-        bit_clear(g_bfr.is_cluster_head, i);
+		if (clus_get_cluster(level, clus_get_clusterId(level), &_cluster) < 0) {
+			_cluster = malloc(sizeof(struct cluster));
+			_cluster->nodes = NULL;
+			_cluster->agg_filter = bloom_create(_strategy.summary_size, BLOOM_ARGS);
+			_cluster->id = clus_get_clusterId(level);
+			_cluster->level = level;
+			clus_add_cluster(_cluster);
+		}
+
+	}
+	
+	bit_clear(g_bfr.is_cluster_head, level);
 
     if (cluster_head == g_bfr.nodeId) {
-        /* we are the cluster head ! */
-        g_bfr.leaf_cluster.agg_filter = bloom_create(_strategy.summary_size, BLOOM_ARGS);
-        g_bfr.leaf_head.distance = 0;
-
-        int i;
-        for (i = g_bfr.num_levels - 1; i > 0; i--) {
-            if (clus_get_clusterHead(i) == join.cluster_id) {
-                /* we are a the cluster head for this level */
-                log_print(g_log, "cluster: is level %u cluster head.", i);
-                bit_set(g_bfr.is_cluster_head, i);
-                struct cluster * _cluster = NULL;
-
-                if (clus_get_cluster(i, clus_get_clusterId(i), &_cluster) < 0) {
-                    _cluster = malloc(sizeof(struct cluster));
-                    _cluster->nodes = NULL;
-                    _cluster->agg_filter = bloom_create(_strategy.summary_size, BLOOM_ARGS);
-                    _cluster->id = clus_get_clusterId(i);
-                    _cluster->level = i;
-                    clus_add_cluster(_cluster);
-                }
-
-            } else {
-                break;
-            }
-        }
-    } else {
-    	struct cluster * _cluster = NULL;
-    	
-    	if (clus_get_cluster(i, clus_get_clusterId(i), &_cluster) < 0) {
-    		_cluster = malloc(sizeof(struct cluster));
-		_cluster->nodes = NULL;
-		_cluster->agg_filter = bloom_create(_strategy.summary_size, BLOOM_ARGS);
-		_cluster->id = clus_get_clusterId(i);
-		_cluster->level = i;
-		clus_add_cluster(_cluster);
+    	if (level == _strategy.num_levels ) {
+			/* we are the leaf cluster head */
+		    g_bfr.leaf_cluster.agg_filter = bloom_create(_strategy.summary_size, BLOOM_ARGS);
+		    g_bfr.leaf_head.distance = 0;
+			bit_set(g_bfr.is_cluster_head, level-1);
+    	} else {
+			/* we are the cluster head for this level */
+			struct cluster * _cluster = NULL;
+			clus_get_cluster(level, clus_get_clusterId(level), &_cluster);
+			bit_set(g_bfr.is_cluster_head, level-1);
     	}
-    }
-
-    struct cluster * clus = NULL;
-    if (clus_get_cluster(join.cluster_level, join.cluster_id, &clus) != 0) {
-        /* we should insert our new cluster */
-        log_print(g_log, "handle_bloom_msg: discovered a new cluster.");
-        clus = (struct cluster *) malloc(sizeof(struct cluster));
-        clus->nodes = NULL;
-        clus->agg_filter = g_bfr.leaf_cluster.agg_filter;
-        clus->id = join.cluster_id;
-        clus->level = join.cluster_level;
-        clus_add_cluster(clus);
     }
 
     pthread_mutex_unlock(&g_bfr.bfr_lock);
 
-    ts_fromnow(&_strategy.ts_next_cluster);
-    ts_addms(&_strategy.ts_next_cluster, _strategy.cluster_interval_ms);
+    ts_fromnow(&_strategy.ts_next_cluster[level - 1]);
+    ts_addms(&_strategy.ts_next_cluster[level - 1], _strategy.cluster_interval_ms);
     log_print(g_log, "cluster: done.");
 
     return 0;
@@ -647,6 +637,24 @@ static int parse_as_cluster_msg(struct bfr_msg * msg,
     return 0;
 }
 
+static int parse_as_pill_msg(struct bfr_msg * msg, struct sleeping_pill_msg * target)
+{
+	if (!msg || !target) return -1;
+	
+	if (msg->hdr.type != MSG_NET_SLEEPING_PILL) return -1;
+	
+	struct net_buffer * buffer = net_buffer_createFrom(msg->payload.data,
+	                                                   msg->hdr.payload_size);
+	target->level = net_buffer_getByte(buffer);
+	target->clusterId = net_buffer_getShort(buffer);
+	target->clusterHead = net_buffer_getInt(buffer);
+	target->hopCount = net_buffer_getByte(buffer);
+	
+	net_buffer_delete(buffer);
+
+	return 0;
+}
+
 static int create_bloom_msg(struct bloom_msg * msg,
                             unsigned origin_level, unsigned origin_clusterId,
                             unsigned dest_level, unsigned dest_clusterId,
@@ -790,6 +798,39 @@ static int broadcast_cluster_msg(struct cluster_msg * msg)
     net_buffer_putShort(&buf, msg->cluster_id);
     net_buffer_putInt(&buf, msg->cluster_head);
     net_buffer_putByte(&buf, msg->hops);
+
+    int rv;
+    if ((rv = net_buffer_send(&buf, g_bfr.sock, &g_bfr.bcast_addr)) < 0) {
+        log_print(g_log, "broadcast_cluster_msg: net_buffer_send failed!");
+    }
+
+    free(buf.buf);
+
+    return rv;
+}
+
+static int broadcast_pill_msg(struct sleeping_pill_msg * msg)
+{
+	if (!msg) {
+        log_print(g_log, "broadcast_pill_msg: tried to send NULL packet -- IGNORING!");
+        return -1;
+    }
+    log_print(g_log, "broadcast_pill_msg: sending sleeping pill msg.");
+
+    int size = SLEEPING_PILL_MSG_SIZE;
+    struct net_buffer buf;
+    net_buffer_init(size + HDR_SIZE, &buf);
+
+    /* header */
+    net_buffer_putByte(&buf, SLEEPING_PILL_MSG_SIZE);
+    net_buffer_putInt(&buf, g_bfr.nodeId);
+    net_buffer_putInt(&buf, size);
+    
+    /* payload */
+    net_buffer_putByte(&buf, msg->level);
+    net_buffer_putShort(&buf, msg->clusterId);
+    net_buffer_putInt(&buf, msg->clusterHead);
+    net_buffer_putByte(&buf, msg->hopCount);
 
     int rv;
     if ((rv = net_buffer_send(&buf, g_bfr.sock, &g_bfr.bcast_addr)) < 0) {

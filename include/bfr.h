@@ -26,6 +26,7 @@
 #define MSG_NET_CLUSTER_JOIN       1
 #define MSG_NET_CLUSTER_RESPONSE   2
 #define MSG_NET_BLOOMFILTER_UPDATE 3
+#define MSG_NET_SLEEPING_PILL      4
 
 #define BFR_MAX_PACKET_SIZE (1500 - 8 - 12) /* UDP+IP overhead of 20 bytes */
 
@@ -47,7 +48,6 @@ struct bfr_msg {
 };
 
 #define BLOOM_MSG_MIN_SIZE (sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint64_t) + sizeof(uint16_t))
-
 struct bloom_msg {
     uint8_t origin_level;
     uint16_t origin_clusterId;
@@ -58,6 +58,14 @@ struct bloom_msg {
 
     uint16_t vector_bits; /* size of bloomfilter in bits */
     uint32_t * vector; /* the bloomfilter in a byte-aligned bit array */
+};
+
+#define SLEEPING_PILL_MSG_SIZE (sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint8_t))
+struct sleeping_pill_msg {
+	uint8_t level;
+	uint16_t clusterId;
+	uint32_t clusterHead;
+	uint8_t hopCount;
 };
 
 #define LOC_MSG_SIZE (2*sizeof(uint64_t))

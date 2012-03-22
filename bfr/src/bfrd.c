@@ -144,6 +144,9 @@ void bfr_handle_net(struct listener_args * net_args)
         } else if (msg->hdr.type == MSG_NET_CLUSTER_RESPONSE) {
             log_print(g_log, "handle_net: Rcvd a MSG_NET_CLUSTER_RESPONSE.");
             strategy_passMsg(msg);
+        } else if (msg->hdr.type == MSG_NET_SLEEPING_PILL) {
+        	log_print(g_log, "handle_net: Rcvd a MSG_NET_CLUSTER_RESPONSE.");
+        	strategy_passMsg(msg);
         } else {
             log_print(g_log, "handle_net: ignoring msg of type %d.", msg->hdr.type);
             free(msg->payload.data);
