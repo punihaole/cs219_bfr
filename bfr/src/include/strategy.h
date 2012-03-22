@@ -12,7 +12,7 @@
 #define JOIN_TIMEOUT_MS 100 /* ms */
 #define JOIN_MAX_ATTEMPTS 4
 
-int stategy_init();
+int strategy_init();
 
 void strategy_close();
 

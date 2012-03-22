@@ -13,7 +13,15 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-g" />
+					<Add option="-iquote src/include" />
+					<Add option="-iquote ../include" />
 				</Compiler>
+				<Linker>
+					<Add option="-lm" />
+					<Add option="-pthread" />
+					<Add library="../lib/libcon.a" />
+					<Add library="../lib/libccnu.a" />
+				</Linker>
 			</Target>
 			<Target title="Release">
 				<Option output="bin/Release/bfr" prefix_auto="1" extension_auto="1" />
@@ -68,9 +76,6 @@
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="src/tests/bfr_test.c">
-			<Option compilerVar="CC" />
-		</Unit>
-		<Unit filename="src/tests/net_test.c">
 			<Option compilerVar="CC" />
 		</Unit>
 		<Extensions>

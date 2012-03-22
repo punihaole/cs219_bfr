@@ -148,23 +148,24 @@ void clus_destroy_node(struct node * _node)
 
 static int search_bloom(struct bloom * filter, struct content_name * name)
 {
+    if (!filter) return 0;
     /* we iteratively check the content name in the bloom filter */
     char str[MAX_NAME_LENGTH];
     str[0] = '\0';
 
-    int i = 1, matches = 0;
+    int matches = 0;
     struct component * curr = name->head;
     /* no longer using the content_name_getComponent func. Doing this by hand
      * is more flexible
      */
     char * copyFrom;
     copyFrom = name->full_name;
-    while (curr != NULL) {
+    int i;
+    for (i = 1; i <= name->num_components; i++) {
         strncat(str, copyFrom, curr->len+1);
         copyFrom += curr->len + 1;
         if (bloom_check(filter, str) == 1)
             matches = i;
-        i++;
         curr = curr->next;
     }
 
@@ -196,13 +197,11 @@ int clus_findCluster(struct content_name * name, unsigned * level, unsigned * cl
 
             log_print(g_log, "cluster = %d, searching aggregate filter", c->id);
             if ((matches = search_bloom(filter, name)) > longest_match) {
-                log_print(g_log, "here1");
                 lm_level = i;
                 lm_clusterId = c->id;
                 longest_match = matches;
                 goto END;
             }
-            log_print(g_log, "here2");
         }
     }
 

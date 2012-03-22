@@ -182,7 +182,7 @@ int main(int argc, char ** argv)
         exit(EXIT_FAILURE);
     }
 
-    if (stategy_init() < 0) {
+    if (strategy_init(levels) < 0) {
         log_print(g_log, "stategy_init: error initializing.");
         exit(EXIT_FAILURE);
     }

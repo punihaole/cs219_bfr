@@ -5,44 +5,49 @@
 #include "bloom_filter.h"
 #include "bitmap.h"
 
+static struct bloom * bloom_vcreate(int size, int nhashes, va_list ap)
+{
+	struct bloom * filter = (struct bloom * ) malloc(sizeof(struct bloom));
+	if (!filter) return NULL;
+
+	filter->size = size;
+	filter->vector = bit_create(size);
+
+	if (!filter->vector) {
+		free(filter);
+		return NULL;
+	}
+
+	filter->hash_funs = (hashfunc_t * ) malloc(sizeof(hashfunc_t) * nhashes);
+	if (!filter->hash_funs) {
+		free(filter->vector);
+		free(filter);
+	}
+
+	int i;
+	for (i = 0; i < nhashes; i++) {
+		filter->hash_funs[i] = va_arg(ap, hashfunc_t);
+	}
+	filter->num_hash_funs = nhashes;
+
+	return filter;
+}
+
 struct bloom * bloom_create(int size, int nhashes, ...)
 {
-        struct bloom * filter = (struct bloom * ) malloc(sizeof(struct bloom));
-        if (!filter) return NULL;
-
-        va_list l;
-
-        filter->size = size;
-        filter->vector = bit_create(size);
-
-        if (!filter->vector) {
-                free(filter);
-                return NULL;
-        }
-
-        filter->hash_funs = (hashfunc_t * ) malloc(sizeof(hashfunc_t) * nhashes);
-        if (!filter->hash_funs) {
-                free(filter->vector);
-                free(filter);
-        }
-
-        int i;
-        va_start(l, nhashes);
-        for (i = 0; i < nhashes; i++) {
-                filter->hash_funs[i] = va_arg(l, hashfunc_t);
-        }
-        va_end(l);
-        filter->num_hash_funs = nhashes;
-
-        return filter;
+	va_list argp;
+	va_start(argp, nhashes);
+	struct bloom * filter = bloom_vcreate(size, nhashes, argp);
+	va_end(argp);
+	return filter;
 }
 
 struct bloom * bloom_createFromVector(int size, unsigned int * vector, int nhashes, ...)
 {
-    va_list ap;
-    va_start(ap, nhashes);
-    struct bloom * filter = NULL;
-    filter = bloom_create(size, nhashes, ap);
+    va_list argp;
+    va_start(argp, nhashes);
+    struct bloom * filter = bloom_vcreate(size, nhashes, argp);
+	va_end(argp);
 	if (!filter) return NULL;
 
     memcpy(filter->vector->map, vector, size/8);

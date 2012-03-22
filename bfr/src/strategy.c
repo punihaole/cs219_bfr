@@ -102,7 +102,7 @@ static void filter_msgs(struct linked_list * putIn, uint8_t type);
 static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId);
 static void * handle_cluster_join_msg(void * arg);
 
-int stategy_init(unsigned num_levels)
+int strategy_init(unsigned num_levels)
 {
 	if (num_levels == 0)
 		return -1;
@@ -153,7 +153,7 @@ struct timespec * calc_next_event(struct linked_list * events)
 			ts_earliest = ts_event;
 		}
 	}
-	
+
 	return ts_earliest;
 }
 
@@ -169,9 +169,10 @@ void * strategy_service(void * ignore)
     struct linked_list * events = linked_list_init(NULL);
     linked_list_append(events, &_strategy.ts_next_bloom);
     int i;
-    for (i = 0; i < _strategy.num_levels; i++) {
-    	linked_list_append(events, &_strategy.ts_next_cluster[i]);
-    	cluster(i+1);
+
+    for (i = _strategy.num_levels; i > 0; i--) {
+    	linked_list_append(events, &_strategy.ts_next_cluster[i-1]);
+    	cluster(i);
     }
 
     next_event = calc_next_event(events);
@@ -205,7 +206,7 @@ void * strategy_service(void * ignore)
     	            cluster(i);
     	        }
     	    }
-           
+
             if (ts_compare(&now, &_strategy.ts_next_bloom) > 0) {
                 bloom();
             }
@@ -320,10 +321,10 @@ static int cluster(unsigned level)
     struct bfr_msg * msg;
     int distance = 0;
 
-    log_print(g_log, "cluster: beginning procedure for %u:%u...", join.cluster_level, join.cluster_id);
+    log_print(g_log, "cluster(%d): beginning procedure for %u:%u...", level, join.cluster_level, join.cluster_id);
 
     wait = backoff_period();
-    log_print(g_log, "cluster: waiting for %ld ms.", wait);
+    log_print(g_log, "cluster(%d): waiting for %ld ms.", level, wait);
     msleep(wait);
 
     pthread_mutex_lock(&g_bfr.bfr_lock);
@@ -334,12 +335,12 @@ static int cluster(unsigned level)
             /* backoff incase join failed from congestion */
             wait = backoff_period();
             msleep(wait);
-            log_print(g_log, "cluster: retrying join attempt.");
+            log_print(g_log, "cluster(%d): retrying join attempt.", level);
         }
 
         broadcast_join_msg(&join);
         wait = join_period(join.cluster_level, join.cluster_id);
-        log_print(g_log, "cluster: waiting for response for %ld ms.", wait);
+        log_print(g_log, "cluster(%d): waiting for response for %ld ms.", level, wait);
         msleep(wait);
         filter_msgs(cluster_responses, MSG_NET_CLUSTER_RESPONSE);
 
@@ -357,7 +358,7 @@ static int cluster(unsigned level)
                 if ((response.cluster_level == join.cluster_level) &&
                     (response.cluster_id == join.cluster_id) &&
                     (response.cluster_id < candidate_id)) {
-                    log_print(g_log, "cluster: got response, cluster head = %u.", response.cluster_head);
+                    log_print(g_log, "cluster(%d): got response, cluster head = %u.", level, response.cluster_head);
                     cluster_head = response.cluster_head;
                     candidate_id = cluster_head;
                     distance = response.hops;
@@ -380,7 +381,7 @@ static int cluster(unsigned level)
 
     FOUND_CLUSTER_HEAD:
     linked_list_delete(cluster_responses);
-    
+
     if (level == _strategy.num_levels) {
 		g_bfr.leaf_head.nodeId = cluster_head;
 		ts_fromnow(&g_bfr.leaf_head.expiration);
@@ -390,8 +391,8 @@ static int cluster(unsigned level)
 		ts_addms(&g_bfr.leaf_head.stale,
 		         _strategy.cluster_freshness_interval_ms);
 
-		log_print(g_log, "cluster: set leaf cluster head to %u.", cluster_head);
-		log_print(g_log, "cluster: distance from head = %u.", distance);
+		log_print(g_log, "cluster(%d): set leaf cluster head to %u.", level, cluster_head);
+		log_print(g_log, "cluster(%d): distance from head = %u.", level, distance);
 
 		g_bfr.leaf_cluster.id = join.cluster_id;
 		g_bfr.leaf_head.nodeId = cluster_head;
@@ -410,7 +411,7 @@ static int cluster(unsigned level)
 		}
 
 	}
-	
+
 	bit_clear(g_bfr.is_cluster_head, level);
 
     if (cluster_head == g_bfr.nodeId) {
@@ -431,7 +432,7 @@ static int cluster(unsigned level)
 
     ts_fromnow(&_strategy.ts_next_cluster[level - 1]);
     ts_addms(&_strategy.ts_next_cluster[level - 1], _strategy.cluster_interval_ms);
-    log_print(g_log, "cluster: done.");
+    log_print(g_log, "cluster(%d): done.", level);
 
     return 0;
 }
@@ -640,16 +641,16 @@ static int parse_as_cluster_msg(struct bfr_msg * msg,
 static int parse_as_pill_msg(struct bfr_msg * msg, struct sleeping_pill_msg * target)
 {
 	if (!msg || !target) return -1;
-	
+
 	if (msg->hdr.type != MSG_NET_SLEEPING_PILL) return -1;
-	
+
 	struct net_buffer * buffer = net_buffer_createFrom(msg->payload.data,
 	                                                   msg->hdr.payload_size);
 	target->level = net_buffer_getByte(buffer);
 	target->clusterId = net_buffer_getShort(buffer);
 	target->clusterHead = net_buffer_getInt(buffer);
 	target->hopCount = net_buffer_getByte(buffer);
-	
+
 	net_buffer_delete(buffer);
 
 	return 0;
@@ -719,10 +720,7 @@ static int broadcast_bloom_msg(struct bloom_msg * msg)
     size += vec_size;
 
     struct net_buffer buf;
-    //net_buffer_init(1024, &buf);
-    buf.buf = (uint8_t * ) malloc(BFR_MAX_PACKET_SIZE);
-    buf.buf_ptr = buf.buf;
-    buf.size = BFR_MAX_PACKET_SIZE;
+    net_buffer_init(BFR_MAX_PACKET_SIZE, &buf);
     /* pack the header */
     int rv = 0;
     net_buffer_putByte(&buf, MSG_NET_BLOOMFILTER_UPDATE);
@@ -825,7 +823,7 @@ static int broadcast_pill_msg(struct sleeping_pill_msg * msg)
     net_buffer_putByte(&buf, SLEEPING_PILL_MSG_SIZE);
     net_buffer_putInt(&buf, g_bfr.nodeId);
     net_buffer_putInt(&buf, size);
-    
+
     /* payload */
     net_buffer_putByte(&buf, msg->level);
     net_buffer_putShort(&buf, msg->clusterId);
@@ -877,6 +875,27 @@ static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
               unpack_ieee754_64(msg->lastHopDistance), msg->lastHopDistance);
     struct bloom * filter = bloom_createFromVector(msg->vector_bits, msg->vector, BLOOM_ARGS);
     if (!filter) return -1;
+
+
+    log_print(g_log, "filter->size = %d", filter->size);
+    log_print(g_log, "filter->vector->num_words = %d", filter->vector->num_words);
+    log_print(g_log, "filter->vector->num_bits = %d", filter->vector->num_bits);
+    /*
+    log_print(g_log, "\torigin_level=%d", msg->origin_level);
+    log_print(g_log, "\torigin_clusterId=%d", msg->origin_clusterId);
+    log_print(g_log, "\tdest_level=%d", msg->dest_level);
+    log_print(g_log, "\tdest_clusterId=%d", msg->dest_clusterId);
+    log_print(g_log, "\tlastHopDistance=%6.5f", msg->vector_bits);
+    int words = ceil(msg->vector_bits/32);
+    char str[words];
+    int i;
+    for (i = 0; i < words; i++) {
+        sprintf(str+i, "%d", msg->vector[i]);
+    }
+    str[words-1] = '\0';
+    log_print(g_log, "\tvector = ");
+    log_print(g_log, "%s", str);
+    */
 
     /* we use overhead bloom filters */
     struct cluster * clus = NULL;

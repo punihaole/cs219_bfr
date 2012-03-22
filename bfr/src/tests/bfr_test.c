@@ -409,25 +409,26 @@ int linked_list_test()
     return 0;
 }
 
-static int search_bloom(struct bloom * filter, struct content_name * name)
+static int search_bloom_test(struct bloom * filter, struct content_name * name)
 {
+    if (!filter) return 0;
     /* we iteratively check the content name in the bloom filter */
     char str[MAX_NAME_LENGTH];
     str[0] = '\0';
 
-    int i = 1, matches = 0;
+    int matches = 0;
     struct component * curr = name->head;
     /* no longer using the content_name_getComponent func. Doing this by hand
      * is more flexible
      */
     char * copyFrom;
     copyFrom = name->full_name;
-    while (curr != NULL) {
+    int i;
+    for (i = 1; i <= name->num_components; i++) {
         strncat(str, copyFrom, curr->len+1);
         copyFrom += curr->len + 1;
         if (bloom_check(filter, str) == 1)
             matches = i;
-        i++;
         curr = curr->next;
     }
 
@@ -452,28 +453,28 @@ int bloom_search_test()
 
     struct content_name * name = content_name_create("/tom/test");
     int matches = 0;
-    if ((matches = search_bloom(filter, name)) != 2) {
+    if ((matches = search_bloom_test(filter, name)) != 2) {
         fprintf(stderr, "Expected 2 matches but got %d", matches);
         return -1;
     }
     content_name_delete(name);
     name = content_name_create("/tom/test/a");
     matches = 0;
-    if ((matches = search_bloom(filter, name)) != 2) {
+    if ((matches = search_bloom_test(filter, name)) != 2) {
         fprintf(stderr, "Expected 2 matches but got %d", matches);
         return -1;
     }
     content_name_delete(name);
     name = content_name_create("/tom/test/web/home.html");
     matches = 0;
-    if ((matches = search_bloom(filter, name)) != 3) {
+    if ((matches = search_bloom_test(filter, name)) != 3) {
         fprintf(stderr, "Expected 3 matches but got %d", matches);
         return -1;
     }
     content_name_delete(name);
     name = content_name_create("/file/test");
     matches = 0;
-    if ((matches = search_bloom(filter, name)) != 0) {
+    if ((matches = search_bloom_test(filter, name)) != 0) {
         fprintf(stderr, "Expected 0 matches but got %d", matches);
         return -1;
     }
@@ -502,6 +503,11 @@ int bloom_vector_test()
         if (filter2->vector->map[i] != filter->vector->map[i])
             return -1;
     }
+
+    vector = malloc(150 * sizeof(uint32_t));
+    filter = bloom_createFromVector(4800, vector, BLOOM_ARGS);
+    struct content_name * name = content_name_create("/afasda/asdas/dasd");
+    if (search_bloom_test(filter, name) != 0) return -1;
 
     return 0;
 }
