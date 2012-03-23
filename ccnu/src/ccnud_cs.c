@@ -103,7 +103,6 @@ int CS_put(struct content_obj * content)
             segment->chunks[seq_no] = content;
             bit_set(segment->valid, seq_no);
         }
-
     } else {
         struct CS_segment * segment;
         segment = (struct CS_segment * ) hash_get(_cs.table, content_prefix(content->name));
@@ -118,8 +117,9 @@ int CS_put(struct content_obj * content)
             segment->valid = bit_create(0);
             hash_put(_cs.table, key, (void * ) segment);
         } else {
-            if (segment->index_chunk)
+            if (segment->index_chunk) {
                 content_obj_destroy(segment->index_chunk);
+            }
             segment->index_chunk = content;
         }
     }

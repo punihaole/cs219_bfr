@@ -69,7 +69,7 @@ int test_grid()
     printf("distance(2,14) = %5.5f\n", d);
     grid_distance(2, 15, x, y, &d);
     printf("distance(2,15) = %5.5f\n", d);
-
+    return 0;
 }
 
 int test_suite()

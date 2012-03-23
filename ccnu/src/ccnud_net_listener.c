@@ -180,22 +180,30 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
 {
     int rv = 0;
 
-    /*log_print(g_log, "handle_interest: %s from %u:%u->%u:%u",
+    log_print(g_log, "handle_interest: %s from %u:%u->%u:%u",
               interest->name->full_name, interest->orig_level, interest->orig_clusterId,
-              interest->dest_level, interest->dest_clusterId);*/
+              interest->dest_level, interest->dest_clusterId);
 
     /* check the CS for data to match interest */
     struct content_obj * content = CS_get(interest->name);
     if (content) {
-        /*log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);*/
+        log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);
         ccnudnb_fwd_data(content, 1);
     } else {
         /* fwd interest */
         PENTRY pe = PIT_search(interest->name);
         if (pe) {
             /* refresh the pit entry */
+            if (PIT_age(pe) >= INTEREST_TIMEOUT_MS) {
+                log_print(g_log, "handle_interest: expired interest, passing on %s",
+                              interest->name->full_name);
+                ccnudnb_fwd_interest(interest);
+            }
             PIT_refresh(pe);
             /* we already saw this interest...drop it */
+            log_print(g_log, "handle_interest: %s previously seen, refresh PIT.",
+                      interest->name->full_name);
+            pthread_mutex_unlock(pe->mutex);
             goto END;
         } else {
             /* ask routing daemon if we should forward the interest */
@@ -222,23 +230,28 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
                     goto END;
                 }
 
+                log_print(g_log, "handle_interest: %s forwarding.",
+                          interest->name->full_name);
+
                 /* we fwded the interest, add it to the pit */
                 PIT_add_entry(interest->name);
             } else {
+                log_print(g_log, "handle_interest: %s dropping.", interest->name->full_name);
                 /* drop interest */
             }
         }
     }
 
     END:
+    log_print(g_log, "handle_interest: done");
 
     return NULL;
 }
 
 static void * handle_data(struct ccnu_data_pkt * data)
 {
-    /*log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
-              data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);*/
+    log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
+              data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);
 
     struct content_obj * obj;
     obj = (struct content_obj *) malloc(sizeof(struct content_obj));
@@ -254,26 +267,31 @@ static void * handle_data(struct ccnu_data_pkt * data)
 	    bfr_sendDistance(obj->name, data->hops);
 	}
 
-    int rv;
-    if ((rv = CS_put(obj)) != 0) {
-        log_print(g_log, "handle_data: failed to put data in CS.");
-    }
-
     /* check if it fulfills a registered interest */
+    log_print(g_log, "%s searching PIT", obj->name->full_name);
     PENTRY pe = PIT_search(obj->name);
     if (!pe) {
+        log_print(g_log, "%s unsolicited data", obj->name->full_name);
         /* unsolicited data */
-        return NULL;
+        goto END;
     }
 
-    PIT_refresh(pe);
+    log_print(g_log, "%s refreshing PIT", obj->name->full_name);
+
+    if (!*pe->obj) {
+        CS_put(obj);
+        *pe->obj = obj; /* hand them the data and wake them up*/
+    }
+
     if (pe->registered) {
+        PIT_refresh(pe);
         /* we fulfilled a pit, we need to notify the waiter */
         /* no need to lock the pe, the pit_longest_match did it for us */
-        *pe->obj = obj; /* hand them the data and wake them up*/
         #ifdef CCNU_USE_SLIDING_WINDOW
+        log_print(g_log, "%s found registered pe", obj->name->full_name);
         _segment_q_t * seg = match_segment(obj->name);
         if (seg) {
+            log_print(g_log, "%s is segmented content", obj->name->full_name);
             /* already locked */
             pthread_mutex_unlock(pe->mutex);
             linked_list_append(seg->rcv_chunks, pe);
@@ -281,9 +299,11 @@ static void * handle_data(struct ccnu_data_pkt * data)
             if (seg->rcv_window >= *seg->max_window / 2) {
                 seg->rcv_window = 0;
                 pthread_cond_signal(&seg->cond);
+                log_print(g_log, "%s signalling segment", obj->name->full_name);
             }
             pthread_mutex_unlock(&seg->mutex);
         } else {
+            log_print(g_log, "%s is a chunk, notifiying expresser thread", obj->name->full_name);
             pthread_cond_signal(pe->cond);
             pthread_mutex_unlock(pe->mutex);
             free(pe);
@@ -295,10 +315,15 @@ static void * handle_data(struct ccnu_data_pkt * data)
         #endif
 
     } else {
+        log_print(g_log, "%s fulfilling PIT, fwding data", obj->name->full_name);
         /* we matched an interest rcvd over the net */
-        rv = ccnudnb_fwd_data(obj, data->hops + 1);
+        ccnudnb_fwd_data(obj, data->hops + 1);
         PIT_release(pe); /* release will unlock the lock */
     }
+
+    END:
+
+    log_print(g_log, "handle_data: done");
 
     return NULL;
 }

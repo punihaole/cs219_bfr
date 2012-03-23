@@ -111,11 +111,10 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
      */
     pe = PIT_get_handle(name);
     if (!pe) {
-        log_print(g_log, "ccnudnb_send_interest: failed to create pit entry");
+        log_print(g_log, "ccnudnb_express_interest: failed to create pit entry");
         goto CLEANUP;
     }
 
-    pthread_mutex_lock(pe->mutex);
     /* we send the interest, and timeout if it is not fullfilled.
      * retransmit after the timeout up until max attempts.
      */
@@ -123,21 +122,20 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
     struct timespec ts;
     for (i = 0; i < retries; i++) {
         if (i > 0) {
-            log_print(g_log, "ccnudnb_send_interest: retransmitting interest (%s),...",
+            log_print(g_log, "ccnudnb_express_interest: retransmitting interest (%s),...",
                       name->full_name);
         }
-        ts_fromnow(&ts);
-        ts_addms(&ts, timeout_ms);
 
         net_buffer_send(&buf, _bcast_sock, &_addr);
-
         /* now that we registered and sent the interest we wait */
         while (!*pe->obj) {
-            log_print(g_log, "ccnudnb_send_interest: waiting for response (%s)...",
+            ts_fromnow(&ts);
+            ts_addms(&ts, timeout_ms);
+            log_print(g_log, "ccnudnb_express_interest: waiting for response (%s)...",
                       name->full_name);
             rv = pthread_cond_timedwait(pe->cond, pe->mutex, &ts);
-            if (rv == ETIMEDOUT && !*pe->obj) {
-                /* we timed out, we need to rtx, exit the invariant check loop */
+            if (rv == ETIMEDOUT || *pe->obj) {
+                /* exit the invariant check loop, timed out or rcvd data */
                 break;
             }
         }
@@ -147,7 +145,7 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
 
     rv = 0;
     if (!*pe->obj) {
-        log_print(g_log, "ccnudnb_send_interest: rtx interest %d times with no data.",i);
+        log_print(g_log, "ccnudnb_express_interest: rtx interest %d times with no data.",i);
         rv = -1;
         goto CLEANUP;
     }

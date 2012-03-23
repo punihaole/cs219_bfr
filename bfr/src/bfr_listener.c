@@ -281,8 +281,8 @@ static void * fwd_query_response(void * arg)
 
     ///@TODO add, Bloom filter checking to do route updating */
 
-    log_print(g_log, "bfr_accept: INTEREST_FWD_QUERY (%d, %s, %d, %d, %10.2f).",
-           name_len, full_name, dest_level, dest_clusterId, dist);
+    log_print(g_log, "fwd_query_response: INTEREST_FWD_QUERY (%d, %s, %d:%d, %d:%d, %10.2f).",
+           name_len, full_name, orig_level, orig_clusterId, dest_level, dest_clusterId, dist);
 
     pthread_mutex_lock(&g_bfr.bfr_lock);
 	double x = g_bfr.x;
@@ -312,7 +312,7 @@ static void * fwd_query_response(void * arg)
 
         if ((rv = grid_distance(g_bfr.num_levels, dest_clusterId,
                                 x, y, &myDist))!= 0) {
-            log_print(g_log, "bfr_accept: failed to calculate distance, must be invalid parameters.");
+            log_print(g_log, "fwd_query_response: failed to calculate distance, must be invalid parameters.");
         }
     }
 
@@ -324,17 +324,56 @@ static void * fwd_query_response(void * arg)
 	int found_clus = clus_findCluster(name, &up_dest_level, &up_dest_clusterId);
 	content_name_delete(name);
 	int calc_dist = -1;
+	bool_t use_update;
 	if (found_clus == 0) {
 		double up_distance;
 		calc_dist = grid_distance(up_dest_level, up_dest_clusterId, x, y, &up_distance);
 		if ((calc_dist == 0) && ((up_distance < myDist) || (myDist < 0))) {
 			myDist = up_distance;
-			log_print(g_log, "dest_query_response: updating cluster level and Id = (%u,%u) for content=%s",
+			log_print(g_log, "fwd_query_response: updating cluster level and Id = (%u,%u) for content=%s",
 				up_dest_level, up_dest_clusterId, full_name);
-			dest_level = up_dest_level;
-			dest_clusterId = up_dest_clusterId;
+			use_update = TRUE;
 		}
 	}
+
+	/* fwd if:
+     * 1. Inter-cluster and closer
+     * 2. They were fwding to their cluster head, and we found the actual dest.
+     * 3. Intra-cluster and same cluster and closer
+     */
+    bool_t intra = (dest_level == orig_level) && (dest_clusterId == orig_clusterId);
+    bool_t inter = !intra;
+
+    pthread_mutex_lock(&g_bfr.bfr_lock);
+    unsigned my_leaf_cluster = clus_leaf_clusterId();
+    pthread_mutex_unlock(&g_bfr.bfr_lock);
+
+    bool_t same_cluster = intra && (my_leaf_cluster == orig_clusterId);
+
+    bool_t closer = abs(myDist) < abs(dist);
+
+    log_print(g_log, "intra = %d", intra);
+    log_print(g_log, "inter = %d", inter);
+    log_print(g_log, "same_cluster = %d", same_cluster);
+    log_print(g_log, "closer = %d", closer);
+    log_print(g_log, "use_update = %d", use_update);
+
+    int response = 0;
+
+    if ((inter && closer) || (intra && use_update) || (intra && same_cluster && closer)) {
+        /* we are closer or we aren't sure */
+        if (use_update) {
+            dest_level = up_dest_level;
+			dest_clusterId = up_dest_clusterId;
+        }
+        response = 1;
+        log_print(g_log, "fwd_query_response: responded to interest forward query with YES.");
+    } else {
+        /* respond: don't forward the interest */
+        response = 0;
+        log_print(g_log, "fwd_query_response: responded to interest forward query with NO.");
+    }
+
 
     if (send(sock2, &orig_level, sizeof(unsigned), 0) == -1) {
         log_print(g_log, "send: %s.", strerror(errno));
@@ -360,17 +399,6 @@ static void * fwd_query_response(void * arg)
     if (send(sock2, &myDist_754, sizeof(uint64_t), 0) == -1) {
         log_print(g_log, "send: %s", strerror(errno));
         goto END_FWD_QRY;
-    }
-
-    int response = 0;
-    if ((rv == 0) && (abs(myDist) >= abs(dist))) {
-        /* respond: don't forward the interest */
-        response = 0;
-        log_print(g_log, "bfr_accept: responded to interest forward query with NO.");
-    } else {
-        /* we are closer or we aren't sure */
-        response = 1;
-        log_print(g_log, "bfr_accept: responded to interest forward query with YES.");
     }
 
     if (send(sock2, &response, sizeof(int), 0) == -1) {

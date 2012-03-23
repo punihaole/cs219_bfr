@@ -59,6 +59,7 @@ PENTRY PIT_longest_match(struct content_name * name);
 /* returns 1 if the entry is expired */
 int PIT_is_expired(PENTRY _pe);
 
+/* PIT entry age in ms */
 long PIT_age(PENTRY _pe);
 
 /* removes an entry from the pit */

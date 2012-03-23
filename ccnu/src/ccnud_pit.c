@@ -116,6 +116,7 @@ PENTRY PIT_get_handle(struct content_name * name)
         }
     }
 
+    pthread_mutex_lock(&g_pit.pit_table[index].mutex);
     pthread_mutex_unlock(&g_pit.pit_lock);
 
     PENTRY pe = (PENTRY) malloc(sizeof(_pit_entry_s));
@@ -160,11 +161,11 @@ int PIT_add_entry(struct content_name * name)
     }
     ts_fromnow(&g_pit.pit_table[index].expires);
     ts_addms(&g_pit.pit_table[index].expires, g_pit.pit_lifetime_ms);
+    g_pit.pit_table[index].name = name;
+    g_pit.pit_table[index].registered = 0;
 
     pthread_mutex_unlock(&g_pit.pit_lock);
 
-    g_pit.pit_table[index].name = name;
-    g_pit.pit_table[index].registered = 0;
     return 0;
 }
 
@@ -179,6 +180,7 @@ PENTRY PIT_search(struct content_name * name)
         }
 
         if (strcmp(g_pit.pit_table[i].name->full_name, name->full_name) == 0) {
+            pthread_mutex_lock(&g_pit.pit_table[i].mutex);
             match = 1;
             break;
         }
@@ -196,9 +198,10 @@ PENTRY PIT_search(struct content_name * name)
         pe->registered = g_pit.pit_table[i].registered;
         pe->expires = &g_pit.pit_table[i].expires;
         pthread_mutex_unlock(&g_pit.pit_lock);
-        pthread_mutex_lock(&g_pit.pit_table[i].mutex);
         return pe;
     } else {
+        if (match)
+            pthread_mutex_unlock(&g_pit.pit_table[i].mutex);
         pthread_mutex_unlock(&g_pit.pit_lock);
         return NULL;
     }
@@ -224,10 +227,10 @@ PENTRY PIT_longest_match(struct content_name * name)
         if (match_len == name->num_components)
             break;
     }
-    pthread_mutex_unlock(&g_pit.pit_lock);
 
     if (index != -1) {
         pthread_mutex_lock(&g_pit.pit_table[index].mutex);
+        pthread_mutex_unlock(&g_pit.pit_lock);
         PENTRY pe = (PENTRY) malloc(sizeof(_pit_entry_s));
         pe->mutex = &g_pit.pit_table[index].mutex;
         pe->cond = &g_pit.pit_table[index].cond;
@@ -237,18 +240,20 @@ PENTRY PIT_longest_match(struct content_name * name)
         pe->expires = &g_pit.pit_table[index].expires;
         return pe;
     } else {
+        pthread_mutex_unlock(&g_pit.pit_lock);
         return NULL;
     }
 }
 
 void PIT_release(PENTRY _pe)
 {
+    g_pit.pit_table[_pe->index].name = NULL;
+    g_pit.pit_table[_pe->index].obj = NULL;
+    g_pit.pit_table[_pe->index].registered = 0;
+    pthread_mutex_unlock(_pe->mutex);
+
     pthread_mutex_lock(&g_pit.pit_lock);
         bit_clear(g_pit.pit_table_valid, _pe->index);
-        g_pit.pit_table[_pe->index].name = NULL;
-        g_pit.pit_table[_pe->index].obj = NULL;
-        g_pit.pit_table[_pe->index].registered = 0;
-        pthread_mutex_unlock(_pe->mutex);
     pthread_mutex_unlock(&g_pit.pit_lock);
 
     free(_pe);

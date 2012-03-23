@@ -71,7 +71,9 @@ int ccnudl_init(int pipeline_size)
     int len;
 
     _listener.interest_pipe_size = pipeline_size;
-    if (tpool_create(&_listener.interest_pipeline, INTEREST_FLOWS) < 0) {
+    //int pool_size = INTEREST_FLOWS;
+    int pool_size = 1;
+    if (tpool_create(&_listener.interest_pipeline, pool_size) < 0) {
         log_print(g_log, "tpool_create: could not create interest thread pool!");
         return -1;
     }
@@ -777,7 +779,7 @@ static int retrieve_segment(struct segment * seg)
             ccnudnb_fwd_interest(&chunk_window[i].intr);
             tx--;
             current_chunk++;
-            /*log_print(g_log, "expressing new interest: %s", chunk_window[i].intr.name->full_name);*/
+            log_print(g_log, "expressing new interest: %s", chunk_window[i].intr.name->full_name);
         }
 
         pthread_mutex_lock(&seg_q.mutex);
@@ -801,6 +803,7 @@ static int retrieve_segment(struct segment * seg)
 
                 int chunk_id = pit_to_chunk[pe->index];
                 if (chunk_id < 0) {
+                    pthread_mutex_unlock(pe->mutex);
                     continue;
                 }
 
@@ -844,6 +847,7 @@ static int retrieve_segment(struct segment * seg)
                     PIT_refresh(_pit_handles[i]);
                     chunk_window[i].retries--;
                     ccnudnb_fwd_interest(&chunk_window[i].intr);
+                    log_print(g_log, "rtx interest: %s", chunk_window[i].intr.name->full_name);
                     ssthresh = cwnd / 2 + 1;
                     cwnd = 1;
                     state = SLOW_START;

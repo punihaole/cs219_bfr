@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -O2 -Wall -iquote ../include -iquote src/include
-CLINK = -L../lib -lcon -lbfr -pthread -lm 
+CLINK = -L../lib -lcon -lbfr -pthread -lm -lrt
 SRC = src
 TEST_SRC = src/tests
 OBJ = bin/obj
@@ -15,6 +15,7 @@ clean:
 	rm -rf $(OBJ)
 	rm -f ccnud
 	rm -f libccnu.a
+	rm -f src/tests/libccnu.a
 
 $(OBJ):
 	mkdir -p $(OBJ)
@@ -22,7 +23,7 @@ $(OBJ):
 libccnu.a: $(OBJ) $(OBJ)/ccnu.o
 	ar rc libccnu.a $(OBJ)/ccnu.o ../lib/libcon.a
 	ranlib libccnu.a
-	cp -p libccnu.a src/tests/libccnu.a
+	cp -p libccnu.a src/tests
 
 $(OBJ)/ccnu.o: $(SRC)/ccnu.c
 	$(CC) $(CFLAGS) -c $(SRC)/ccnu.c -o $(OBJ)/ccnu.o

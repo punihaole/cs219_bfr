@@ -3,6 +3,10 @@
 
 #include "bfrd.h"
 
+/* lock the g_bfr struct before touching any of these functions! */
+
+#define clus_leaf_clusterId() clus_get_clusterId(g_bfr.num_levels)
+
 int clus_get_level(unsigned level_id, struct bfr_level ** level);
 
 int clus_get_cluster(unsigned level_id, unsigned cluster_id, struct cluster ** clus);
