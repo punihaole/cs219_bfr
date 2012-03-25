@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="ccnflood" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Release">
+				<Option output="bin/Release/ccnflood" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+					<Add option="-iquote src/include" />
+					<Add option="-iquote ../include" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+					<Add option="-lm" />
+					<Add option="-pthread" />
+					<Add option="-lrt" />
+					<Add library="../lib/libcon.a" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-Wall" />
+		</Compiler>
+		<Unit filename="src/ccnf.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnfd.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnfd_cs.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnfd_listener.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnfd_net_broadcaster.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnfd_net_listener.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/ccnfd_pit.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src/include/ccnf_packet.h" />
+		<Unit filename="src/include/ccnfd.h" />
+		<Unit filename="src/include/ccnfd_constants.h" />
+		<Unit filename="src/include/ccnfd_cs.h" />
+		<Unit filename="src/include/ccnfd_listener.h" />
+		<Unit filename="src/include/ccnfd_net_broadcaster.h" />
+		<Unit filename="src/include/ccnfd_net_listener.h" />
+		<Unit filename="src/include/ccnfd_pit.h" />
+		<Unit filename="src/tests/ccnf_net_test.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Extensions>
+			<code_completion />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

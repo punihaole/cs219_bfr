@@ -1,0 +1,26 @@
+CC = gcc
+CFLAGS = -g -O2 -Wall -iquote ../include -iquote ../../../include
+CLINK = -lm -lpthread -L. -lccnf -L. -lcon
+
+all: bloom_test publish_test retrieve_test 
+
+bloom_test: bloom_test.o
+	$(CC) $(CFLAGS) bloom_test.o $(CLINK) -o bloom_test
+
+publish_test: publish_test.o
+	$(CC) $(CFLAGS) publish_test.o $(CLINK) -o publish_test
+
+retrieve_test: retrieve_test.o
+	$(CC) $(CFLAGS) retrieve_test.o $(CLINK) -o retrieve_test
+
+clean:
+	rm -f *.o *~ bloom_test publish_test retrieve_test 
+
+bloom_test.o : bloom_test.c
+	$(CC) $(CFLAGS) -c bloom_test.c
+
+publish_test.o : publish_test.c
+	$(CC) $(CFLAGS) -c publish_test.c
+
+retrieve_test.o: retrieve_test.c
+	$(CC) $(CFLAGS) -c retrieve_test.c

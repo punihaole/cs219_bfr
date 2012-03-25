@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_layout_file>
+	<ActiveTarget name="Release" />
+	<File name="src/ccnf.c" open="1" top="0" tabpos="2">
+		<Cursor position="1312" topLine="648" />
+	</File>
+	<File name="src/ccnfd.c" open="0" top="0" tabpos="0">
+		<Cursor position="417" topLine="0" />
+	</File>
+	<File name="src/ccnfd_cs.c" open="1" top="0" tabpos="5">
+		<Cursor position="5736" topLine="181" />
+	</File>
+	<File name="src/ccnfd_listener.c" open="0" top="0" tabpos="0">
+		<Cursor position="1081" topLine="37" />
+	</File>
+	<File name="src/ccnfd_net_broadcaster.c" open="1" top="1" tabpos="6">
+		<Cursor position="4529" topLine="140" />
+	</File>
+	<File name="src/ccnfd_net_listener.c" open="1" top="0" tabpos="1">
+		<Cursor position="3068" topLine="81" />
+	</File>
+	<File name="src/include/ccnf_packet.h" open="1" top="0" tabpos="3">
+		<Cursor position="0" topLine="15" />
+	</File>
+	<File name="src/include/ccnfd_constants.h" open="1" top="0" tabpos="4">
+		<Cursor position="293" topLine="0" />
+	</File>
+</CodeBlocks_layout_file>
