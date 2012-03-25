@@ -71,8 +71,8 @@ int ccnudl_init(int pipeline_size)
     int len;
 
     _listener.interest_pipe_size = pipeline_size;
-    //int pool_size = INTEREST_FLOWS;
-    int pool_size = 1;
+    int pool_size = INTEREST_FLOWS;
+    //int pool_size = 1;
     if (tpool_create(&_listener.interest_pipeline, pool_size) < 0) {
         log_print(g_log, "tpool_create: could not create interest thread pool!");
         return -1;
@@ -1091,10 +1091,9 @@ static void * seq_response(void * arg)
     ccnudnb_opt_t opts;
     opts.mode = CCNUDNB_USE_ROUTE | CCNUDNB_USE_TIMEOUT;
     opts.timeout_ms = INTEREST_TIMEOUT_MS;
-    if (bfr_sendWhere(name,
-                        &opts.orig_level_u, &opts.orig_clusterId_u,
-                        &opts.dest_level_u, &opts.dest_clusterId_u,
-                        &opts.distance) < 0) {
+    if (bfr_sendWhere(name, &opts.orig_level_u, &opts.orig_clusterId_u,
+                      &opts.dest_level_u, &opts.dest_clusterId_u,
+                      &opts.distance) < 0) {
         log_print(g_log, "seq_response: sendWhere? failed! -- cannot send interest, %s!",
                   name->full_name);
         send(sock, &rv, sizeof(uint32_t), 0);

@@ -3,24 +3,36 @@
 #include <string.h>
 #include <math.h>
 
+#include "ccnf.h"
 #include "ccnu.h"
 #include "content_name.h"
 #include "content.h"
 #include "ts.h"
 
+typedef int (*publishSeq_t)(struct content_obj * , struct linked_list * );
+
 static void print_usage(char * argv_0)
 {
 	printf("cftps\n");
 	printf("CCNU FTP server: serves specified file under given content name\n");
-    printf("Usage: %s filename content name\n", argv_0);
+    printf("Usage: %s filename content name -f(optional)\n", argv_0);
+	printf("\tthe optional (-f) argument specifies to publish to the flooding ccn daemon\n");
     printf("Example: %s /example/path/to/file /example/content/name\n", argv_0);
 }
 
 int main(int argc, char ** argv)
 {
-	if (argc != 3) {
+	if (argc > 4 || argc < 3) {
 		print_usage(argv[0]);
 		exit(EXIT_FAILURE);
+	}
+
+	publishSeq_t publish;
+
+	if (argc == 4 && (strcmp(argv[3], "-f") == 0)) {
+		publish = ccnf_publishSeq;
+	} else {
+		publish = ccnu_publishSeq;
 	}
 
 	char * filename = argv[1];
@@ -92,7 +104,7 @@ int main(int argc, char ** argv)
 		chunk_id++;
 	}
 
-	if (ccnu_publishSeq(&index, chunks) != 0) {
+	if (publish(&index, chunks) != 0) {
 		printf("Failed to publish segment!\n");
 	}
 

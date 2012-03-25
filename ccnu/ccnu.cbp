@@ -20,6 +20,7 @@
 					<Add option="-s" />
 					<Add option="-pthread" />
 					<Add option="-lm" />
+					<Add option="-lrt" />
 					<Add library="../lib/libbfr.a" />
 					<Add library="../lib/libcon.a" />
 				</Linker>

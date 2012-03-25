@@ -4,21 +4,33 @@
 #include <fcntl.h>
 
 #include "ccnu.h"
+#include "ccnf.h"
 #include "ts.h"
+
+typedef int (*publish_t)(struct content_obj * );
 
 void print_usage(char * exec)
 {
 	printf("%s publishes as many bytes of input as possible under the given content name\n", exec);
-	printf("usage: %s content_name \"content\"\n", exec);
+	printf("usage: %s content_name \"content\" -f(optional)\n", exec);
+	printf("\tthe optional (-f) argument specifies to publish to the flooding ccn daemon\n");
 	printf("example: %s /hello_world \"Hello World!\"", exec);
 	printf("example: cat Hello_World.txt | %s /hello_world -", exec);
 }
 
 int main(int argc, char ** argv)
 {
-	if (argc != 3) {
+	if (argc > 4) {
 		print_usage(argv[0]);
 		exit(EXIT_FAILURE);
+	}
+
+	publish_t publish;
+
+	if (argc == 4 && (strcmp(argv[3], "-f") == 0)) {
+		publish = ccnf_publish;
+	} else {
+		publish = ccnu_publish;
 	}
 
 	char * name = argv[1];
@@ -55,5 +67,5 @@ int main(int argc, char ** argv)
 	}
 	con.data = realloc(con.data, con.size);
 	
-	exit(ccnu_publish(&con));
+	exit(publish(&con));
 }

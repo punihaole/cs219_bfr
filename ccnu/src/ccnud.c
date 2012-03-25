@@ -164,7 +164,7 @@ int main(int argc, char *argv[])
     char log_name[256];
     snprintf(log_name, 256, "ccnud_%u", g_nodeId);
     if (!log_file_set)
-        snprintf(log_file, 256, "/tmp/ccnud_%u.log", g_nodeId);
+        snprintf(log_file, 256, "/home/tom/log/ccnud_%u.log", g_nodeId);
 
     if (log_init(log_name, log_file, g_log, LOG_OVERWRITE) < 0) {
         syslog(LOG_ERR, "ccnud log: %s failed to initalize!", log_file);

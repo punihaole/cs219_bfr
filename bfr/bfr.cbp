@@ -19,6 +19,7 @@
 				<Linker>
 					<Add option="-lm" />
 					<Add option="-pthread" />
+					<Add option="-lrt" />
 					<Add library="../lib/libcon.a" />
 					<Add library="../lib/libccnu.a" />
 				</Linker>
@@ -30,9 +31,16 @@
 				<Option compiler="gcc" />
 				<Compiler>
 					<Add option="-O2" />
+					<Add option="-iquote src/include" />
+					<Add option="-iquote ../include" />
 				</Compiler>
 				<Linker>
 					<Add option="-s" />
+					<Add option="-lm" />
+					<Add option="-pthread" />
+					<Add option="-lrt" />
+					<Add library="../lib/libcon.a" />
+					<Add library="../lib/libccnu.a" />
 				</Linker>
 			</Target>
 		</Build>

@@ -4,8 +4,12 @@
 #include <sys/time.h>
 
 #include "ccnu.h"
+#include "ccnf.h"
 #include "content_name.h"
 #include "content.h"
+
+typedef int (*retrieve_t)(struct content_name * , struct content_obj ** );
+typedef int (*retrieveSeq_t)(struct content_name * , int, int, struct content_obj ** );
 
 static void print_usage(char * argv_0)
 {
@@ -17,13 +21,23 @@ static void print_usage(char * argv_0)
 
 int main(int argc, char ** argv)
 {
-	if (argc != 3) {
+	if (argc > 4 || argc < 3) {
 		print_usage(argv[0]);
 		exit(EXIT_FAILURE);
 	}
+	retrieve_t retrieve_content;
+	retrieveSeq_t retrieve_seq;
+	if (argc == 4 && (strcmp(argv[3], "-f") == 0)) {
+		printf("Using interest flooding\n");
+		retrieve_content = ccnf_retrieve;
+		retrieve_seq = ccnf_retrieveSeq;
+	} else {
+		printf("Using interest BFR\n");
+		retrieve_content = ccnu_retrieve;
+		retrieve_seq = ccnu_retrieveSeq;
+	}
 
 	struct timeval tv_start, tv_end;
-	gettimeofday(&tv_start, NULL);
 
 	char * con_name = argv[1];
 	char * filename = argv[2];
@@ -36,7 +50,8 @@ int main(int argc, char ** argv)
 	struct content_obj * index;
 
 	printf("retrieving index (%s).\n", con_name);
-	if (ccnu_retrieve(name, &index) != 0) {
+	gettimeofday(&tv_start, NULL);
+	if (retrieve_content(name, &index) != 0) {
 		printf("could not retrieve index segment!\n");
 		exit(EXIT_FAILURE);
 	}
@@ -50,7 +65,7 @@ int main(int argc, char ** argv)
 	printf("retrieved index, found %d segments, file size = %d.\n", num_segments, file_size);
 
 	struct content_obj * obj;
-	if (ccnu_retrieveSeq(name, num_segments, file_size, &obj) != 0) {
+	if (retrieve_seq(name, num_segments, file_size, &obj) != 0) {
 		fprintf(stderr, "failed to retrieve segments!\n");
 		exit(EXIT_FAILURE);
 	}

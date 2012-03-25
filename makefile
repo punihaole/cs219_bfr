@@ -1,7 +1,7 @@
 LIB_DIR = lib
 BIN_DIR = bin
 
-all: $(LIB_DIR) $(LIB_BIN) libcon.a libbfr.a libccnu.a bfrd ccnud apps
+all: $(LIB_DIR) $(LIB_BIN) libcon.a libbfr.a libccnu.a libccnf.a bfrd ccnud ccnfd apps
 
 $(LIB_DIR):
 	mkdir -p $(LIB_DIR)
@@ -13,6 +13,7 @@ clean:
 	cd libcon && echo "cleaning libcon\n" && make clean;\
 	cd ../bfr && echo "cleaning bfr\n" && make clean; \
 	cd ../ccnu && echo "cleaning ccnu\n" && make clean; \
+	cd ../ccnflood && echo "cleaning ccnflood\n" && make clean; \
 	cd ../apps && echo "cleaning apps\n" && make clean; \
 	cd ../$(BIN_DIR) && rm -f *; \
 	cd ../$(LIB_DIR) && rm -f *; \
@@ -34,6 +35,11 @@ libccnu.a: $(LIB_DIR)/libcon.a
 	make libccnu.a; \
 	cp libccnu.a ../lib/libccnu.a;
 
+libccnf.a: $(LIB_DIR)/libcon.a
+	cd ccnflood; echo "compiling libccnf.a and copying to lib"; \
+	make libccnf.a; \
+	cp libccnf.a ../lib/libccnf.a;
+
 bfrd: $(LIB_DIR)/libcon.a $(LIB_DIR)/libccnu.a
 	cd bfr; echo "compiling bfrd and copying to bin"; \
 	make bfrd; \
@@ -44,6 +50,11 @@ ccnud: $(LIB_DIR)/libcon.a $(LIB_DIR)/libbfr.a
 	make ccnud; \
 	cp ccnud ../bin/ccnud;
 
-apps: $(LIB_DIR)/libcon.a $(LIB_DIR)/libbfr.a $(LIB_DIR)/libccnu.a
+ccnfd: $(LIB_DIR)/libcon.a
+	cd ccnflood; echo "compiling ccnfd and copying to bin"; \
+	make ccnfd; \
+	cp ccnfd ../bin/ccnfd;
+
+apps: $(LIB_DIR)/libcon.a $(LIB_DIR)/libbfr.a $(LIB_DIR)/libccnu.a $(LIB_DIR)/libccnf.a
 	cd apps; echo "compiling apps"; \
 	make;

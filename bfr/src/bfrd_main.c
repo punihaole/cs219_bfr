@@ -161,7 +161,7 @@ int main(int argc, char ** argv)
     char log_name[256];
     snprintf(log_name, 256, "bfr_%u", nodeId);
     if (!log_file_set)
-        snprintf(log_file, 256, "/tmp/bfr_%u.log", nodeId);
+        snprintf(log_file, 256, "/home/tom/log/bfr_%u.log", nodeId);
     log_name[255] = '\0';
     log_file[255] = '\0';
 
