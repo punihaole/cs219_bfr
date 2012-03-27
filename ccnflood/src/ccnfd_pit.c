@@ -108,7 +108,6 @@ PENTRY PIT_get_handle(struct content_name * name)
 
         /* we can evict this pit entry */
         if (g_pit.pit_table[index].obj) {
-            content_obj_destroy(g_pit.pit_table[index].obj);
             g_pit.pit_table[index].obj = NULL;
         }
 
@@ -153,7 +152,6 @@ int PIT_add_entry(struct content_name * name)
 
         /* we can evict this pit entry */
         if (g_pit.pit_table[index].obj) {
-            content_obj_destroy(g_pit.pit_table[index].obj);
             g_pit.pit_table[index].obj = NULL;
         }
 

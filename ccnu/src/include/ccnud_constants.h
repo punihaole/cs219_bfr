@@ -16,7 +16,6 @@
 #define LISTEN_PORT 8282
 #define SOCK_QUEUE 5
 
-#define CCNU_USE_SLIDING_WINDOW
 typedef enum {
     SLOW_START,
     CONG_AVOID

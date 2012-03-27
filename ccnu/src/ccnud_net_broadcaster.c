@@ -46,7 +46,6 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
 
     struct net_buffer buf;
     net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
-    PENTRY pe = NULL;
     uint8_t packet_type = PACKET_TYPE_INTEREST;
 
     /* We need to hook into our routing daemon and use the sendWhere
@@ -59,6 +58,7 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
     int timeout_ms = INTEREST_TIMEOUT_MS;
     int ttl = MAX_TTL;
     int qry = 1;
+    PENTRY pe = PIT_INVALID;
 
     if (use_opt) {
         if ((opt->mode & CCNUDNB_USE_ROUTE) == CCNUDNB_USE_ROUTE) {
@@ -110,8 +110,14 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
      * arrives.
      */
     pe = PIT_get_handle(name);
-    if (!pe) {
+    if (pe < 0) {
         log_print(g_log, "ccnudnb_express_interest: failed to create pit entry");
+        goto CLEANUP;
+    }
+    struct content_obj ** data = NULL;
+    if (PIT_point_data(pe, &data) < 0) {
+        PIT_close(pe);
+        log_print(g_log, "ccnudnb_express_interest: failed to get data ptr");
         goto CLEANUP;
     }
 
@@ -125,34 +131,35 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
             log_print(g_log, "ccnudnb_express_interest: retransmitting interest (%s),...",
                       name->full_name);
         }
-
+        PIT_refresh(pe);
         net_buffer_send(&buf, _bcast_sock, &_addr);
         /* now that we registered and sent the interest we wait */
-        while (!*pe->obj) {
+        while (!*data) {
             ts_fromnow(&ts);
             ts_addms(&ts, timeout_ms);
             log_print(g_log, "ccnudnb_express_interest: waiting for response (%s)...",
                       name->full_name);
-            rv = pthread_cond_timedwait(pe->cond, pe->mutex, &ts);
-            if (rv == ETIMEDOUT || *pe->obj) {
+            rv = PIT_wait(pe, &ts);
+            if (rv == ETIMEDOUT || *data) {
                 /* exit the invariant check loop, timed out or rcvd data */
                 break;
             }
         }
 
-        if (*pe->obj) break;
+        if (*data) break;
     }
 
     rv = 0;
-    if (!*pe->obj) {
+    if (!*data) {
         log_print(g_log, "ccnudnb_express_interest: rtx interest %d times with no data.",i);
         rv = -1;
         goto CLEANUP;
+    } else {
+        *content_ptr = *data;
     }
 
     CLEANUP:
-    if (pe) {
-        *content_ptr = *pe->obj;
+    if (pe >= 0) {
         PIT_release(pe); /* will unlock our mutex */
     }
 

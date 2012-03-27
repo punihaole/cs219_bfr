@@ -29,6 +29,13 @@
 		<Compiler>
 			<Add option="-Wall" />
 		</Compiler>
+		<Linker>
+			<Add option="-pthread" />
+			<Add option="-lm" />
+			<Add option="-lrt" />
+			<Add library="../lib/libbfr.a" />
+			<Add library="../lib/libcon.a" />
+		</Linker>
 		<Unit filename="src/ccnu.c">
 			<Option compilerVar="CC" />
 		</Unit>

@@ -2,12 +2,12 @@
 <CodeBlocks_layout_file>
 	<ActiveTarget name="Release" />
 	<File name="src/bfr.c" open="0" top="0" tabpos="2">
-		<Cursor position="4257" topLine="150" />
+		<Cursor position="5186" topLine="150" />
 	</File>
 	<File name="src/bfr_listener.c" open="0" top="0" tabpos="3">
 		<Cursor position="10690" topLine="350" />
 	</File>
-	<File name="src/bfrd_main.c" open="1" top="1" tabpos="5">
+	<File name="src/bfrd_main.c" open="0" top="0" tabpos="5">
 		<Cursor position="5716" topLine="181" />
 	</File>
 	<File name="src/cluster.c" open="0" top="0" tabpos="0">

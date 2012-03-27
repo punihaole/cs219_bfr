@@ -154,7 +154,7 @@ int ccnfdnb_fwd_data(struct content_obj * content, int hops_taken)
     if (!content || !content->name || !content->data) return -1;
 
     struct net_buffer buf;
-    net_buffer_init(CCNF_MAX_PACKET_SIZE+1, &buf);
+    net_buffer_init(CCNF_MAX_PACKET_SIZE, &buf);
 
     net_buffer_putByte(&buf, PACKET_TYPE_DATA);
     net_buffer_putByte(&buf, hops_taken);

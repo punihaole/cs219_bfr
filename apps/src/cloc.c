@@ -19,6 +19,7 @@ int main(int argc, char ** argv)
 	double y = atof(argv[2]);
 
 	if (bfr_sendLoc(x, y) == 0) {
+		printf("Success\n");
 		exit(EXIT_SUCCESS);		
 	} else {
 		fprintf(stderr, "Failed to send coordinates!\n");

@@ -189,14 +189,10 @@ static void * handle_interest(struct ccnf_interest_pkt * interest)
         if (pe) {
             /* refresh the pit entry */
             if (PIT_age(pe) >= INTEREST_TIMEOUT_MS) {
-                log_print(g_log, "handle_interest: expired interest, passing on %s",
-                              interest->name->full_name);
                 ccnfdnb_fwd_interest(interest);
             }
             PIT_refresh(pe);
             /* we already saw this interest...drop it */
-            log_print(g_log, "handle_interest: %s previously seen, refresh PIT.",
-                      interest->name->full_name);
             PIT_close(pe);
             goto END;
         } else {
@@ -233,15 +229,12 @@ static void * handle_data(struct ccnf_data_pkt * data)
     obj->data = data->payload;
 
     /* check if it fulfills a registered interest */
-    log_print(g_log, "%s searching PIT", obj->name->full_name);
     PENTRY pe = PIT_search(obj->name);
     if (!pe) {
         log_print(g_log, "%s unsolicited data", obj->name->full_name);
         /* unsolicited data */
         goto END;
     }
-
-    log_print(g_log, "%s refreshing PIT", obj->name->full_name);
 
     CS_put(obj);
     if (!*pe->obj) {
@@ -253,10 +246,8 @@ static void * handle_data(struct ccnf_data_pkt * data)
         /* we fulfilled a pit, we need to notify the waiter */
         /* no need to lock the pe, the pit_longest_match did it for us */
         #ifdef CCNU_USE_SLIDING_WINDOW
-        log_print(g_log, "%s found registered pe", obj->name->full_name);
         _segment_q_t * seg = match_segment(obj->name);
         if (seg) {
-            log_print(g_log, "%s is segmented content", obj->name->full_name);
             /* already locked */
             pthread_mutex_unlock(pe->mutex);
             linked_list_append(seg->rcv_chunks, pe);
@@ -264,26 +255,25 @@ static void * handle_data(struct ccnf_data_pkt * data)
             if (seg->rcv_window >= *seg->max_window / 2) {
                 seg->rcv_window = 0;
                 pthread_cond_signal(&seg->cond);
-                log_print(g_log, "%s signalling segment", obj->name->full_name);
             }
             pthread_mutex_unlock(&seg->mutex);
         } else {
             log_print(g_log, "%s is a chunk, notifiying expresser thread", obj->name->full_name);
             pthread_cond_signal(pe->cond);
             pthread_mutex_unlock(pe->mutex);
+            free(pe);
         }
         #else
         pthread_cond_signal(pe->cond);
         pthread_mutex_unlock(pe->mutex);
+        free(pe);
         #endif
 
     } else {
         log_print(g_log, "%s fulfilling PIT, fwding data", obj->name->full_name);
         /* we matched an interest rcvd over the net */
         ccnfdnb_fwd_data(obj, data->hops + 1);
-        log_print(g_log, "fwded, releasing PIT...");
         PIT_release(pe); /* release will unlock the lock */
-        log_print(g_log, "released pit");
     }
 
     END:

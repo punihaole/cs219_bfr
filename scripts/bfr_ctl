@@ -11,9 +11,16 @@ else
 	arg="start"
 fi	
 
-if [ "$arg" != 'start' -a "$arg" != 'restart' -a "$arg" != 'stop' ]; then
+if [ "$arg" != 'start' -a "$arg" != 'restart' -a "$arg" != 'stop' -a "$arg" != 'loc' ]; then
 	echo "unexpected command"
 	exit 1
+fi
+
+MY_PATH=$(readlink -m $0)
+MY_PATH=${MY_PATH/%bfr_ctl/}
+
+if [ "$arg" = 'loc' ]; then
+	$MY_PATH/../apps/bin/cloc $2 $3
 fi
 
 if [ "$arg" = 'start' ]; then
@@ -22,10 +29,10 @@ if [ "$arg" = 'start' ]; then
 	else
 		echo " * Starting ccnud"
 		if [ "$#" -ge '2' ]; then
-			result=`~/projects/cs219_bfr/bin/ccnud $2`
+			result=`$MY_PATH/../bin/ccnud $2`
 			echo $result
 		else
-			result=`~/projects/cs219_bfr/bin/ccnud`
+			result=`$MY_PATH/../bin/ccnud`
 		fi
 	fi
 
@@ -36,9 +43,9 @@ if [ "$arg" = 'start' ]; then
 	else
 		echo " * Starting bfrd"
 		if [ "$#" -ge '3' ]; then
-			result=`~/projects/cs219_bfr/bin/bfrd $3`
+			result=`$MY_PATH/../bin/bfrd $3`
 		else
-			result=`~/projects/cs219_bfr/bin/bfrd`
+			result=`$MY_PATH/../bin/bfrd`
 		fi
 	fi
 
@@ -50,10 +57,10 @@ elif [ "$arg" = 'restart' ]; then
 
 	echo " * Starting ccnud"
 	if [ "$#" -ge '2' ]; then
-		result=`~/projects/cs219_bfr/bin/ccnud $2`
+		result=`$MY_PATH/../bin/ccnud $2`
 		echo $result
 	else
-		result=`~/projects/cs219_bfr/bin/ccnud`
+		result=`$MY_PATH/../bin/ccnud`
 	fi
 
 	if [ "$(pidof bfrd)" ]; then
@@ -65,9 +72,9 @@ elif [ "$arg" = 'restart' ]; then
 	echo " * Starting bfrd"
 
 	if [ "$#" -ge '3' ]; then
-		result=`~/projects/cs219_bfr/bin/bfrd $3`
+		result=`$MY_PATH/../bin/bfrd $3`
 	else
-		result=`~/projects/cs219_bfr/bin/bfrd`
+		result=`$MY_PATH/../bin/bfrd`
 	fi
 
 elif [ "$arg" = 'stop' ]; then
