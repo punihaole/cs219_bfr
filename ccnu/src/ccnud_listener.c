@@ -628,6 +628,7 @@ static void * retrieve_response(void * arg)
     }
 
     END_RETRIEVE_RESP:
+    if (content) content_obj_destroy(content);
 
     close(sock);
 
@@ -837,6 +838,7 @@ static int retrieve_segment(struct segment * seg)
                 pit_to_chunk[pe] = -1;
                 log_print(g_log, "PIT %d done, releasing", pe);
                 PIT_release(pe);
+                content_obj_destroy(pe_data);
                 _pit_handles[chunk_id] = PIT_INVALID;
                 bit_clear(window, chunk_id);
                 bit_set(missing, chunk_window[chunk_id].seq_no);

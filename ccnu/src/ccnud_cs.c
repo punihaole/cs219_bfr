@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <pthread.h>
 
 #include "ccnud_cs.h"
 #include "hash.h"
@@ -10,7 +11,7 @@
 #include "bitmap.h"
 
 struct CS {
-    pthread_mutex_lock lock;
+    pthread_mutex_t lock;
     struct hashtable * table;
     int summary_size;
 };
@@ -77,8 +78,25 @@ int CS_init(evict_policy_t ep, double p)
     return 0;
 }
 
+static struct content_obj * content_copy(struct content_obj * orig)
+{
+    if (!orig) {
+        return NULL;
+    }
+    struct content_obj * copy = malloc(sizeof(struct content_obj));
+    copy->publisher = orig->publisher;
+    copy->name = content_name_create(orig->name->full_name);
+    copy->timestamp = orig->timestamp;
+    copy->size = orig->size;
+    copy->data = malloc(sizeof(uint8_t) * copy->size);
+    memcpy(copy->data, orig->data, copy->size);
+
+    return copy;
+}
+
 int CS_put(struct content_obj * content)
 {
+    content = content_copy(content);
     pthread_mutex_lock(&_cs.lock);
     if (content_is_segmented(content->name)) {
         struct CS_segment * segment = NULL;
@@ -144,10 +162,10 @@ int CS_putSegment(struct content_obj * prefix_obj, struct linked_list * content_
     segment->chunks = malloc(sizeof(struct content_obj * ) * segment->num_chunks);
     segment->valid = bit_create(segment->num_chunks);
 
-    int i = 0;
-    while (content_chunks->len) {
+    int i;
+    for (i = 0; i < segment->num_chunks; i++) {
         bit_set(segment->valid, i);
-        segment->chunks[i++] = linked_list_remove(content_chunks, 0);
+        segment->chunks[i] = linked_list_remove(content_chunks, 0);
     }
 
     pthread_mutex_lock(&_cs.lock);
@@ -167,7 +185,7 @@ struct content_obj * CS_get(struct content_name * name)
         pthread_mutex_lock(&_cs.lock);
             segment = (struct CS_segment * ) hash_get(_cs.table, name->full_name);
             if (segment) {
-                ret = segment->index_chunk;
+                ret = content_copy(segment->index_chunk);
             }
         pthread_mutex_unlock(&_cs.lock);
     } else {
@@ -176,8 +194,8 @@ struct content_obj * CS_get(struct content_name * name)
         pthread_mutex_lock(&_cs.lock);
             segment = (struct CS_segment * ) hash_get(_cs.table, prefix);
 
-            if (segment && (segment->num_chunks <= chunk)) {
-                ret = segment->chunks[chunk];
+            if (segment && (segment->num_chunks >= chunk) && bit_test(segment->valid, chunk)) {
+                ret = content_copy(segment->chunks[chunk]);
             }
         pthread_mutex_unlock(&_cs.lock);
 

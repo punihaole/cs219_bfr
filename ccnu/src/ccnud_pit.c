@@ -103,6 +103,7 @@ PENTRY PIT_get_handle(struct content_name * name)
 {
     if (!name) return PIT_ARG_ERR;
 
+    log_print(g_log, "PIT_get_handle trying to lock PIT");
     pthread_mutex_lock(&g_pit.pit_lock);
     /* bit find also set the bit it returns */
     int index = bit_find(g_pit.pit_table_valid);
@@ -131,7 +132,9 @@ PENTRY PIT_get_handle(struct content_name * name)
     g_pit.pit_table[index].name = content_name_create(name->full_name);
     g_pit.pit_table[index].registered = 1;
     g_pit.pit_table[index].available = TRUE;
+    log_print(g_log, "PIT_get_handle trying to lock %d", index);
     pthread_mutex_lock(&g_pit.pit_table[index].mutex);
+    log_print(g_log, "PIT_get_handle locked %d", index);
     pthread_mutex_unlock(&g_pit.pit_lock);
 
     return pe;
@@ -179,9 +182,7 @@ int PIT_add_entry(struct content_name * name)
 PENTRY PIT_search(struct content_name * name)
 {
     int index = -1;
-    log_print(g_log, "PIT_search trying to lock table");
     pthread_mutex_lock(&g_pit.pit_lock);
-    log_print(g_log, "PIT_search locked");
     int i;
     for (i = 0; i < PIT_SIZE; i++) {
         if (!bit_test(g_pit.pit_table_valid, i)) {

@@ -80,6 +80,7 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
         }
     }
 
+    log_print(g_log, "qry for %s", name->full_name);
     if (qry) {
         if (bfr_sendWhere(name, &orig_level_u, &orig_clusterId_u,
                             &dest_level_u, &dest_clusterId_u, &distance) < 0) {
@@ -109,7 +110,9 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
     /* we register the interest so that we can be notified when the data
      * arrives.
      */
+    log_print(g_log, "get_handle for %s", name->full_name);
     pe = PIT_get_handle(name);
+    log_print(g_log, "got %d", pe);
     if (pe < 0) {
         log_print(g_log, "ccnudnb_express_interest: failed to create pit entry");
         goto CLEANUP;
@@ -127,6 +130,7 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
     int i;
     struct timespec ts;
     for (i = 0; i < retries; i++) {
+        log_print(g_log, "ccnudnb_express_interest: %d", i);
         if (i > 0) {
             log_print(g_log, "ccnudnb_express_interest: retransmitting interest (%s),...",
                       name->full_name);
@@ -155,6 +159,7 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
         rv = -1;
         goto CLEANUP;
     } else {
+        log_print(g_log, "ccnudnb_express_interest: rcvd data for %s", name->full_name);
         *content_ptr = *data;
     }
 

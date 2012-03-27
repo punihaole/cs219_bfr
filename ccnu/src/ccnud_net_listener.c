@@ -186,28 +186,30 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
               interest->name->full_name, interest->orig_level, interest->orig_clusterId,
               interest->dest_level, interest->dest_clusterId);
 
-    /* check if we've seen this interest already */
-    PENTRY pe = PIT_search(interest->name);
-
-    if (pe >= 0) {
-        /* refresh the pit entry */
-        if (PIT_age(pe) >= INTEREST_TIMEOUT_MS) {
-            log_print(g_log, "handle_interest: expired interest, passing on %s",
-                      interest->name->full_name);
-            ccnudnb_fwd_interest(interest);
-        }
-        PIT_refresh(pe);
-        /* we already saw this interest...drop it */
-        log_print(g_log, "handle_interest: %s previously seen, refresh PIT.",
-                  interest->name->full_name);
-        PIT_close(pe);
+    log_print(g_log, "handle_interest: checking CS");
+    struct content_obj * content = CS_get(interest->name);
+    if (content) {
+        log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);
+        ccnudnb_fwd_data(content, 1);
     } else {
-        /* see if we can satisfy this interest */
-        struct content_obj * content = CS_get(interest->name);
-        if (content) {
-            log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);
-            ccnudnb_fwd_data(content, 1);
+        log_print(g_log, "handle_interest: CS miss, checking PIT");
+        /* check if we've seen this interest already */
+        PENTRY pe = PIT_search(interest->name);
+
+        if (pe >= 0) {
+            log_print(g_log, "handle_interest: %s previously seen, refresh PIT.",
+                      interest->name->full_name);
+            /* refresh the pit entry */
+            if (PIT_age(pe) >= INTEREST_TIMEOUT_MS) {
+                log_print(g_log, "handle_interest: expired interest, passing on %s",
+                          interest->name->full_name);
+                ccnudnb_fwd_interest(interest);
+            }
+            PIT_refresh(pe);
+            /* we already saw this interest...drop it */
+            PIT_close(pe);
         } else {
+            /* see if we can satisfy this interest */
             log_print(g_log, "handle_interest: checking if should fwd: %d\n", pe);
             /* ask routing daemon if we should forward the interest */
             double last_hop_distance = unpack_ieee754_64(interest->distance);
@@ -262,7 +264,7 @@ static void * handle_data(struct ccnu_data_pkt * data)
 
     struct content_obj * obj = NULL;
     obj = (struct content_obj *) malloc(sizeof(struct content_obj));
-    int put = -1, handed = -1;
+    int handed = -1;
 
     obj->publisher = data->publisher_id;
     obj->name = data->name;
@@ -277,6 +279,8 @@ static void * handle_data(struct ccnu_data_pkt * data)
 
     /* check if it fulfills a registered interest */
     PENTRY pe = PIT_search(obj->name);
+    CS_put(obj);
+
     if (pe < 0) {
         log_print(g_log, "%s unsolicited data", obj->name->full_name);
         /* unsolicited data */
@@ -284,7 +288,6 @@ static void * handle_data(struct ccnu_data_pkt * data)
         handed = PIT_hand_data(pe, obj);
         log_print(g_log, "%s handing data to PIT", obj->name->full_name);
         if (handed < 0) goto END;
-        put = CS_put(obj);
 
         if (PIT_is_registered(pe)) {
             log_print(g_log, "%s refreshing PIT", obj->name->full_name);
@@ -318,12 +321,13 @@ static void * handle_data(struct ccnu_data_pkt * data)
             /* we matched an interest rcvd over the net */
             ccnudnb_fwd_data(obj, data->hops + 1);
             PIT_release(pe); /* release will unlock the lock */
+            content_obj_destroy(obj);
         }
     }
 
     END:
-    if (put < 0 && handed < 0) {
-        /* data did not get cached, delete it */
+    if (handed < 0) {
+        /* data did not get handed */
         content_obj_destroy(obj);
     }
 
