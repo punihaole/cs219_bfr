@@ -10,8 +10,8 @@
 #include "bitmap.h"
 
 struct CS {
+    pthread_mutex_lock lock;
     struct hashtable * table;
-
     int summary_size;
 };
 
@@ -60,6 +60,7 @@ int CS_init(evict_policy_t ep, double p)
     }
 
     _cs.table = hash_create(CS_SIZE, evict_fun, (delete_t)segment_destroy, BLOOM_ARGS);
+    pthread_mutex_init(&_cs.lock, NULL);
 
     if (!_cs.table) return -1;
 
@@ -78,11 +79,13 @@ int CS_init(evict_policy_t ep, double p)
 
 int CS_put(struct content_obj * content)
 {
+    pthread_mutex_lock(&_cs.lock);
     if (content_is_segmented(content->name)) {
         struct CS_segment * segment = NULL;
         segment = (struct CS_segment * ) hash_get(_cs.table, content_prefix(content->name));
         if (!segment) {
             /* don't store segmented chunks we haven't seen ? */
+            pthread_mutex_unlock(&_cs.lock);
             return -1;
         }
         int seq_no = content_seq_no(content->name);
@@ -123,6 +126,7 @@ int CS_put(struct content_obj * content)
             segment->index_chunk = content;
         }
     }
+    pthread_mutex_unlock(&_cs.lock);
 
     return 0;
 }
@@ -146,7 +150,9 @@ int CS_putSegment(struct content_obj * prefix_obj, struct linked_list * content_
         segment->chunks[i++] = linked_list_remove(content_chunks, 0);
     }
 
-    hash_put(_cs.table, key, (void * ) segment);
+    pthread_mutex_lock(&_cs.lock);
+        hash_put(_cs.table, key, (void * ) segment);
+    pthread_mutex_unlock(&_cs.lock);
     return 0;
 }
 
@@ -154,27 +160,31 @@ struct content_obj * CS_get(struct content_name * name)
 {
     if (!name) return NULL;
 
+    struct content_obj * ret = NULL;
     struct CS_segment * segment = NULL;
 
     if (!content_is_segmented(name)) {
-        segment = (struct CS_segment * ) hash_get(_cs.table, name->full_name);
-        if (!segment) {
-            return NULL;
-        }
-        return segment->index_chunk;
+        pthread_mutex_lock(&_cs.lock);
+            segment = (struct CS_segment * ) hash_get(_cs.table, name->full_name);
+            if (segment) {
+                ret = segment->index_chunk;
+            }
+        pthread_mutex_unlock(&_cs.lock);
     } else {
         int chunk = content_seq_no(name);
         char * prefix = content_prefix(name);
-        segment = (struct CS_segment * ) hash_get(_cs.table, prefix);
+        pthread_mutex_lock(&_cs.lock);
+            segment = (struct CS_segment * ) hash_get(_cs.table, prefix);
+
+            if (segment && (segment->num_chunks <= chunk)) {
+                ret = segment->chunks[chunk];
+            }
+        pthread_mutex_unlock(&_cs.lock);
+
         free(prefix);
-        if (!segment) {
-            return NULL;
-        }
-        if (segment->num_chunks <= chunk) {
-            return NULL;
-        }
-        return segment->chunks[chunk];
     }
+
+    return ret;
 }
 
 struct content_obj * CS_getSegment(struct content_name * prefix)
@@ -182,8 +192,9 @@ struct content_obj * CS_getSegment(struct content_name * prefix)
     if (!prefix) return NULL;
 
     struct CS_segment * segment;
-    segment = (struct CS_segment * ) hash_get(_cs.table, prefix->full_name);
-
+    pthread_mutex_lock(&_cs.lock);
+        segment = (struct CS_segment * ) hash_get(_cs.table, prefix->full_name);
+    pthread_mutex_unlock(&_cs.lock);
     if (!segment || segment->num_chunks < 0) {
         return NULL;
     }
@@ -211,6 +222,8 @@ int CS_summary(struct bloom ** filter_ptr)
     if (!filter_ptr) return -1;
 
     *filter_ptr = bloom_create(_cs.summary_size, BLOOM_ARGS);
+    pthread_mutex_lock(&_cs.lock);
+
     int i;
     for (i = 0; i < _cs.table->size; i++) {
         struct hash_entry * entry = _cs.table->entries[i];
@@ -219,6 +232,7 @@ int CS_summary(struct bloom ** filter_ptr)
             bloom_add(*filter_ptr, name);
         }
     }
+    pthread_mutex_unlock(&_cs.lock);
 
     return 0;
 }

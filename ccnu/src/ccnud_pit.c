@@ -201,6 +201,7 @@ PENTRY PIT_search(struct content_name * name)
     }
 
     if (g_pit.pit_table[index].available == FALSE) {
+        log_print(g_log, "PIT search found %s = %d, available = NO", name->full_name, index);
         pthread_mutex_unlock(&g_pit.pit_lock);
         return PIT_BUSY;
     }
@@ -272,9 +273,7 @@ PENTRY PIT_longest_match(struct content_name * name)
 void PIT_release(PENTRY _pe)
 {
     if (check_handle(_pe)) {
-        log_print(g_log, "PIT_release: %d valid, locking table", _pe);
         pthread_mutex_lock(&g_pit.pit_lock);
-            log_print(g_log, "PIT_release: unlocking, %d", _pe);
             pthread_mutex_unlock(&g_pit.pit_table[_pe].mutex);
             bit_clear(g_pit.pit_table_valid, _pe);
             content_name_delete(g_pit.pit_table[_pe].name);

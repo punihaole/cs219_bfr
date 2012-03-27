@@ -60,6 +60,7 @@ int ccnudnl_init(int pipeline_size)
         return -1;
     }
 
+    pipeline_size = 1;
     if (tpool_create(&_net.packet_pipeline, pipeline_size) < 0) {
         log_print(g_log, "tpool_create: could not create interest thread pool!");
         return -1;
@@ -269,8 +270,6 @@ static void * handle_data(struct ccnu_data_pkt * data)
     obj->size = data->payload_len;
     obj->data = data->payload;
 
-    put = CS_put(obj);
-
 	/* update the forwarding table in the routing daemon (if prefix) */
 	if (!content_is_segmented(obj->name)) {
 	    bfr_sendDistance(obj->name, data->hops);
@@ -285,6 +284,7 @@ static void * handle_data(struct ccnu_data_pkt * data)
         handed = PIT_hand_data(pe, obj);
         log_print(g_log, "%s handing data to PIT", obj->name->full_name);
         if (handed < 0) goto END;
+        put = CS_put(obj);
 
         if (PIT_is_registered(pe)) {
             log_print(g_log, "%s refreshing PIT", obj->name->full_name);
@@ -310,7 +310,6 @@ static void * handle_data(struct ccnu_data_pkt * data)
             } else {
                 log_print(g_log, "%s is a chunk, notifiying expresser thread", obj->name->full_name);
                 PIT_signal(pe);
-                PIT_unlock(pe);
                 PIT_close(pe);
             }
 
