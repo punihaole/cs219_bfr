@@ -186,13 +186,11 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
               interest->name->full_name, interest->orig_level, interest->orig_clusterId,
               interest->dest_level, interest->dest_clusterId);
 
-    log_print(g_log, "handle_interest: checking CS");
     struct content_obj * content = CS_get(interest->name);
     if (content) {
         log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);
         ccnudnb_fwd_data(content, 1);
     } else {
-        log_print(g_log, "handle_interest: CS miss, checking PIT");
         /* check if we've seen this interest already */
         PENTRY pe = PIT_search(interest->name);
 
