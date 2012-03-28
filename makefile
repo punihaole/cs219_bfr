@@ -19,6 +19,8 @@ clean:
 	cd ../$(LIB_DIR) && rm -f *; \
 	rm -f *~
 	rm -f include/*~
+	rm -f *~
+	rm -f scripts/*~	
 
 libcon.a:
 	cd libcon; echo "compiling the shared content lib"; \

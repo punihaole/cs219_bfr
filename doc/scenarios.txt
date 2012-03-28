@@ -1,0 +1,29 @@
+I. Setup core to work with CCN+BFR, CCN+Flooding
+	I.i.  Copy core_cfg/ccn_exp.py to ~/.core/myservices
+	I.ii. Modify ~/.core/myservices/__init__.py
+
+II. We can test CCN+Flooding and CCN+BFR. 
+	II.i. To get CCN+Flooding:
+
+	copy scripts/core_exp_setup_flood.sh to scripts/core_exp_setup.sh
+
+	e.g.
+	>$cd /path/to/cs219_bfr/scripts
+	>$cp core_exp_setup_flood.sh core_exp_setup.sh
+
+	II.ii. To get CCN+BFR:
+
+	copy scripts/core_exp_setup_bfr.sh to scripts/core_exp_setup.sh
+
+	e.g.
+	>$cd /path/to/cs219_bfr/scripts
+	>$cp core_exp_setup_bfr.sh core_exp_setup.sh
+
+III. Running CCN+BFR on a standalone machine
+
+	scripts/bfr_ctl is a bash script to stop, start, or restart the ccn and bfr
+	daemons. 
+	Accepts self-explanatory arguments of 'stop', 'start', or 'restart'.
+	Also, if you specify loc and 2 more arguments it will pass these as the 
+	<x,y> coordinates of your node to the BFR daemon. Arguments that are not 
+	valid floats or ints will be cast to 0.0 or ignored.
