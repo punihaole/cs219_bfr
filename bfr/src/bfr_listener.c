@@ -356,6 +356,7 @@ static void * fwd_query_response(void * arg)
     log_print(g_log, "inter = %d", inter);
     log_print(g_log, "same_cluster = %d", same_cluster);
     log_print(g_log, "closer = %d", closer);
+    log_print(g_log, "myDist = %5.5f, lastHop = %5.5f", myDist, dist);
     log_print(g_log, "use_update = %d", use_update);
 
     int response = 0;

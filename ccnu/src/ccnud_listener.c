@@ -6,7 +6,7 @@
  * periodically poll the queue for messages and parse them.
  *
  **/
-
+#include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -699,8 +699,10 @@ static int retrieve_segment(struct segment * seg)
     unsigned orig_clusterId_u = seg->opts->orig_clusterId_u;
     unsigned dest_level_u = seg->opts->dest_level_u;
     unsigned dest_clusterId_u = seg->opts->dest_clusterId_u;
-    int retries = INTEREST_MAX_ATTEMPTS;
-    int timeout_ms = INTEREST_TIMEOUT_MS;
+    pthread_mutex_lock(&g_lock);
+    int retries = g_interest_attempts;
+    int timeout_ms = g_timeout_ms;
+    pthread_mutex_unlock(&g_lock);
     int ttl = MAX_TTL;
 
     if ((seg->opts->mode & CCNUDNB_USE_RETRIES) == CCNUDNB_USE_RETRIES) {
@@ -723,7 +725,7 @@ static int retrieve_segment(struct segment * seg)
     char str[MAX_NAME_LENGTH], comp[MAX_NAME_LENGTH];
     strncpy(str, seg->name->full_name, seg->name->len);
 
-    int rtt_est = INTEREST_TIMEOUT_MS;
+    int rtt_est = timeout_ms;
     int cwnd = 1;
     int ssthresh = DEFAULT_INTEREST_PIPELINE;
     int fullfilled = 0;
@@ -802,23 +804,21 @@ static int retrieve_segment(struct segment * seg)
                 }
                 PENTRY pe = *pe_ptr;
                 free(pe_ptr);
-                log_print(g_log, "GOT PIT %d", pe);
+                //log_print(g_log, "GOT PIT %d", pe);
 
                 PIT_lock(pe);
 
                 int chunk_id = pit_to_chunk[pe];
-                log_print(g_log, "chunk id = %d", chunk_id);
+                //log_print(g_log, "chunk id = %d", chunk_id);
                 if (chunk_id < 0) {
                     PIT_unlock(pe);
                     continue;
                 }
 
-                log_print(g_log, "chunk = %s", chunk_window[chunk_id].intr.name->full_name);
+                //log_print(g_log, "chunk = %s", chunk_window[chunk_id].intr.name->full_name);
 
                 struct content_obj * pe_data = PIT_get_data(pe);
-                if (!pe_data) {
-                    log_print(g_log, "PIT %d data NULL?", pe);
-                }
+
                 if (chunk_window[chunk_id].seq_no == 0) {
                     seg->obj->publisher = pe_data->publisher;
                     seg->obj->timestamp = pe_data->timestamp;
@@ -836,7 +836,7 @@ static int retrieve_segment(struct segment * seg)
                 }
 
                 pit_to_chunk[pe] = -1;
-                log_print(g_log, "PIT %d done, releasing", pe);
+                //log_print(g_log, "PIT %d done, releasing", pe);
                 PIT_release(pe);
                 content_obj_destroy(pe_data);
                 _pit_handles[chunk_id] = PIT_INVALID;
@@ -887,8 +887,6 @@ static int retrieve_segment(struct segment * seg)
               seg->name->full_name, 0, seg->num_chunks-1);
 
     rv = 0;
-
-    PIT_print();
     ccnudnl_unreg_segment(&seg_q);
     pthread_mutex_destroy(&seg_q.mutex);
     pthread_cond_destroy(&seg_q.cond);
@@ -968,7 +966,9 @@ static void * seq_response(void * arg)
     /* tell the broadcaster not to query the strategy layer to lower overhead */
     ccnudnb_opt_t opts;
     opts.mode = CCNUDNB_USE_ROUTE | CCNUDNB_USE_TIMEOUT;
-    opts.timeout_ms = INTEREST_TIMEOUT_MS;
+    pthread_mutex_lock(&g_lock);
+    opts.timeout_ms = g_timeout_ms;
+    pthread_mutex_unlock(&g_lock);
     if (bfr_sendWhere(name, &opts.orig_level_u, &opts.orig_clusterId_u,
                       &opts.dest_level_u, &opts.dest_clusterId_u,
                       &opts.distance) < 0) {

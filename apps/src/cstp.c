@@ -89,7 +89,7 @@ int server(struct content_name * base_name, int interval_ms, FILE * source, int 
 
 int client(struct content_name * base_name, int interval_ms, FILE * dest, int flood)
 {
-	int lost = 0;
+	int lost = 0, lost_consec = 0;
 	retrieve_t retrieve_fun;
 	if (flood) retrieve_fun = ccnf_retrieve;
 	else retrieve_fun = ccnu_retrieve;
@@ -107,11 +107,14 @@ int client(struct content_name * base_name, int interval_ms, FILE * dest, int fl
 	int tries = 2;
 	int i;
 	int rv;
-	while (chunk_id < 100000) {
+	long jitter_ms = 0;
+	struct timespec ts_start, ts_end;
+	while ((chunk_id < 100000) && (lost_consec <= 10)) {
 		snprintf(str, MAX_NAME_LENGTH, "%s/%d", base_name->full_name, chunk_id);
 		next_name = content_name_create(str);
 		
 		printf("retrieving %s\n", str);
+		ts_fromnow(&ts_start);
 		for (i = 0; i < tries; i++) {
 			if ((rv = retrieve_fun(next_name, &obj)) != 0) {
 				mssleep(2 * interval_ms);
@@ -120,15 +123,28 @@ int client(struct content_name * base_name, int interval_ms, FILE * dest, int fl
 		if (rv != 0) {
 			printf("lost %s...\n", str);
 			lost++;
+			lost_consec++;
 		} else {
+			ts_fromnow(&ts_end);
+			long delay_ms = ts_mselapsed(&ts_start, &ts_end);
+			jitter_ms = ((chunk_id+1) * jitter_ms + delay_ms) / ((chunk_id+1) + 1);
 			fwrite(obj->data, 1, obj->size, dest);
 			content_obj_destroy(obj);
+			lost_consec = 0;
+		}
+
+		if ((chunk_id % 10) == 0) {
+			printf("detected jitter = %dms\n", (int)(jitter_ms - interval_ms));
 		}
 
 		content_name_delete(next_name);
 		chunk_id++;
 	}
 
+	if (lost_consec > 10)
+		fprintf(stderr, "lost %d consecutive chunks, closing application...\n", lost_consec);
+
+	printf("average session jitter = %5.4f\n", (jitter_ms / 1000.0));
 	return 0;
 }
 

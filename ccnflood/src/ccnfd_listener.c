@@ -692,8 +692,10 @@ static int retrieve_segment(struct segment * seg)
     log_print(g_log, "retrieve_segment: trying to retrieve segment %s[%d - %d].",
               seg->name->full_name, 0, seg->num_chunks-1);
 
-    int retries = INTEREST_MAX_ATTEMPTS;
-    int timeout_ms = INTEREST_TIMEOUT_MS;
+    pthread_mutex_lock(&g_lock);
+    int retries = g_interest_attempts;
+    int timeout_ms = g_timeout_ms;
+    pthread_mutex_unlock(&g_lock);
     int ttl = MAX_TTL;
 
     if ((seg->opts->mode & CCNUDNB_USE_RETRIES) == CCNUDNB_USE_RETRIES) {
@@ -717,7 +719,7 @@ static int retrieve_segment(struct segment * seg)
     char str[MAX_NAME_LENGTH], comp[MAX_NAME_LENGTH];
     strncpy(str, seg->name->full_name, seg->name->len);
 
-    int rtt_est = INTEREST_TIMEOUT_MS;
+    int rtt_est = timeout_ms;
     int cwnd = 1;
     int ssthresh = DEFAULT_INTEREST_PIPELINE;
     int fullfilled = 0;
@@ -1079,7 +1081,9 @@ static void * seq_response(void * arg)
     /* tell the broadcaster not to query the strategy layer to lower overhead */
     ccnfdnb_opt_t opts;
     opts.mode = CCNUDNB_USE_ROUTE | CCNUDNB_USE_TIMEOUT;
-    opts.timeout_ms = INTEREST_TIMEOUT_MS;
+    pthread_mutex_lock(&g_lock);
+    opts.timeout_ms = g_timeout_ms;
+    pthread_mutex_unlock(&g_lock);
 
     /* we add a dummy component of maximum length to make sure all the segment
      * names willl be valid.

@@ -16,6 +16,7 @@
 #include "ccnu_packet.h"
 #include "ccnud_constants.h"
 #include "ccnud_pit.h"
+#include "ccnud_stats.h"
 
 #include "bfr.h"
 
@@ -44,18 +45,16 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
 
     int rv = -1;
 
-    struct net_buffer buf;
-    net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
-    uint8_t packet_type = PACKET_TYPE_INTEREST;
-
     /* We need to hook into our routing daemon and use the sendWhere
      * query to figure out the dest_level, dest_clusterId, and distance.
      */
     double distance;
     unsigned orig_level_u, orig_clusterId_u;
     unsigned dest_level_u, dest_clusterId_u;
-    int retries = INTEREST_MAX_ATTEMPTS;
-    int timeout_ms = INTEREST_TIMEOUT_MS;
+    pthread_mutex_lock(&g_lock);
+    int retries = g_interest_attempts;
+    int timeout_ms = g_timeout_ms;
+    pthread_mutex_unlock(&g_lock);
     int ttl = MAX_TTL;
     int qry = 1;
     PENTRY pe = PIT_INVALID;
@@ -89,22 +88,14 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
         }
     }
 
-    uint8_t orig_level = (uint8_t) orig_level_u;
-    uint16_t orig_clusterId = (uint16_t) orig_clusterId_u;
-    uint8_t dest_level = (uint8_t) dest_level_u;
-    uint16_t dest_clusterId = (uint16_t) dest_clusterId_u;
-    uint64_t distance_754 = pack_ieee754_64(distance);
-    uint32_t name_len = name->len;
-
-    net_buffer_putByte(&buf, packet_type);
-    net_buffer_putByte(&buf, ttl);
-    net_buffer_putByte(&buf, orig_level);
-    net_buffer_putShort(&buf, orig_clusterId);
-    net_buffer_putByte(&buf, dest_level);
-    net_buffer_putShort(&buf, dest_clusterId);
-    net_buffer_putLong(&buf, distance_754);
-    net_buffer_putInt(&buf, name_len);
-    net_buffer_copyTo(&buf, name->full_name, name_len);
+	struct ccnu_interest_pkt interest;
+	interest.ttl = ttl;
+	interest.orig_level = (uint8_t) orig_level_u;
+    interest.orig_clusterId = (uint16_t) orig_clusterId_u;
+    interest.dest_level = (uint8_t) dest_level_u;
+    interest.dest_clusterId = (uint16_t) dest_clusterId_u;
+    interest.distance = pack_ieee754_64(distance);
+    interest.name = name;
 
     /* we register the interest so that we can be notified when the data
      * arrives.
@@ -132,29 +123,31 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
                       name->full_name);
         }
         PIT_refresh(pe);
-        net_buffer_send(&buf, _bcast_sock, &_addr);
+        ccnudnb_fwd_interest(&interest);
         /* now that we registered and sent the interest we wait */
         while (!*data) {
             ts_fromnow(&ts);
             ts_addms(&ts, timeout_ms);
-            log_print(g_log, "ccnudnb_express_interest: waiting for response (%s)...",
-                      name->full_name);
             rv = PIT_wait(pe, &ts);
-            if (rv == ETIMEDOUT || *data) {
-                /* exit the invariant check loop, timed out or rcvd data */
+
+            if (rv == ETIMEDOUT) {
                 break;
             }
+            if (*data) {
+                /* exit the invariant check loop, timed out or rcvd data */
+                goto END;
+            }
         }
-
-        if (*data) break;
     }
 
+    END:
     rv = 0;
     if (!*data) {
         log_print(g_log, "ccnudnb_express_interest: rtx interest %d times with no data.",i);
         rv = -1;
         goto CLEANUP;
     } else {
+        log_print(g_log, "ccnudnb_express_interest: rcvd data %s", name->full_name);
         *content_ptr = *data;
     }
 
@@ -162,8 +155,6 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
     if (pe >= 0) {
         PIT_release(pe); /* will unlock our mutex */
     }
-
-    free(buf.buf);
 
     return rv;
 }
@@ -187,6 +178,7 @@ int ccnudnb_fwd_interest(struct ccnu_interest_pkt * interest)
     net_buffer_copyTo(&buf, interest->name->full_name, interest->name->len);
 
     int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
+	ccnustat_sent_interest(interest);
 
     free(buf.buf);
 
@@ -211,6 +203,7 @@ int ccnudnb_fwd_data(struct content_obj * content, int hops_taken)
     net_buffer_copyTo(&buf, content->data, content->size);
 
     int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
+	ccnustat_sent_data(content);
 
     free(buf.buf);
 

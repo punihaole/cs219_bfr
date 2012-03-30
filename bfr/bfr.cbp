@@ -56,6 +56,9 @@
 		<Unit filename="src/bfr_net_listener.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="src/bfr_stats.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="src/bfrd.c">
 			<Option compilerVar="CC" />
 		</Unit>
@@ -73,6 +76,7 @@
 		</Unit>
 		<Unit filename="src/include/bfr_listener.h" />
 		<Unit filename="src/include/bfr_net_listener.h" />
+		<Unit filename="src/include/bfr_stats.h" />
 		<Unit filename="src/include/bfr_test.h" />
 		<Unit filename="src/include/bfrd.h" />
 		<Unit filename="src/include/bfrd_constants.h" />

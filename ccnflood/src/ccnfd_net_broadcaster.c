@@ -16,6 +16,7 @@
 #include "ccnf_packet.h"
 #include "ccnfd_constants.h"
 #include "ccnfd_pit.h"
+#include "ccnfd_stats.h"
 
 #include "log.h"
 #include "net_buffer.h"
@@ -42,16 +43,16 @@ int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** c
 
     int rv = -1;
 
-    struct net_buffer buf;
-    net_buffer_init(CCNF_MAX_PACKET_SIZE, &buf);
+	struct ccnf_interest_pkt interest;
     PENTRY pe = NULL;
-    uint8_t packet_type = PACKET_TYPE_INTEREST;
 
     /* We need to hook into our routing daemon and use the sendWhere
      * query to figure out the dest_level, dest_clusterId, and distance.
      */
-    int retries = INTEREST_MAX_ATTEMPTS;
-    int timeout_ms = INTEREST_TIMEOUT_MS;
+    pthread_mutex_lock(&g_lock);
+    int retries = g_interest_attempts;
+    int timeout_ms = g_timeout_ms;
+    pthread_mutex_unlock(&g_lock);
     int ttl = MAX_TTL;
 
     if (use_opt) {
@@ -66,12 +67,8 @@ int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** c
         }
     }
 
-    uint32_t name_len = name->len;
-
-    net_buffer_putByte(&buf, packet_type);
-    net_buffer_putByte(&buf, ttl);
-    net_buffer_putInt(&buf, name_len);
-    net_buffer_copyTo(&buf, name->full_name, name_len);
+    interest.ttl = ttl;
+	interest.name = name;
 
     /* we register the interest so that we can be notified when the data
      * arrives.
@@ -92,8 +89,9 @@ int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** c
             log_print(g_log, "ccnfdnb_express_interest: retransmitting interest (%s),...",
                       name->full_name);
         }
+		PIT_refresh(pe);
+		ccnfdnb_fwd_interest(&interest);
 
-        net_buffer_send(&buf, _bcast_sock, &_addr);
         /* now that we registered and sent the interest we wait */
         while (!*pe->obj) {
             ts_fromnow(&ts);
@@ -123,8 +121,6 @@ int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** c
         PIT_release(pe); /* will unlock our mutex */
     }
 
-    free(buf.buf);
-
     return rv;
 }
 
@@ -142,6 +138,7 @@ int ccnfdnb_fwd_interest(struct ccnf_interest_pkt * interest)
     net_buffer_copyTo(&buf, interest->name->full_name, interest->name->len);
 
     int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
+	ccnfstat_sent_interest(interest);
 
     free(buf.buf);
 
@@ -166,6 +163,7 @@ int ccnfdnb_fwd_data(struct content_obj * content, int hops_taken)
     net_buffer_copyTo(&buf, content->data, content->size);
 
     int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
+	ccnfstat_sent_data(content);
 
     free(buf.buf);
 

@@ -16,6 +16,7 @@
 #include "ccnfd_constants.h"
 #include "ccnfd_cs.h"
 #include "ccnfd_pit.h"
+#include "ccnfd_stats.h"
 #include "ccnfd_net_broadcaster.h"
 #include "ccnf_packet.h"
 #include "ccnfd_net_listener.h"
@@ -175,6 +176,7 @@ static void * handle_interest(struct ccnf_interest_pkt * interest)
     snprintf(proc, 256, "hi%u", g_nodeId);
     prctl(PR_SET_NAME, proc, 0, 0, 0);
 
+	ccnfstat_rcvd_interest(interest);
     log_print(g_log, "handle_interest: %s, ttl = %d",
               interest->name->full_name, interest->ttl);
 
@@ -188,7 +190,10 @@ static void * handle_interest(struct ccnf_interest_pkt * interest)
         PENTRY pe = PIT_search(interest->name);
         if (pe) {
             /* refresh the pit entry */
-            if (PIT_age(pe) >= INTEREST_TIMEOUT_MS) {
+            pthread_mutex_lock(&g_lock);
+            int timeout = g_timeout_ms;
+            pthread_mutex_unlock(&g_lock);
+            if (PIT_age(pe) >= timeout) {
                 ccnfdnb_fwd_interest(interest);
             }
             PIT_refresh(pe);
@@ -216,6 +221,8 @@ static void * handle_data(struct ccnf_data_pkt * data)
     char proc[256];
     snprintf(proc, 256, "hd%u", g_nodeId);
     prctl(PR_SET_NAME, proc, 0, 0, 0);
+
+	ccnfstat_rcvd_data(data);
     log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
               data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);
 

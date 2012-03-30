@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "bfr.h"
+#include "bfr_stats.h"
 #include "bfrd.h"
 #include "bfr_listener.h"
 #include "bfr_net_listener.h"
@@ -38,8 +39,9 @@ static void print_usage(char * argv_0)
     printf("      -l\tSet the number of hierarchy levels.\n");
     printf("      -g\tSet the grid dimensions, format:\n");
     printf("        \t\t%%dx%%d (ex. -g 100x100)\n");
-    printf("      -s\tSet the starting position of the node, format:\n");
+    printf("      -c\tSet the starting position of the node, format:\n");
     printf("        \t\t%%d,%%d (ex. -s 10,10)\n");
+    printf("      -s\tSet the stat file.\n");
     printf("\n");
 }
 
@@ -78,6 +80,8 @@ int main(int argc, char ** argv)
 {
     char log_file[256];
     int log_file_set = 0;
+    char stat_file[256];
+    int stat_file_set = 0;
 
     int nodeId = DEFAULT_NODE_ID, levels = DEFAULT_NUM_LEVELS;
     unsigned int width = DEFAULT_GRID_WIDTH, height = DEFAULT_GRID_HEIGHT,
@@ -95,12 +99,16 @@ int main(int argc, char ** argv)
     signal(SIGUSR2, signal_handler);
 
     int c;
-    while ((c = getopt(argc, argv, "-h?tn:l:g:s:")) != -1) {
+    while ((c = getopt(argc, argv, "-h?tn:l:g:s:c:")) != -1) {
         switch (c) {
             case 'h':
             case '?':
                 print_usage(argv[0]);
                 exit(EXIT_SUCCESS);
+            case 'c':
+                sscanf(optarg, "%d,%d", &startX, &startY);
+                fprintf(stderr, "set start pos = (%d, %d).\n", startX, startY);
+                break;
             case 'n':
                 nodeId = atoi(optarg);
                 fprintf(stderr, "set node ID = %u.\n", nodeId);
@@ -111,14 +119,17 @@ int main(int argc, char ** argv)
                 break;
             case 'f':
                 strncpy(optarg, log_file, 256);
+                printf("set log file = %s.\n", log_file);
+                log_file_set = 1;
                 break;
             case 'g':
                 sscanf(optarg, "%dx%d", &height, &width);
                 fprintf(stderr, "set grid dim: %d X %d.\n", height, width);
                 break;
             case 's':
-                sscanf(optarg, "%d,%d", &startX, &startY);
-                fprintf(stderr, "set start pos = (%d, %d).\n", startX, startY);
+                strncpy(optarg, stat_file, 256);
+                printf("set stat file = %s.\n", stat_file);
+                stat_file_set = 1;
                 break;
             case 't':
                 if (test_suite())
@@ -152,23 +163,31 @@ int main(int argc, char ** argv)
         exit(EXIT_FAILURE);
     }
 
-    /* close out the std io file handles */
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
-
     g_log = (struct log * ) malloc(sizeof(struct log));
     char log_name[256];
     snprintf(log_name, 256, "bfr_%u", nodeId);
     if (!log_file_set)
-        snprintf(log_file, 256, "/home/tom/log/bfr_%u.log", nodeId);
+        snprintf(log_file, 256, "~/log/bfr_%u.log", nodeId);
     log_name[255] = '\0';
     log_file[255] = '\0';
 
     if (log_init(log_name, log_file, g_log, LOG_OVERWRITE) < 0) {
-        syslog(LOG_ERR, "bfr log: %s failed to initalize, exiting!", log_file);
+        fprintf(stderr, "bfr log: %s failed to initalize, exiting!", log_file);
         exit(EXIT_FAILURE);
     }
+
+    if (!stat_file_set)
+        snprintf(stat_file, 256, "~/stat/bfr_%u.stat", g_bfr.nodeId);
+    stat_file[255] = '\0';
+    if (bfrstat_init(stat_file) < 0) {
+        fprintf(stderr, "bfrd stat: %s failed to initalize!", stat_file);
+        exit(EXIT_FAILURE);
+    }
+
+    /* close out the std io file handles */
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
 
     /* change the current working directory (after log is inited) */
     if ((chdir("/")) < 0) {

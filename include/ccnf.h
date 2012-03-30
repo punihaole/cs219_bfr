@@ -18,6 +18,20 @@
 inline void ccnf_did2sockpath(uint32_t daemonId, char * str, int size);
 
 /**
+ * ccnu_set_timeout
+ *      Set the number of milliseconds to wait before retransmitting an
+ *      interest.
+ **/
+int ccnf_set_timeout(unsigned timeout_ms);
+
+/**
+ * ccnu_set_retries
+ *      Set the number of times to retransmit and interest before ccnu_retrieve
+ *      fails.
+ **/
+int ccnf_set_retries(unsigned max_attempts);
+
+/**
  * ccnf_max_payload_size
  *      Calculates the maximum allowable payload size from the maximum
  *      allowable packet size, the number of overhead bytes in a data

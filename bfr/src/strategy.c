@@ -15,6 +15,7 @@
 #include "cluster.h"
 #include "bfr.h"
 #include "bfrd.h"
+#include "bfr_stats.h"
 
 #include "grid.h"
 #include "strategy.h"
@@ -26,6 +27,8 @@
 
 #include "ts.h"
 #include "thread_pool.h"
+
+#include "bloom_filter.h"
 
 #include "ccnu.h"
 
@@ -57,7 +60,7 @@ struct strategy {
     pthread_cond_t cond;
     stategy_state_t state;
 
-    int summary_size; /* num bits in our Bloom filters, calcualted by ccnud */
+    int summary_size; /* num bits in our Bloom filters, calcualted by bfrd */
 
     thread_pool_t handler_pool;
 };
@@ -254,6 +257,8 @@ void * strategy_service(void * ignore)
                 if (parse_as_cluster_msg(msg, response) < 0) {
                     log_print(g_log, "strategy_service: failed to parse MSG_NET_CLUSTER_RESPONSE -- IGNORING");
                 } else {
+                    bfrstat_rcvd_cluster(response);
+
                     /* see if the response matches any of the joins that are pending */
                     int found = 0;
                     int i;
@@ -711,6 +716,7 @@ static int broadcast_bloom_msg(struct bloom_msg * msg)
         return -1;
     }
 
+    bfrstat_sent_bloom(msg);
     log_print(g_log, "broadcast_bloom_msg: sending bloom msg %u:%u -> %u:%u (lhd = %5.2f, %lu)",
               msg->origin_level,  msg->origin_clusterId, msg->dest_level, msg->dest_clusterId,
               unpack_ieee754_64(msg->lastHopDistance), msg->lastHopDistance);
@@ -750,6 +756,8 @@ static int broadcast_join_msg(struct cluster_join_msg * msg)
         log_print(g_log, "broadcast_join_msg: tried to send NULL packet -- IGNORING!");
         return -1;
     }
+
+    bfrstat_sent_join(msg);
     log_print(g_log, "broadcast_join_msg: sending join msg.");
 
     int size = CLUSTER_JOIN_MSG_SIZE;
@@ -781,6 +789,8 @@ static int broadcast_cluster_msg(struct cluster_msg * msg)
         log_print(g_log, "broadcast_cluster_msg: tried to send NULL packet -- IGNORING!");
         return -1;
     }
+
+    bfrstat_sent_cluster(msg);
     log_print(g_log, "broadcast_cluster_msg: sending cluster msg.");
 
     int size = CLUSTER_RESPONSE_MSG_SIZE;
@@ -869,6 +879,7 @@ static void filter_msgs(struct linked_list * putIn, uint8_t type)
 
 static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
 {
+    bfrstat_rcvd_bloom(msg);
     log_print(g_log, "handle_bloom_msg: from %u@%u:%u for (%u:%u), lhd = %5.2f, %lu.",
               origin_nodeId, msg->origin_level, msg->origin_clusterId,
               msg->dest_level, msg->dest_clusterId,
@@ -1006,6 +1017,8 @@ static void * handle_cluster_join_msg(void * arg)
 {
     prctl(PR_SET_NAME, "join_handler", 0, 0, 0);
     struct cluster_join_msg * jmsg = (struct cluster_join_msg *) arg;
+
+    bfrstat_rcvd_join(jmsg);
 
     /* add the join msg to the list of pending joins */
     pthread_mutex_lock(&pending_joins_lock);

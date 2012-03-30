@@ -368,6 +368,8 @@ struct content_obj * PIT_get_data(PENTRY _pe)
 int PIT_hand_data(PENTRY _pe, struct content_obj * obj)
 {
     if (check_handle(_pe)) {
+        if (g_pit.pit_table[_pe].obj)
+            content_obj_destroy(g_pit.pit_table[_pe].obj);
         g_pit.pit_table[_pe].obj = obj;
         return 0;
     }

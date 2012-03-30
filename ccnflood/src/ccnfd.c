@@ -11,11 +11,13 @@
 #include <unistd.h>
 #include <math.h>
 
+#include "ccnf.h"
 #include "ccnfd_listener.h"
 #include "ccnfd_net_broadcaster.h"
 #include "ccnfd_net_listener.h"
 #include "ccnfd_cs.h"
 #include "ccnfd_pit.h"
+#include "ccnfd_stats.h"
 #include "ccnfd.h"
 #include "net_lib.h"
 #include "log.h"
@@ -26,6 +28,9 @@ extern int ccnf_net_test();
 
 struct log * g_log;
 uint32_t g_nodeId;
+int g_timeout_ms;
+int g_interest_attempts;
+pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static pthread_t idp_listener;
 static pthread_t net_listener;
@@ -70,7 +75,8 @@ int main(int argc, char *argv[])
 {
     pid_t pid, sid;
     char log_file[256];
-    int log_file_set = 0;
+    char stat_file[256];
+    int log_file_set = 0, stat_file_set = 0;
     double p = DEFAULT_P;
     int interest_pipeline = DEFAULT_INTEREST_PIPELINE;
 
@@ -122,6 +128,11 @@ int main(int argc, char *argv[])
                     printf("set p to %1.4f...\n", p);
                 }
                 break;
+			case 's':
+                strncpy(stat_file, optarg, 256);
+                printf("set log file = %s.\n", stat_file);
+                stat_file_set = 1;
+                break;
             case 'i':
                 interest_pipeline = atoi(optarg);
                 fprintf(stderr, "set interest pipeline size to %d.\n", interest_pipeline);
@@ -154,11 +165,6 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    /* close out the std io file handles */
-    close(STDIN_FILENO);
-    close(STDOUT_FILENO);
-    close(STDERR_FILENO);
-
     g_log = (struct log * ) malloc(sizeof(struct log));
     char log_name[256];
     snprintf(log_name, 256, "ccnfd_%u", g_nodeId);
@@ -170,9 +176,22 @@ int main(int argc, char *argv[])
     prctl(PR_SET_NAME, proc, 0, 0, 0);
 
     if (log_init(log_name, log_file, g_log, LOG_OVERWRITE) < 0) {
-        syslog(LOG_ERR, "ccnfd log: %s failed to initalize!", log_file);
+        fprintf(stderr, "ccnfd log: %s failed to initalize!", log_file);
         exit(EXIT_FAILURE);
     }
+
+	if (!stat_file_set)
+        snprintf(stat_file, 256, "~/stat/ccnfd_%u.stat", g_nodeId);
+	stat_file[255] = '\0';
+    if (ccnfstat_init(stat_file) < 0) {
+        fprintf(stderr, "ccnfd stat: %s failed to initalize!", stat_file);
+        exit(EXIT_FAILURE);
+    }
+
+	/* close out the std io file handles */
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
 
     /* change the current working directory (after log is inited) */
     if ((chdir("/")) < 0) {
@@ -225,6 +244,36 @@ int main(int argc, char *argv[])
         pthread_mutex_lock(&ccnfd_mutex);
             pthread_cond_wait(&ccnfd_var, &ccnfd_mutex);
         pthread_mutex_unlock(&ccnfd_mutex);
+
+        while (synch_len(ipc_args.queue)) {
+            struct ccnfd_msg * msg = synch_dequeue(ipc_args.queue);
+            switch (msg->type) {
+                case MSG_IPC_TIMEOUT:
+                    if (msg->payload_size != sizeof(uint32_t)) {
+                        log_print(g_log, "ccnfd: malformed MSG_IPC_TIMEOUT");
+                    }
+                    pthread_mutex_lock(&g_lock);
+                    memcpy(&g_timeout_ms, msg->payload, sizeof(uint32_t));
+                    pthread_mutex_unlock(&g_lock);
+                    log_print(g_log, "ccnfd: updating interest timeout = %d", g_timeout_ms);
+                    break;
+                case MSG_IPC_RETRIES:
+                    if (msg->payload_size != sizeof(uint32_t)) {
+                        log_print(g_log, "ccnfd: malformed MSG_IPC_TIMEOUT");
+                    }
+                    pthread_mutex_lock(&g_lock);
+                    memcpy(&g_interest_attempts, msg->payload, sizeof(uint32_t));
+                    pthread_mutex_unlock(&g_lock);
+                    log_print(g_log, "ccnfd: updating interest retries = %d", g_interest_attempts);
+                    break;
+                default:
+                    log_print(g_log, "ccnud: unknown IPC message: %d", msg->type);
+                    break;
+            }
+
+            free(msg->payload);
+            free(msg);
+        }
     }
 
     exit(EXIT_SUCCESS);

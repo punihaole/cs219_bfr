@@ -183,7 +183,7 @@ int clus_findCluster(struct content_name * name, unsigned * level, unsigned * cl
     unsigned lm_level = g_bfr.num_levels; /* the level and cluster ID cooresponding to longest match */
     unsigned lm_clusterId = g_bfr.clusterIds[lm_level - 1];
 
-    for (i = 0; i < g_bfr.num_levels; i++) {
+    for (i = g_bfr.num_levels-1; i >= 0; i--) {
         log_print(g_log, "level = %d, clusters = %d", i, g_bfr.levels[i].clusters->len);
 
         int j;

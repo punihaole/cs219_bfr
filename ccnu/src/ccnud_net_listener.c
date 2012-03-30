@@ -16,6 +16,7 @@
 #include "ccnud_constants.h"
 #include "ccnud_cs.h"
 #include "ccnud_pit.h"
+#include "ccnud_stats.h"
 #include "ccnud_net_broadcaster.h"
 #include "ccnu_packet.h"
 #include "ccnud_net_listener.h"
@@ -60,7 +61,7 @@ int ccnudnl_init(int pipeline_size)
         return -1;
     }
 
-    pipeline_size = 1;
+    //pipeline_size = 1;
     if (tpool_create(&_net.packet_pipeline, pipeline_size) < 0) {
         log_print(g_log, "tpool_create: could not create interest thread pool!");
         return -1;
@@ -181,7 +182,8 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
     snprintf(proc, 256, "hi%u", g_nodeId);
     prctl(PR_SET_NAME, proc, 0, 0, 0);
     int rv = 0;
-
+	
+	ccnustat_rcvd_interest(interest);
     log_print(g_log, "handle_interest: %s from %u:%u->%u:%u",
               interest->name->full_name, interest->orig_level, interest->orig_clusterId,
               interest->dest_level, interest->dest_clusterId);
@@ -191,6 +193,7 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
         log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);
         ccnudnb_fwd_data(content, 1);
     } else {
+        log_print(g_log, "handle_interest: %s not in CS", interest->name->full_name);
         /* check if we've seen this interest already */
         PENTRY pe = PIT_search(interest->name);
 
@@ -198,7 +201,10 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
             log_print(g_log, "handle_interest: %s previously seen, refresh PIT.",
                       interest->name->full_name);
             /* refresh the pit entry */
-            if (PIT_age(pe) >= INTEREST_TIMEOUT_MS) {
+            pthread_mutex_lock(&g_lock);
+            int timeout_ms = g_timeout_ms;
+            pthread_mutex_unlock(&g_lock);
+            if (PIT_age(pe) >= timeout_ms) {
                 log_print(g_log, "handle_interest: expired interest, passing on %s",
                           interest->name->full_name);
                 ccnudnb_fwd_interest(interest);
@@ -208,7 +214,7 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
             PIT_close(pe);
         } else {
             /* see if we can satisfy this interest */
-            log_print(g_log, "handle_interest: checking if should fwd: %d\n", pe);
+            log_print(g_log, "handle_interest: checking if should fwd: %s\n", interest->name->full_name);
             /* ask routing daemon if we should forward the interest */
             double last_hop_distance = unpack_ieee754_64(interest->distance);
             int need_fwd = 0;
@@ -257,6 +263,8 @@ static void * handle_data(struct ccnu_data_pkt * data)
     char proc[256];
     snprintf(proc, 256, "hd%u", g_nodeId);
     prctl(PR_SET_NAME, proc, 0, 0, 0);
+
+	ccnustat_rcvd_data(data);
     log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
               data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);
 
@@ -311,7 +319,7 @@ static void * handle_data(struct ccnu_data_pkt * data)
             } else {
                 log_print(g_log, "%s is a chunk, notifiying expresser thread", obj->name->full_name);
                 PIT_signal(pe);
-                PIT_close(pe);
+                PIT_unlock(pe);
             }
 
         } else {

@@ -19,7 +19,7 @@
 	"bfrd.h"
 	"net_lib.h"
 
-1332489604 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_listener.c
+1333042281 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_listener.c
 	<errno.h>
 	<errno.h>
 	<pthread.h>
@@ -66,7 +66,7 @@
 	"synch_queue.h"
 	"log.h"
 
-1332431958 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd.c
+1333128594 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd.c
 	<stdlib.h>
 	<string.h>
 	<errno.h>
@@ -94,7 +94,7 @@
 	"ccnu.h"
 	"distance_table.h"
 
-1332561208 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd_main.c
+1333128600 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd_main.c
 	<sys/types.h>
 	<sys/stat.h>
 	<errno.h>
@@ -107,6 +107,7 @@
 	<syslog.h>
 	<unistd.h>
 	"bfr.h"
+	"bfr_stats.h"
 	"bfrd.h"
 	"bfr_listener.h"
 	"bfr_net_listener.h"
@@ -117,7 +118,7 @@
 	"strategy.h"
 	"synch_queue.h"
 
-1332446031 source:/home/tom/projects/cs219_bfr/bfr/src/cluster.c
+1333042434 source:/home/tom/projects/cs219_bfr/bfr/src/cluster.c
 	<math.h>
 	"cluster.h"
 	"bloom_filter.h"
@@ -201,4 +202,12 @@
 	"bitmap.h"
 	"bloom_filter.h"
 	"hash.h"
+
+1333128179 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_stats.c
+	<stdlib.h>
+	<string.h>
+	<pthread.h>
+	"bfrd.h"
+	"bfr_stats.h"
+	"log.h"
 

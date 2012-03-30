@@ -1,6 +1,8 @@
 #ifndef CCNUD_H_INCLUDED
 #define CCNUD_H_INCLUDED
 
+#include <netinet/in.h>
+
 struct ccnud_msg {
     uint8_t type;
     uint32_t payload_size;
@@ -11,6 +13,9 @@ struct ccnud_packet {
     uint8_t type;
     void * packet;
 };
+
+extern int g_timeout_ms;
+extern int g_interest_attempts;
 
 /**
  * DOCUMENTATION of msg format for ccnud IPC
@@ -43,5 +48,8 @@ struct listener_args {
 
 extern struct log * g_log;
 extern uint32_t g_nodeId;
+extern int g_timeout_ms;
+extern int g_interest_attempts;
+extern pthread_mutex_t g_lock;
 
 #endif // CCNUD_H_INCLUDED

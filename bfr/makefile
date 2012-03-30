@@ -5,7 +5,7 @@ SRC = src
 TEST_SRC = src/tests
 OBJ = bin/obj
 
-all: $(OBJ) $(OBJ)/cluster.o $(OBJ)/bfr.o $(OBJ)/bfr_listener.o $(OBJ)/bfr_net_listener.o $(OBJ)/bfrd.o $(OBJ)/distance_table.o $(OBJ)/grid.o $(OBJ)/bfrd_main.o $(OBJ)/strategy.o $(OBJ)/bfr_test.o bfrd libbfr.a
+all: $(OBJ) $(OBJ)/cluster.o $(OBJ)/bfr.o $(OBJ)/bfr_listener.o $(OBJ)/bfr_net_listener.o $(OBJ)/bfrd.o $(OBJ)/bfr_stats.o $(OBJ)/distance_table.o $(OBJ)/grid.o $(OBJ)/bfrd_main.o $(OBJ)/strategy.o $(OBJ)/bfr_test.o bfrd libbfr.a
 
 $(OBJ):
 	mkdir -p $(OBJ)
@@ -14,7 +14,7 @@ libbfr.a: $(OBJ) $(OBJ)/bfr.o
 	ar rc libbfr.a $(OBJ)/bfr.o ../lib/libcon.a
 	ranlib libbfr.a
 
-bfrd: $(OBJ) $(OBJ)/cluster.o $(OBJ)/bfr.o $(OBJ)/bfr_listener.o $(OBJ)/bfr_net_listener.o $(OBJ)/bfrd.o $(OBJ)/distance_table.o $(OBJ)/grid.o $(OBJ)/bfrd_main.o $(OBJ)/strategy.o $(OBJ)/bfr_test.o
+bfrd: $(OBJ) $(OBJ)/cluster.o $(OBJ)/bfr.o $(OBJ)/bfr_listener.o $(OBJ)/bfr_net_listener.o $(OBJ)/bfrd.o $(OBJ)/bfr_stats.o $(OBJ)/distance_table.o $(OBJ)/grid.o $(OBJ)/bfrd_main.o $(OBJ)/strategy.o $(OBJ)/bfr_test.o
 	$(CC) $(CFLAGS) $(OBJ)/*.o $(CLINK) -o bfrd
 	
 clean:
@@ -29,19 +29,22 @@ $(OBJ)/bfr.o: $(SRC)/bfr.c
 $(OBJ)/bfr_listener.o: $(SRC)/bfr_listener.c $(OBJ)/grid.o $(OBJ)/bfr.o
 	$(CC) $(CFLAGS) -c $(SRC)/bfr_listener.c -o $(OBJ)/bfr_listener.o
 
-$(OBJ)/bfr_net_listener.o: $(SRC)/bfr_net_listener.c $(OBJ)/bfr.o
+$(OBJ)/bfr_net_listener.o: $(SRC)/bfr_net_listener.c $(OBJ)/bfr.o $(OBJ)/bfr_stats.o
 	$(CC) $(CFLAGS) -c $(SRC)/bfr_net_listener.c -o $(OBJ)/bfr_net_listener.o
 
-$(OBJ)/bfrd.o: $(SRC)/bfrd.c $(OBJ)/bfr.o $(OBJ)/grid.o $(OBJ)/bfr_listener.o $(OBJ)/bfr_net_listener.o $(OBJ)/strategy.o
+$(OBJ)/bfrd.o: $(SRC)/bfrd.c $(OBJ)/bfr.o $(OBJ)/grid.o $(OBJ)/bfr_listener.o $(OBJ)/bfr_net_listener.o $(OBJ)/strategy.o $(OBJ)/bfr_stats.o
 	$(CC) $(CFLAGS) -c $(SRC)/bfrd.c -o $(OBJ)/bfrd.o
 
 $(OBJ)/grid.o: $(SRC)/grid.c
 	$(CC) $(CFLAGS) -c $(SRC)/grid.c -o $(OBJ)/grid.o
 
-$(OBJ)/bfrd_main.o: $(SRC)/bfrd_main.c $(OBJ)/bfr.o $(OBJ)/bfrd.o $(OBJ)/bfr_listener.o $(OBJ)/bfr_net_listener.o $(OBJ)/bfr_test.o $(OBJ)/strategy.o
+$(OBJ)/bfrd_main.o: $(SRC)/bfrd_main.c $(OBJ)/bfr.o $(OBJ)/bfrd.o $(OBJ)/bfr_listener.o $(OBJ)/bfr_net_listener.o $(OBJ)/bfr_test.o $(OBJ)/strategy.o $(OBJ)/bfr_stats.o
 	$(CC) $(CFLAGS) -c $(SRC)/bfrd_main.c -o $(OBJ)/bfrd_main.o
 
-$(OBJ)/strategy.o: $(SRC)/strategy.c $(OBJ)/bfr.o
+$(OBJ)/bfr_stats.o: $(SRC)/bfr_stats.c $(OBJ)/bfr.o
+	$(CC) $(CFLAGS) -c $(SRC)/bfr_stats.c -o $(OBJ)/bfr_stats.o
+
+$(OBJ)/strategy.o: $(SRC)/strategy.c $(OBJ)/bfr.o $(OBJ)/bfr_stats.o
 	$(CC) $(CFLAGS) -c $(SRC)/strategy.c -o $(OBJ)/strategy.o
 
 $(OBJ)/bfr_test.o: $(TEST_SRC)/bfr_test.c $(OBJ)/bfr.o

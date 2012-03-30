@@ -113,10 +113,10 @@ int CS_put(struct content_obj * content)
             segment->num_chunks = seq_no + 1;
             segment->chunks[seq_no] = content;
             struct bitmap * larger = bit_create(segment->num_chunks);
-            memcpy(larger->map, segment->valid->map, segment->valid->num_words);
+            memcpy(larger->map, segment->valid->map, segment->valid->num_words * 4);
             bit_destroy(segment->valid);
             segment->valid = larger;
-            bit_set(larger, seq_no);
+            bit_set(segment->valid, seq_no);
         } else {
             if (bit_test(segment->valid, seq_no)) {
                 content_obj_destroy(segment->chunks[seq_no]);
@@ -194,6 +194,9 @@ struct content_obj * CS_get(struct content_name * name)
         pthread_mutex_lock(&_cs.lock);
             segment = (struct CS_segment * ) hash_get(_cs.table, prefix);
 
+            log_print(g_log, "requesting chunk    = %d", chunk);
+            log_print(g_log, "segment->num_chunks = %d", segment->num_chunks);
+            log_print(g_log, "valid(%d) = %d", chunk, bit_test(segment->valid, chunk));
             if (segment && (segment->num_chunks >= chunk) && bit_test(segment->valid, chunk)) {
                 ret = content_copy(segment->chunks[chunk]);
             }

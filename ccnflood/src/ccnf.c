@@ -62,6 +62,92 @@ inline int ccnf_max_payload_size(struct content_name * name)
     return CCNF_MAX_PACKET_SIZE - MIN_DATA_PKT_SIZE - name->len;
 }
 
+int ccnf_set_timeout(unsigned timeout_ms)
+{
+    int s;
+    struct sockaddr_un daemon;
+
+    if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        close (s);
+        return -1;
+    }
+
+    daemon.sun_family = AF_UNIX;
+    char sock_path[256];
+    ccnf_did2sockpath(IP4_to_nodeId(), sock_path, 256);
+    strcpy(daemon.sun_path, sock_path);
+    int len = strlen(daemon.sun_path) + sizeof(daemon.sun_family);
+    if (connect(s, (struct sockaddr * ) &daemon, len) == -1) {
+        perror("connect");
+        close (s);
+        return -1;
+    }
+
+    char buf[sizeof(uint8_t)+ sizeof(uint32_t) + sizeof(uint32_t)];
+
+    uint8_t type = MSG_IPC_TIMEOUT;
+    uint32_t msg_size = sizeof(uint32_t);
+    uint32_t payload = (uint32_t)timeout_ms;
+    memcpy(buf, &type, sizeof(uint8_t));
+    memcpy(buf+sizeof(uint8_t), &msg_size, sizeof(uint32_t));
+    memcpy(buf+sizeof(uint8_t)+sizeof(uint32_t), &payload, sizeof(uint32_t));
+
+    /* send the req */
+    if (send(s, buf, sizeof(type) + sizeof(msg_size) + sizeof(payload), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+
+    close(s);
+
+    return 0;
+}
+
+int ccnf_set_retries(unsigned max_attempts)
+{
+    int s;
+    struct sockaddr_un daemon;
+
+    if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        close (s);
+        return -1;
+    }
+
+    daemon.sun_family = AF_UNIX;
+    char sock_path[256];
+    ccnf_did2sockpath(IP4_to_nodeId(), sock_path, 256);
+    strcpy(daemon.sun_path, sock_path);
+    int len = strlen(daemon.sun_path) + sizeof(daemon.sun_family);
+    if (connect(s, (struct sockaddr * ) &daemon, len) == -1) {
+        perror("connect");
+        close (s);
+        return -1;
+    }
+
+    char buf[sizeof(uint8_t) + sizeof(uint32_t) + sizeof(uint32_t)];
+
+    uint8_t type = MSG_IPC_RETRIES;
+    uint32_t msg_size = sizeof(uint32_t);
+    uint32_t payload = (uint32_t)max_attempts;
+    memcpy(buf, &type, sizeof(uint8_t));
+    memcpy(buf+sizeof(uint8_t), &msg_size, sizeof(uint32_t));
+    memcpy(buf+sizeof(uint8_t)+sizeof(uint32_t), &payload, sizeof(uint32_t));
+
+    /* send the req */
+    if (send(s, buf, sizeof(type) + sizeof(msg_size) + sizeof(payload), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+
+    close(s);
+
+    return 0;
+}
+
 int ccnf_publishSeq(struct content_obj * index_obj, struct linked_list * chunks)
 {
     if (verify_content(index_obj) != 0) {

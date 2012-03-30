@@ -19,8 +19,24 @@
 #define MSG_IPC_RETRIEVE       3
 #define MSG_IPC_SEQ_RETRIEVE   4
 #define MSG_IPC_CS_SUMMARY_REQ 5
+#define MSG_IPC_TIMEOUT        6
+#define MSG_IPC_RETRIES        7
 
 inline void ccnu_did2sockpath(uint32_t daemonId, char * str, int size);
+
+/**
+ * ccnu_set_timeout
+ *      Set the number of milliseconds to wait before retransmitting an
+ *      interest.
+ **/
+int ccnu_set_timeout(unsigned timeout_ms);
+
+/**
+ * ccnu_set_retries
+ *      Set the number of times to retransmit and interest before ccnu_retrieve
+ *      fails.
+ **/
+int ccnu_set_retries(unsigned max_attempts);
 
 /**
  * ccnu_max_payload_size

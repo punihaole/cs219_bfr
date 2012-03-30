@@ -57,6 +57,9 @@
 		<Unit filename="src/ccnud_pit.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="src/ccnud_stats.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="src/include/ccnu_packet.h" />
 		<Unit filename="src/include/ccnud.h" />
 		<Unit filename="src/include/ccnud_constants.h" />
@@ -65,6 +68,7 @@
 		<Unit filename="src/include/ccnud_net_broadcaster.h" />
 		<Unit filename="src/include/ccnud_net_listener.h" />
 		<Unit filename="src/include/ccnud_pit.h" />
+		<Unit filename="src/include/ccnud_stats.h" />
 		<Unit filename="src/tests/ccnu_net_test.c">
 			<Option compilerVar="CC" />
 		</Unit>
