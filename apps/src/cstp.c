@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <signal.h>
 
 #include "ccnf.h"
 #include "ccnu.h"
@@ -10,8 +11,24 @@
 #include "content.h"
 #include "ts.h"
 
+long jitter_ms;
+
 typedef int (*publish_t)(struct content_obj *);
 typedef int (*retrieve_t)(struct content_name * , struct content_obj ** );
+
+void signal_handler(int signal)
+{
+	switch(signal) {
+		case SIGHUP:
+			exit(EXIT_SUCCESS);
+		case SIGINT:
+		case SIGTERM:
+			printf("\naverage session jitter = %5.4fms\n", jitter_ms);
+			exit(EXIT_SUCCESS);
+		default:
+			break;
+	}
+}
 
 void print_usage(char * argv_0)
 {
@@ -89,6 +106,11 @@ int server(struct content_name * base_name, int interval_ms, FILE * source, int 
 
 int client(struct content_name * base_name, int interval_ms, FILE * dest, int flood)
 {
+	signal(SIGHUP, signal_handler);
+    signal(SIGTERM, signal_handler);
+    signal(SIGINT, signal_handler);
+    signal(SIGQUIT, signal_handler);
+
 	int lost = 0, lost_consec = 0;
 	retrieve_t retrieve_fun;
 	if (flood) retrieve_fun = ccnf_retrieve;
@@ -107,7 +129,6 @@ int client(struct content_name * base_name, int interval_ms, FILE * dest, int fl
 	int tries = 2;
 	int i;
 	int rv;
-	long jitter_ms = 0;
 	struct timespec ts_start, ts_end;
 	while ((chunk_id < 100000) && (lost_consec <= 10)) {
 		snprintf(str, MAX_NAME_LENGTH, "%s/%d", base_name->full_name, chunk_id);
@@ -134,7 +155,7 @@ int client(struct content_name * base_name, int interval_ms, FILE * dest, int fl
 		}
 
 		if ((chunk_id % 10) == 0) {
-			printf("detected jitter = %dms\n", (int)(jitter_ms - interval_ms));
+			printf("detected jitter = %dms\n", (int)(jitter_ms));
 		}
 
 		content_name_delete(next_name);
@@ -144,7 +165,7 @@ int client(struct content_name * base_name, int interval_ms, FILE * dest, int fl
 	if (lost_consec > 10)
 		fprintf(stderr, "lost %d consecutive chunks, closing application...\n", lost_consec);
 
-	printf("average session jitter = %5.4f\n", (jitter_ms / 1000.0));
+	printf("\naverage session jitter = %5.4fms\n", jitter_ms);
 	return 0;
 }
 

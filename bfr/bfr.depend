@@ -94,7 +94,7 @@
 	"ccnu.h"
 	"distance_table.h"
 
-1333128600 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd_main.c
+1333130699 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd_main.c
 	<sys/types.h>
 	<sys/stat.h>
 	<errno.h>
@@ -147,7 +147,7 @@
 	<stdlib.h>
 	"log.h"
 
-1332444018 source:/home/tom/projects/cs219_bfr/bfr/src/strategy.c
+1333128701 source:/home/tom/projects/cs219_bfr/bfr/src/strategy.c
 	<stdlib.h>
 	<string.h>
 	<stdio.h>
@@ -164,6 +164,7 @@
 	"cluster.h"
 	"bfr.h"
 	"bfrd.h"
+	"bfr_stats.h"
 	"grid.h"
 	"strategy.h"
 	"log.h"
@@ -172,6 +173,7 @@
 	"linked_list.h"
 	"ts.h"
 	"thread_pool.h"
+	"bloom_filter.h"
 	"ccnu.h"
 
 1332456485 source:/home/tom/projects/cs219_bfr/bfr/src/tests/bfr_test.c

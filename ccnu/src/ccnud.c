@@ -63,7 +63,8 @@ void signal_handler(int signal)
             break;
         case SIGTERM:
             log_print(g_log, "Received SIGTERM signal.");
-            /* do cleanup */
+            log_close(g_log);
+            ccnustat_done();
             exit(EXIT_SUCCESS);
             break;
         default:
@@ -147,6 +148,33 @@ int main(int argc, char *argv[])
         }
     }
 
+    char * home_env = getenv("HOME");
+    if (!home_env) {
+        fprintf(stderr, "bfrd: could not parse HOME environment, exiting!");
+        exit(EXIT_FAILURE);
+    }
+    char home[256];
+    strncpy(home, home_env, 256);
+
+    g_log = (struct log * ) malloc(sizeof(struct log));
+    char log_name[256];
+    snprintf(log_name, 256, "ccnud_%u", g_nodeId);
+    if (!log_file_set)
+        snprintf(log_file, 256, "%s/log/ccnud_%u.log", home, g_nodeId);
+
+    if (log_init(log_name, log_file, g_log, LOG_OVERWRITE) < 0) {
+        fprintf(stderr, "ccnud log: %s failed to initalize!\n", log_file);
+        exit(EXIT_FAILURE);
+    }
+
+    if (!stat_file_set)
+        snprintf(stat_file, 256, "%s/stat/ccnud_%u.stat", home, g_nodeId);
+	stat_file[255] = '\0';
+    if (ccnustat_init(stat_file) < 0) {
+        fprintf(stderr, "ccnud stat: %s failed to initalize!\n", stat_file);
+        exit(EXIT_FAILURE);
+    }
+
     fprintf(stderr, "Starting ccnud...");
 
     pid = fork();
@@ -165,25 +193,6 @@ int main(int argc, char *argv[])
     sid = setsid();
     if (sid < 0) {
         fprintf(stderr, "setsid: %s.", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    g_log = (struct log * ) malloc(sizeof(struct log));
-    char log_name[256];
-    snprintf(log_name, 256, "ccnud_%u", g_nodeId);
-    if (!log_file_set)
-        snprintf(log_file, 256, "~/log/ccnud_%u.log", g_nodeId);
-
-    if (log_init(log_name, log_file, g_log, LOG_OVERWRITE) < 0) {
-        fprintf(stderr, "ccnud log: %s failed to initalize!", log_file);
-        exit(EXIT_FAILURE);
-    }
-
-    if (!stat_file_set)
-        snprintf(stat_file, 256, "~/stat/ccnud_%u.stat", g_nodeId);
-	stat_file[255] = '\0';
-    if (ccnustat_init(stat_file) < 0) {
-        fprintf(stderr, "ccnud stat: %s failed to initalize!", stat_file);
         exit(EXIT_FAILURE);
     }
 

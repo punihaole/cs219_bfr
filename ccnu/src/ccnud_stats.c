@@ -8,6 +8,7 @@
 
 static struct log * stat_log;
 static pthread_mutex_t stat_lock = PTHREAD_MUTEX_INITIALIZER;
+static bool_t done = FALSE;
 
 int ccnustat_init(char * filename)
 {
@@ -17,6 +18,16 @@ int ccnustat_init(char * filename)
     if (log_init(log_name, filename, stat_log, LOG_OVERWRITE)) return -1;
 
     return 0;
+}
+
+void ccnustat_done()
+{
+    pthread_mutex_lock(&stat_lock);
+    if (!done) {
+        log_close(stat_log);
+        done = TRUE;
+    }
+    pthread_mutex_unlock(&stat_lock);
 }
 
 void ccnustat_rcvd_interest(struct ccnu_interest_pkt * interest)

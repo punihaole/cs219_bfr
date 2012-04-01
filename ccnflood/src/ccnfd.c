@@ -144,26 +144,13 @@ int main(int argc, char *argv[])
         }
     }
 
-    fprintf(stderr, "Starting ccnfd...");
-
-    pid = fork();
-    if (pid < 0) {
+    char * home_env = getenv("HOME");
+    if (!home_env) {
+        fprintf(stderr, "bfrd: could not parse HOME environment, exiting!");
         exit(EXIT_FAILURE);
     }
-
-    if (pid > 0) {
-        /* parent exits */
-        fprintf(stderr, "Done. pid = %d\n", pid);
-        exit(EXIT_SUCCESS);
-    }
-
-    umask(0); /* os calls provide their own permissions */
-
-    sid = setsid();
-    if (sid < 0) {
-        fprintf(stderr, "setsid: %s.", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
+    char home[256];
+    strncpy(home, home_env, 256);
 
     g_log = (struct log * ) malloc(sizeof(struct log));
     char log_name[256];
@@ -185,6 +172,27 @@ int main(int argc, char *argv[])
 	stat_file[255] = '\0';
     if (ccnfstat_init(stat_file) < 0) {
         fprintf(stderr, "ccnfd stat: %s failed to initalize!", stat_file);
+        exit(EXIT_FAILURE);
+    }
+
+    fprintf(stderr, "Starting ccnfd...");
+
+    pid = fork();
+    if (pid < 0) {
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid > 0) {
+        /* parent exits */
+        fprintf(stderr, "Done. pid = %d\n", pid);
+        exit(EXIT_SUCCESS);
+    }
+
+    umask(0); /* os calls provide their own permissions */
+
+    sid = setsid();
+    if (sid < 0) {
+        fprintf(stderr, "setsid: %s.", strerror(errno));
         exit(EXIT_FAILURE);
     }
 

@@ -17,6 +17,8 @@ int log_init(char * log_name, char * filename, struct log * _log_ptr, int mode);
 
 int log_close(struct log * _log);
 
+void log_flush(struct log * _log);
+
 void log_print(struct log * _log, const char * str, ...);
 
 void log_printnow(struct log * _log, const char * format, ...);

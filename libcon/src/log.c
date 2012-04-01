@@ -45,6 +45,11 @@ int log_close(struct log * _log)
 	return 0;
 }
 
+void log_flush(struct log * _log)
+{
+	fflush(_log->log_fp);
+}
+
 void log_print(struct log * _log, const char * format, ...)
 {
 	if (!_log || !format) return;

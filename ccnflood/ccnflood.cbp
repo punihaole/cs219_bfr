@@ -49,6 +49,9 @@
 		<Unit filename="src/ccnfd_pit.c">
 			<Option compilerVar="CC" />
 		</Unit>
+		<Unit filename="src/ccnfd_stats.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="src/include/ccnf_packet.h" />
 		<Unit filename="src/include/ccnfd.h" />
 		<Unit filename="src/include/ccnfd_constants.h" />
@@ -57,6 +60,7 @@
 		<Unit filename="src/include/ccnfd_net_broadcaster.h" />
 		<Unit filename="src/include/ccnfd_net_listener.h" />
 		<Unit filename="src/include/ccnfd_pit.h" />
+		<Unit filename="src/include/ccnfd_stats.h" />
 		<Unit filename="src/tests/ccnf_net_test.c">
 			<Option compilerVar="CC" />
 		</Unit>

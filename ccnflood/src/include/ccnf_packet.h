@@ -29,7 +29,7 @@
  *     +payload : byte[size]
  **/
 
-#define MIN_INTEREST_PKT_SIZE 5 /* bytes */
+#define MIN_INTEREST_PKT_SIZE 6 /* bytes */
 struct ccnf_interest_pkt {
     uint8_t ttl;
     struct content_name * name;

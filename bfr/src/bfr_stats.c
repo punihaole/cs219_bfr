@@ -23,7 +23,7 @@ void bfrstat_rcvd_bloom(struct bloom_msg * msg)
 {
     if (!msg) return;
 
-    int bytes = BLOOM_MSG_MIN_SIZE + (msg->vector_bits / 8);
+    int bytes = HDR_SIZE + BLOOM_MSG_MIN_SIZE + (msg->vector_bits / 8);
     pthread_mutex_lock(&stat_lock);
     log_print(stat_log, "EVENT BLOOM_RCVD %d", bytes);
     pthread_mutex_unlock(&stat_lock);
@@ -33,7 +33,7 @@ void bfrstat_sent_bloom(struct bloom_msg * msg)
 {
     if (!msg) return;
 
-    int bytes = BLOOM_MSG_MIN_SIZE + (msg->vector_bits / 8);
+    int bytes = HDR_SIZE + BLOOM_MSG_MIN_SIZE + (msg->vector_bits / 8);
     pthread_mutex_lock(&stat_lock);
     log_print(stat_log, "EVENT BLOOM_SENT %d", bytes);
     pthread_mutex_unlock(&stat_lock);
@@ -43,7 +43,7 @@ void bfrstat_rcvd_join(struct cluster_join_msg * msg)
 {
     if (!msg) return;
 
-    int bytes = CLUSTER_JOIN_MSG_SIZE;
+    int bytes = HDR_SIZE + CLUSTER_JOIN_MSG_SIZE;
     pthread_mutex_lock(&stat_lock);
     log_print(stat_log, "EVENT JOIN_RCVD %d", bytes);
     pthread_mutex_unlock(&stat_lock);
@@ -53,7 +53,7 @@ void bfrstat_sent_join(struct cluster_join_msg * msg)
 {
     if (!msg) return;
 
-    int bytes = CLUSTER_JOIN_MSG_SIZE;
+    int bytes = HDR_SIZE + CLUSTER_JOIN_MSG_SIZE;
     pthread_mutex_lock(&stat_lock);
     log_print(stat_log, "EVENT JOIN_SENT %d", bytes);
     pthread_mutex_unlock(&stat_lock);
@@ -63,7 +63,7 @@ void bfrstat_rcvd_cluster(struct cluster_msg * msg)
 {
     if (!msg) return;
 
-    int bytes = CLUSTER_RESPONSE_MSG_SIZE;
+    int bytes = HDR_SIZE + CLUSTER_RESPONSE_MSG_SIZE;
     pthread_mutex_lock(&stat_lock);
     log_print(stat_log, "EVENT CLUSTER_RCVD %d", bytes);
     pthread_mutex_unlock(&stat_lock);
@@ -73,7 +73,7 @@ void bfrstat_sent_cluster(struct cluster_msg * msg)
 {
     if (!msg) return;
 
-    int bytes = CLUSTER_RESPONSE_MSG_SIZE;
+    int bytes = HDR_SIZE + CLUSTER_RESPONSE_MSG_SIZE;
     pthread_mutex_lock(&stat_lock);
     log_print(stat_log, "EVENT CLUSTER_SENT %d", bytes);
     pthread_mutex_unlock(&stat_lock);

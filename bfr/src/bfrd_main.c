@@ -142,6 +142,36 @@ int main(int argc, char ** argv)
         }
     }
 
+    g_bfr.nodeId = nodeId;
+    char * home_env = getenv("HOME");
+    if (!home_env) {
+        fprintf(stderr, "bfrd: could not parse HOME environment, exiting!");
+        exit(EXIT_FAILURE);
+    }
+    char home[256];
+    strncpy(home, home_env, 256);
+
+    g_log = (struct log * ) malloc(sizeof(struct log));
+    char log_name[256];
+    snprintf(log_name, 256, "bfr_%u", nodeId);
+    if (!log_file_set)
+        snprintf(log_file, 256, "%s/log/bfr_%u.log", home, nodeId);
+    log_name[255] = '\0';
+    log_file[255] = '\0';
+
+    if (log_init(log_name, log_file, g_log, LOG_OVERWRITE) < 0) {
+        fprintf(stderr, "bfr log: %s failed to initalize, exiting!", log_file);
+        exit(EXIT_FAILURE);
+    }
+
+    if (!stat_file_set)
+        snprintf(stat_file, 256, "%s/stat/bfr_%u.stat", home, nodeId);
+    stat_file[255] = '\0';
+    if (bfrstat_init(stat_file) < 0) {
+        fprintf(stderr, "bfrd stat: %s failed to initalize!", stat_file);
+        exit(EXIT_FAILURE);
+    }
+
     fprintf(stderr, "Starting daemon...");
 
     pid = fork();
@@ -160,27 +190,6 @@ int main(int argc, char ** argv)
     sid = setsid();
     if (sid < 0) {
         fprintf(stderr, "setsid: %s.", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    g_log = (struct log * ) malloc(sizeof(struct log));
-    char log_name[256];
-    snprintf(log_name, 256, "bfr_%u", nodeId);
-    if (!log_file_set)
-        snprintf(log_file, 256, "~/log/bfr_%u.log", nodeId);
-    log_name[255] = '\0';
-    log_file[255] = '\0';
-
-    if (log_init(log_name, log_file, g_log, LOG_OVERWRITE) < 0) {
-        fprintf(stderr, "bfr log: %s failed to initalize, exiting!", log_file);
-        exit(EXIT_FAILURE);
-    }
-
-    if (!stat_file_set)
-        snprintf(stat_file, 256, "~/stat/bfr_%u.stat", g_bfr.nodeId);
-    stat_file[255] = '\0';
-    if (bfrstat_init(stat_file) < 0) {
-        fprintf(stderr, "bfrd stat: %s failed to initalize!", stat_file);
         exit(EXIT_FAILURE);
     }
 

@@ -1,29 +1,9 @@
 #!/bin/bash
 
-if [ $(id -u) = '0' ]; then
-	echo "should not run as superuser!"
-	exit 1
-fi
-
-if [ "$#" -ge '1' ]; then
-	arg=$1
-else
-	arg="start"
-fi	
-
-if [ "$arg" != 'start' -a "$arg" != 'restart' -a "$arg" != 'stop' -a "$arg" != 'loc' ]; then
-	echo "unexpected command"
-	exit 1
-fi
-
 MY_PATH=$(readlink -m $0)
 MY_PATH=${MY_PATH/%bfr_ctl/}
 
-if [ "$arg" = 'loc' ]; then
-	$MY_PATH/../apps/bin/cloc $2 $3
-fi
-
-if [ "$arg" = 'start' ]; then
+start() {
 	if [ "$(pidof ccnud)" ]; then
 		echo " * ccnud already running"
 	else
@@ -48,8 +28,9 @@ if [ "$arg" = 'start' ]; then
 			result=`$MY_PATH/../bin/bfrd`
 		fi
 	fi
+}
 
-elif [ "$arg" = 'restart' ]; then
+restart() {
 	if [ "$(pidof ccnud)" ]; then
 		echo " * Shutting down ccnud"
 		killall ccnud
@@ -76,10 +57,46 @@ elif [ "$arg" = 'restart' ]; then
 	else
 		result=`$MY_PATH/../bin/bfrd`
 	fi
+}
 
-elif [ "$arg" = 'stop' ]; then
+stop() {
 	echo " * Shutting down ccnud"
 	killall ccnud
 	echo " * Shutting down bfrd"
 	killall bfrd
+}
+
+loc() {
+	$MY_PATH/../apps/bin/cloc $1 $2
+}
+
+if [ $(id -u) = '0' ]; then
+	echo " * Should not run as superuser!"
+	exit 1
 fi
+
+if [ "$#" -ge '1' ]; then
+	arg=$1
+else
+	arg="start"
+fi	
+
+case "$arg" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart)
+		restart
+		;;
+	loc)
+		loc $2 $3
+		;;
+	*)
+		echo " * Usage: $0 {start|stop|restart|loc}"
+		exit 1
+esac
+
+exit 0

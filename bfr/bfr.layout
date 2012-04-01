@@ -1,25 +1,25 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
 <CodeBlocks_layout_file>
 	<ActiveTarget name="Release" />
-	<File name="src/bfr.c" open="1" top="0" tabpos="6">
+	<File name="src/bfr.c" open="0" top="0" tabpos="6">
 		<Cursor position="7660" topLine="279" />
 	</File>
 	<File name="src/bfr_listener.c" open="0" top="0" tabpos="3">
 		<Cursor position="9994" topLine="333" />
 	</File>
-	<File name="src/bfr_stats.c" open="1" top="0" tabpos="2">
-		<Cursor position="1575" topLine="0" />
+	<File name="src/bfr_stats.c" open="1" top="1" tabpos="1">
+		<Cursor position="1912" topLine="47" />
 	</File>
-	<File name="src/bfrd.c" open="1" top="1" tabpos="4">
+	<File name="src/bfrd.c" open="0" top="0" tabpos="4">
 		<Cursor position="274" topLine="9" />
 	</File>
-	<File name="src/bfrd_main.c" open="1" top="0" tabpos="5">
-		<Cursor position="263" topLine="0" />
+	<File name="src/bfrd_main.c" open="0" top="0" tabpos="1">
+		<Cursor position="4434" topLine="136" />
 	</File>
 	<File name="src/cluster.c" open="0" top="0" tabpos="0">
 		<Cursor position="4803" topLine="171" />
 	</File>
-	<File name="src/include/bfr_stats.h" open="1" top="0" tabpos="3">
+	<File name="src/include/bfr_stats.h" open="0" top="0" tabpos="3">
 		<Cursor position="255" topLine="0" />
 	</File>
 	<File name="src/include/bfrd.h" open="0" top="0" tabpos="2">
@@ -34,7 +34,7 @@
 	<File name="src/include/strategy.h" open="0" top="0" tabpos="1">
 		<Cursor position="274" topLine="0" />
 	</File>
-	<File name="src/strategy.c" open="1" top="0" tabpos="1">
+	<File name="src/strategy.c" open="0" top="0" tabpos="1">
 		<Cursor position="28505" topLine="803" />
 	</File>
 	<File name="src/tests/bfr_test.c" open="0" top="0" tabpos="0">

@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1332567054 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnf.c
+1333064407 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnf.c
 	<stdlib.h>
 	<stdio.h>
 	<string.h>
@@ -21,7 +21,7 @@
 	"ccnf_packet.h"
 	"net_lib.h"
 
-1332615691 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd.c
+1333130813 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd.c
 	<sys/prctl.h>
 	<sys/types.h>
 	<sys/stat.h>
@@ -34,11 +34,13 @@
 	<syslog.h>
 	<unistd.h>
 	<math.h>
+	"ccnf.h"
 	"ccnfd_listener.h"
 	"ccnfd_net_broadcaster.h"
 	"ccnfd_net_listener.h"
 	"ccnfd_cs.h"
 	"ccnfd_pit.h"
+	"ccnfd_stats.h"
 	"ccnfd.h"
 	"net_lib.h"
 	"log.h"
@@ -55,7 +57,7 @@
 	"linked_list.h"
 	"bitmap.h"
 
-1332567694 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_listener.c
+1333064156 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_listener.c
 	<string.h>
 	<stdlib.h>
 	<errno.h>
@@ -81,7 +83,7 @@
 	"thread_pool.h"
 	"ts.h"
 
-1332617142 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_net_broadcaster.c
+1333125773 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_net_broadcaster.c
 	<stdlib.h>
 	<string.h>
 	<stdio.h>
@@ -98,13 +100,14 @@
 	"ccnf_packet.h"
 	"ccnfd_constants.h"
 	"ccnfd_pit.h"
+	"ccnfd_stats.h"
 	"log.h"
 	"net_buffer.h"
 	"net_lib.h"
 	"synch_queue.h"
 	"ts.h"
 
-1332635128 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_net_listener.c
+1333125931 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_net_listener.c
 	<errno.h>
 	<stdlib.h>
 	<string.h>
@@ -121,6 +124,7 @@
 	"ccnfd_constants.h"
 	"ccnfd_cs.h"
 	"ccnfd_pit.h"
+	"ccnfd_stats.h"
 	"ccnfd_net_broadcaster.h"
 	"ccnf_packet.h"
 	"ccnfd_net_listener.h"
@@ -130,7 +134,7 @@
 	"net_lib.h"
 	"thread_pool.h"
 
-1332565556 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_pit.c
+1332780751 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_pit.c
 	<stdlib.h>
 	<sys/time.h>
 	<string.h>
@@ -230,4 +234,29 @@
 	"content_name.h"
 	"ccnf.h"
 	"net_lib.h"
+
+1332565776 source:/home/tom/projects/cs219_bfr/ccnflood/src/tests/retrieve_test.c
+	<sys/types.h>
+	<sys/stat.h>
+	<errno.h>
+	<fcntl.h>
+	<signal.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<syslog.h>
+	<unistd.h>
+	<math.h>
+	"ccnu.h"
+	"hash.h"
+	"content.h"
+	"net_lib.h"
+
+1333126150 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_stats.c
+	<stdlib.h>
+	<string.h>
+	<pthread.h>
+	"ccnfd.h"
+	"ccnfd_stats.h"
+	"log.h"
 

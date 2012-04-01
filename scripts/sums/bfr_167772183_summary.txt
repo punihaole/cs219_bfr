@@ -1,0 +1,23 @@
+0
+goodput:
+
+overhead:
+0: 709 bytes/sec
+1: 12 bytes/sec
+20: 38281 bytes/sec
+21: 2391 bytes/sec
+40: 71875 bytes/sec
+41: 3027 bytes/sec
+60: 116875 bytes/sec
+61: 1224 bytes/sec
+62: 24 bytes/sec
+64: 1971 bytes/sec
+80: 95625 bytes/sec
+81: 576 bytes/sec
+82: 480 bytes/sec
+84: 1971 bytes/sec
+100: 20625 bytes/sec
+101: 240 bytes/sec
+102: 432 bytes/sec
+104: 1899 bytes/sec
+105: 72 bytes/sec
