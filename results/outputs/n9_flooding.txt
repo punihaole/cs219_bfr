@@ -1,0 +1,10 @@
+Using interest flooding
+retrieving index (/flow1/map).
+retrieved index, found 64 segments, file size = 91728.
+finished retrieving content, /flow1/map.
+	publisher = 271741464
+	timestamp = 1333338915
+	size = 91728
+Start time: Sun Apr  1 20:55:20 2012
+End time: Sun Apr  1 20:55:23 2012
+Took 2.946749 sec.

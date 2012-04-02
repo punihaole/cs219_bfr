@@ -80,7 +80,7 @@ foreach (sort { $a<=>$b } keys %overhead) {
 sub parseLine($)
 {
 	my $line = shift;
-	if ($line =~ m/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}) (\d+):(\d+):(\d+) (\d{4}) \w+_stats_(\d+): EVENT ([A-Za-z_]+) (\d+)$/) {
+	if ($line =~ m/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}) (\d+):(\d+):(\d+) (\d{4}) \w+_stats_(\d+): EVENT ([A-Za-z_]+) (\d+)$/) {
 		return (0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10);
 	} else {
 		return (1, "", "", "", "", "", "", "", "", "", "");

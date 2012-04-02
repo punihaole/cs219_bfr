@@ -531,6 +531,7 @@ int ccnf_retrieve(struct content_name * name, struct content_obj ** content_ptr)
     END_RETRIEVE:
     if (rv != 0) {
         /* error */
+        fprintf(stderr, "rv < 0\n");
         if (data) free(data);
         if (content->name) content_name_delete(content->name);
         free(content);

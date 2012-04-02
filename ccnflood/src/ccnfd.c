@@ -81,6 +81,8 @@ int main(int argc, char *argv[])
     int interest_pipeline = DEFAULT_INTEREST_PIPELINE;
 
     g_nodeId = DEFAULT_NODE_ID;
+    g_timeout_ms = DEFAULT_INTEREST_TIMEOUT_MS;
+    g_interest_attempts = DEFAULT_INTEREST_MAX_ATTEMPTS;
 
     signal(SIGHUP, signal_handler);
     signal(SIGTERM, signal_handler);
@@ -145,18 +147,18 @@ int main(int argc, char *argv[])
     }
 
     char * home_env = getenv("HOME");
+    char home[256];
     if (!home_env) {
         fprintf(stderr, "bfrd: could not parse HOME environment, exiting!");
         exit(EXIT_FAILURE);
     }
-    char home[256];
     strncpy(home, home_env, 256);
 
     g_log = (struct log * ) malloc(sizeof(struct log));
     char log_name[256];
     snprintf(log_name, 256, "ccnfd_%u", g_nodeId);
     if (!log_file_set)
-        snprintf(log_file, 256, "/home/tom/log/ccnfd_%u.log", g_nodeId);
+        snprintf(log_file, 256, "%s/log/ccnfd_%u.log", home, g_nodeId);
 
     char proc[256];
     snprintf(proc, 256, "ccnfd%u", g_nodeId);
@@ -168,7 +170,7 @@ int main(int argc, char *argv[])
     }
 
 	if (!stat_file_set)
-        snprintf(stat_file, 256, "~/stat/ccnfd_%u.stat", g_nodeId);
+        snprintf(stat_file, 256, "%s/stat/ccnfd_%u.stat", home, g_nodeId);
 	stat_file[255] = '\0';
     if (ccnfstat_init(stat_file) < 0) {
         fprintf(stderr, "ccnfd stat: %s failed to initalize!", stat_file);

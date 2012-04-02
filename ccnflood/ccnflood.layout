@@ -4,8 +4,8 @@
 	<File name="src/ccnf.c" open="0" top="0" tabpos="2">
 		<Cursor position="2920" topLine="102" />
 	</File>
-	<File name="src/ccnfd.c" open="0" top="0" tabpos="1">
-		<Cursor position="4812" topLine="137" />
+	<File name="src/ccnfd.c" open="1" top="1" tabpos="2">
+		<Cursor position="4946" topLine="143" />
 	</File>
 	<File name="src/ccnfd_cs.c" open="0" top="0" tabpos="5">
 		<Cursor position="3167" topLine="91" />
@@ -22,7 +22,7 @@
 	<File name="src/ccnfd_pit.c" open="0" top="0" tabpos="2">
 		<Cursor position="5660" topLine="208" />
 	</File>
-	<File name="src/ccnfd_stats.c" open="1" top="1" tabpos="1">
+	<File name="src/ccnfd_stats.c" open="1" top="0" tabpos="1">
 		<Cursor position="0" topLine="0" />
 	</File>
 	<File name="src/include/ccnf_packet.h" open="0" top="0" tabpos="3">

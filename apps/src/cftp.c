@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <time.h>
 
 #include "ccnu.h"
 #include "ccnf.h"
@@ -38,6 +39,9 @@ int main(int argc, char ** argv)
 	}
 
 	struct timeval tv_start, tv_end;
+	time_t clock_start = time(NULL);
+	char clock_start_str[256];
+	strcpy(clock_start_str, ctime(&clock_start));
 
 	char * con_name = argv[1];
 	char * filename = argv[2];
@@ -83,9 +87,16 @@ int main(int argc, char ** argv)
 	fclose(fp);
 
 	gettimeofday(&tv_end, NULL);
+
 	double time_start = tv_start.tv_sec + (double) tv_start.tv_usec / 1000000.0;
 	double time_end = tv_end.tv_sec + (double) tv_end.tv_usec / 1000000.0;
 
+	time_t clock_end = time(NULL);
+	char clock_end_str[256];
+	strcpy(clock_end_str, ctime(&clock_end));
+
+	printf("Start time: %s", clock_start_str);
+	printf("End time: %s", clock_end_str);
 	printf("Took %f sec.\n", time_end - time_start);
 	exit(EXIT_SUCCESS);
 }

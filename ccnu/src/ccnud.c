@@ -149,11 +149,11 @@ int main(int argc, char *argv[])
     }
 
     char * home_env = getenv("HOME");
+    char home[256];
     if (!home_env) {
         fprintf(stderr, "bfrd: could not parse HOME environment, exiting!");
         exit(EXIT_FAILURE);
     }
-    char home[256];
     strncpy(home, home_env, 256);
 
     g_log = (struct log * ) malloc(sizeof(struct log));

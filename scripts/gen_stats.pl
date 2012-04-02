@@ -11,7 +11,13 @@ GOODPUT_STATE => 'GOODPUT',
 OVERHEAD_STATE => 'OVERHEAD',
 };
 
-my @files = glob "sums/*_summary.txt";
+if (@ARGV < 1) {
+	print "Usage: gen_stats.pl /path/to/summaries\n";
+	exit 1;
+}
+
+my $dir = $ARGV[0];
+my @files = glob "$dir/*_summary.txt";
 my %goodput = ();
 my %overhead = ();
 
@@ -54,6 +60,8 @@ foreach (@files) {
 			}
 		}
 	}
+
+	close (FH);
 }
 
 print "Summary:\n";
@@ -66,6 +74,8 @@ print "\noverhead:\n";
 foreach (sort { $a<=>$b } keys %overhead) {
 	print "$_: $overhead{$_} bytes/sec\n";
 }
+
+exit 0;
 
 sub parseLine($)
 {

@@ -1,0 +1,12 @@
+167772173
+goodput:
+0: 216 bytes/sec
+1: 374242 bytes/sec
+2: 357918 bytes/sec
+3: 249794 bytes/sec
+
+overhead:
+0: 340 bytes/sec
+1: 42245 bytes/sec
+2: 50298 bytes/sec
+3: 20753 bytes/sec
