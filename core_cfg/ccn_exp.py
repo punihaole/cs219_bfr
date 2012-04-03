@@ -28,7 +28,7 @@ class CcnExp(CoreService):
     # this controls the starting order vs other enabled services
     _startindex = 50
     # list of startup commands, also may be generated during startup
-    _startup = ('sh /home/tom/projects/cs219_bfr/scripts/core_exp_setup.sh',)
+    _startup = ('bash /home/tom/projects/cs219_bfr/scripts/core_exp_setup.sh',)
     # list of shutdown commands
     _shutdown = ()
 

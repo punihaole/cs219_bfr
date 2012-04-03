@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Recursively runs parse_stats.pl on files in the ~/stat directory. Ignores
+# files not ending in *.stat. If there are collected statistics from other
+# experiments lingering in the stat directory they should be moved or renamed.
+# Writes all the summaries to the specified output directory (created if not
+# present).
 if [ -z "$1" ]; then
 	echo "Usage: $0 /path/to/output/dir"
 	exit 1

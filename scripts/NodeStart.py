@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
+# Periodically reads the node's xy coordinates from the CORE generated location
+# file and sends the coordinates to the bfrd.
 from socket import gethostname
 import os
 import sys

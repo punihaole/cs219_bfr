@@ -10,10 +10,13 @@
 #include "linked_list.h"
 #include "bitmap.h"
 
+extern uint32_t g_nodeId;
+
 struct CS {
     pthread_mutex_t lock;
     struct hashtable * table;
     int summary_size;
+    uint32_t nodeId;
 };
 
 struct CS_segment {
@@ -60,6 +63,7 @@ int CS_init(evict_policy_t ep, double p)
             break;
     }
 
+    _cs.nodeId = g_nodeId;
     _cs.table = hash_create(CS_SIZE, evict_fun, (delete_t)segment_destroy, BLOOM_ARGS);
     pthread_mutex_init(&_cs.lock, NULL);
 
@@ -245,12 +249,16 @@ int CS_summary(struct bloom ** filter_ptr)
     *filter_ptr = bloom_create(_cs.summary_size, BLOOM_ARGS);
     pthread_mutex_lock(&_cs.lock);
 
+
     int i;
     for (i = 0; i < _cs.table->size; i++) {
         struct hash_entry * entry = _cs.table->entries[i];
         if (entry && entry->valid) {
-            char * name = entry->key;
-            bloom_add(*filter_ptr, name);
+            struct CS_segment * segment = entry->data;
+            if (segment->index_chunk->publisher == _cs.nodeId) {
+                char * name = entry->key;
+                bloom_add(*filter_ptr, name);
+            }
         }
     }
     pthread_mutex_unlock(&_cs.lock);

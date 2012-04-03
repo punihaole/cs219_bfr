@@ -443,7 +443,7 @@
 	"net_buffer.h"
 	"synch_queue.h"
 
-1333122788 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud.c
+1333396384 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud.c
 	<sys/types.h>
 	<sys/stat.h>
 	<errno.h>
@@ -467,7 +467,7 @@
 	"bfr.h"
 	"synch_queue.h"
 
-1333043927 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud_cs.c
+1333411704 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud_cs.c
 	<stdlib.h>
 	<string.h>
 	<math.h>
@@ -479,7 +479,7 @@
 	"linked_list.h"
 	"bitmap.h"
 
-1333070061 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud_net_broadcaster.c
+1333396384 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud_net_broadcaster.c
 	<stdlib.h>
 	<string.h>
 	<stdio.h>
@@ -496,6 +496,7 @@
 	"ccnu_packet.h"
 	"ccnud_constants.h"
 	"ccnud_pit.h"
+	"ccnud_stats.h"
 	"bfr.h"
 	"log.h"
 	"net_buffer.h"
@@ -503,7 +504,7 @@
 	"synch_queue.h"
 	"ts.h"
 
-1333062133 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud_net_listener.c
+1333396384 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud_net_listener.c
 	<errno.h>
 	<stdlib.h>
 	<string.h>
@@ -520,6 +521,7 @@
 	"ccnud_constants.h"
 	"ccnud_cs.h"
 	"ccnud_pit.h"
+	"ccnud_stats.h"
 	"ccnud_net_broadcaster.h"
 	"ccnu_packet.h"
 	"ccnud_net_listener.h"
@@ -530,7 +532,7 @@
 	"thread_pool.h"
 	"bfr.h"
 
-1333036997 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud_pit.c
+1333396384 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud_pit.c
 	<stdlib.h>
 	<sys/time.h>
 	<string.h>
@@ -542,7 +544,7 @@
 	"ts.h"
 	"log.h"
 
-1332288054 source:/home/tom/projects/cs219_bfr/ccnu/src/tests/ccnu_net_test.c
+1332536844 source:/home/tom/projects/cs219_bfr/ccnu/src/tests/ccnu_net_test.c
 	<string.h>
 	<stdlib.h>
 	<stdio.h>
@@ -560,7 +562,7 @@
 	"ccnu.h"
 	"net_lib.h"
 
-1332288054 source:/home/tom/projects/cs219_bfr/ccnu/src/tests/cs_test.c
+1332536844 source:/home/tom/projects/cs219_bfr/ccnu/src/tests/cs_test.c
 	<stdio.h>
 	<string.h>
 	<stdlib.h>
@@ -570,7 +572,7 @@
 	"content.h"
 	"hash.h"
 
-1333059888 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnu.c
+1333396384 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnu.c
 	<stdlib.h>
 	<stdio.h>
 	<string.h>
@@ -592,7 +594,7 @@
 	"ccnu_packet.h"
 	"net_lib.h"
 
-1333062387 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud_listener.c
+1333396384 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud_listener.c
 	<assert.h>
 	<string.h>
 	<stdlib.h>
@@ -619,4 +621,12 @@
 	"synch_queue.h"
 	"thread_pool.h"
 	"ts.h"
+
+1333396384 source:/home/tom/projects/cs219_bfr/ccnu/src/ccnud_stats.c
+	<stdlib.h>
+	<string.h>
+	<pthread.h>
+	"ccnud.h"
+	"ccnud_stats.h"
+	"log.h"
 

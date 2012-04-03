@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -O2 -Wall -iquote ../include
-CLINK = -lm -pthread
+CLINK = -lm -pthread -lrt
 SRC = src
 OBJ = obj
 
