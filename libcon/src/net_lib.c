@@ -9,6 +9,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <math.h>
 
 #include <arpa/inet.h>
 #include <ifaddrs.h>
@@ -148,23 +149,55 @@ static long double unpack_ieee754(uint64_t i, unsigned int bits, unsigned int ex
     return result;
 }
 
-uint64_t pack_ieee754_32(long double f)
+#define NET_LIB_IEEE754_PINF_32 0x7F800000
+#define NET_LIB_IEEE754_NINF_32 0xFF800000
+#define NET_LIB_IEEE754_PINF_64 0x7FF0000000000000
+#define NET_LIB_IEEE754_NINF_64 0xFFF0000000000000
+#define NET_LIB_IEEE754_NAN_64  0x7FF8000000000000
+#define NET_LIB_IEEE754_NAN_32  0x7FC00000
+uint32_t pack_ieee754_32(long double f)
 {
+	if (isnan(f) || f == NAN) {
+		//hack - hand-coded QNaN
+		return NET_LIB_IEEE754_NAN_32;
+	} else if (isinf(f) || f == INFINITY) {
+		//hack - hand-coded PINF
+		return NET_LIB_IEEE754_PINF_32;
+	}
     return pack_ieee754(f, 32, 8);
 }
 
 uint64_t pack_ieee754_64(long double f)
 {
+	if (isnan(f) || f == NAN) {
+		//hack - hand-coded QNaN
+		return NET_LIB_IEEE754_NAN_64;
+	} else if (isinf(f) || f == INFINITY) {
+		//hack - hand-coded PINF
+		return NET_LIB_IEEE754_PINF_64;
+	}
     return pack_ieee754(f, 64, 11);
 }
 
 float unpack_ieee754_32(uint64_t f)
 {
+	if (isnan(f) || f == NAN) {
+		//hack - hand-coded QNaN
+		return NET_LIB_IEEE754_NAN_32;
+	} else if (isinf(f) || f == INFINITY) {
+		//hack - hand-coded PINF
+		return NET_LIB_IEEE754_PINF_32;
+	}
+
     return unpack_ieee754(f, 32, 8);
 }
 
 double unpack_ieee754_64(uint64_t f)
 {
+	if (f == NET_LIB_IEEE754_NAN_64)
+		return NAN;
+	else if (f == NET_LIB_IEEE754_PINF_64)
+		return INFINITY;
     return unpack_ieee754(f, 64, 11);
 }
 

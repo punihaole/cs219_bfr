@@ -2,37 +2,38 @@
 
 HOST=$(hostname)
 MYDIR=$(dirname $0)
+CONTENT='TEST STRING'
 
 sleep 10
 
 case "$HOST" in
-	n29)
-		$MYDIR/put_map_1.sh -f
+	n25)
+		$MYDIR/../bin/pchunk /flow1/string "$CONTENT" -f
 		;;
 	n32)
-		$MYDIR/put_map_2.sh -f
+		$MYDIR/../bin/pchunk /flow2/string "$CONTENT" -f
 		;;
 	n11)
-		$MYDIR/put_map_3.sh -f
+		$MYDIR/../bin/pchunk /flow3/string "$CONTENT" -f
 		;;
 	n33)
-		$MYDIR/put_map_4.sh -f
-		;;
-	n9)
-		sleep 5
-		$MYDIR/get_map_1.sh -f
+		$MYDIR/../bin/pchunk /flow4/string "$CONTENT" -f
 		;;
 	n5)
-		sleep 5
-		$MYDIR/get_map_2.sh -f
+		sleep 20
+		$MYDIR/../bin/gchunk /flow1/string > $MYDIR/../flow1_flood.txt -f
 		;;
+#	n9)
+#		sleep 20
+#		$MYDIR/../bin/gchunk /flow2/string > $MYDIR/../flow2_flood.txt -f
+#		;;
 #	n47)
-#		sleep 5
-#		$MYDIR/get_map_3.sh -f
+#		sleep 20
+#		$MYDIR/../bin/gchunk /flow3/string > $MYDIR/../flow3_flood.txt -f
 #		;;
 #	n22)
-#		sleep 5
-#		$MYDIR/get_map_4.sh -f
+#		sleep 20
+#		$MYDIR/../bin/gchunk /flow4/string > $MYDIR/../flow4_flood.txt -f
 #		;;
 	*)
 		exit 0

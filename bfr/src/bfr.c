@@ -369,6 +369,7 @@ int bfr_sendWhere(struct content_name * name,
     }
 
     double new_dist = unpack_ieee754_64(new_dist_754);
+
     *distance = new_dist;
 
     close(s);

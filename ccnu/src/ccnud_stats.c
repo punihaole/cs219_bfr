@@ -58,6 +58,15 @@ void ccnustat_rcvd_data(struct ccnu_data_pkt * data)
     pthread_mutex_unlock(&stat_lock);
 }
 
+void ccnustat_rcvd_data_unsolicited(struct ccnu_data_pkt * data)
+{
+    if (!data) return;
+    int bytes = MIN_DATA_PKT_SIZE + data->name->len + data->payload_len;
+    pthread_mutex_lock(&stat_lock);
+    log_print(stat_log, "EVENT UNSOLICITED_RCVD %d", bytes);
+    pthread_mutex_unlock(&stat_lock);
+}
+
 void ccnustat_sent_data(struct content_obj * content)
 {
     if (!content) return;

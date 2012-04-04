@@ -17,6 +17,8 @@ void ccnustat_sent_interest(struct ccnu_interest_pkt * interest);
 /* logs a data reception event */
 void ccnustat_rcvd_data(struct ccnu_data_pkt * data);
 
+void ccnustat_rcvd_data_unsolicited(struct ccnu_data_pkt * data);
+
 /* logs a data sent event */
 void ccnustat_sent_data(struct content_obj * content);
 

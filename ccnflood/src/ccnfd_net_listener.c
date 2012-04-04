@@ -222,7 +222,6 @@ static void * handle_data(struct ccnf_data_pkt * data)
     snprintf(proc, 256, "hd%u", g_nodeId);
     prctl(PR_SET_NAME, proc, 0, 0, 0);
 
-	ccnfstat_rcvd_data(data);
     log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
               data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);
 
@@ -240,8 +239,11 @@ static void * handle_data(struct ccnf_data_pkt * data)
     if (!pe) {
         log_print(g_log, "%s unsolicited data", obj->name->full_name);
         /* unsolicited data */
+		ccnfstat_rcvd_data_unsolicited(data);
         goto END;
-    }
+    } else {
+		ccnfstat_rcvd_data(data);
+	}
 
     CS_put(obj);
     if (!*pe->obj) {

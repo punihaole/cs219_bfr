@@ -23,7 +23,7 @@ void signal_handler(int signal)
 			exit(EXIT_SUCCESS);
 		case SIGINT:
 		case SIGTERM:
-			printf("\naverage session jitter = %5.4fms\n", jitter_ms);
+			printf("\naverage session jitter = %ld ms\n", jitter_ms);
 			exit(EXIT_SUCCESS);
 		default:
 			break;
@@ -165,7 +165,7 @@ int client(struct content_name * base_name, int interval_ms, FILE * dest, int fl
 	if (lost_consec > 10)
 		fprintf(stderr, "lost %d consecutive chunks, closing application...\n", lost_consec);
 
-	printf("\naverage session jitter = %5.4fms\n", jitter_ms);
+	printf("\naverage session jitter = %ld ms\n", jitter_ms);
 	return 0;
 }
 

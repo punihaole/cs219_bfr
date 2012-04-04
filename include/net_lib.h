@@ -24,7 +24,7 @@ void putInt(uint8_t * buf, uint32_t _int);
 void putLong(uint8_t * buf, uint64_t _long);
 
 /* pack or unpack doubles. Appropriately changes byte order */
-uint64_t pack_ieee754_32(long double f);
+uint32_t pack_ieee754_32(long double f);
 
 uint64_t pack_ieee754_64(long double f);
 

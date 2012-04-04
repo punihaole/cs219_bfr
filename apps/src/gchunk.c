@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <ctype.h>
 
 #include "ccnu.h"
 #include "ccnf.h"
@@ -38,6 +39,7 @@ int main(int argc, char ** argv)
 
 	struct content_obj * con;
 	struct content_name * name = content_name_create(str);
+	printf("Retrieving %s...\n", str);
 	gettimeofday(&tv_start, NULL);
 	if (retrieve_content(name, &con) == 0) {
 		gettimeofday(&tv_end, NULL);
@@ -45,13 +47,16 @@ int main(int argc, char ** argv)
 		printf("Got content: %s\n", str);
 		int b;
 		for (b = 0; b < con->size; b++) {
-			printf("%c", data[b]);
+			if (isprint(data[b]))
+				printf("%c", data[b]);
+			else
+				printf("%d", data[b]);
 		}
 		
 		double time_start = tv_start.tv_sec + (double) tv_start.tv_usec / 1000000.0;
 		double time_end = tv_end.tv_sec + (double) tv_end.tv_usec / 1000000.0;
 
-		printf("Took %f sec.\n", time_end - time_start);
+		printf("\nTook %f sec.\n", time_end - time_start);
 		exit(EXIT_SUCCESS);		
 	} else {
 		fprintf(stderr, "Failed to retrieve content, did you run producer before consumer?\n");

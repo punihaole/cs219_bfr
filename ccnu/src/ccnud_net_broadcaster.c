@@ -79,13 +79,16 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
         }
     }
 
+    log_print(g_log, "ccnudnb: qry = %d", qry);
     if (qry) {
+        log_print(g_log, "ccnudnb: querying bfrd", qry);
         if (bfr_sendWhere(name, &orig_level_u, &orig_clusterId_u,
                             &dest_level_u, &dest_clusterId_u, &distance) < 0) {
             log_print(g_log, "ccnudnb: sendWhere? failed! -- cannot send interest, %s!",
                       name->full_name);
             goto CLEANUP;
         }
+        log_print(g_log, "ccnudnb: got route: (%d:%d) -> (%d:%d)", orig_level_u, orig_clusterId_u, dest_level_u, dest_clusterId_u);
     }
 
 	struct ccnu_interest_pkt interest;
@@ -177,8 +180,8 @@ int ccnudnb_fwd_interest(struct ccnu_interest_pkt * interest)
     net_buffer_putInt(&buf, interest->name->len);
     net_buffer_copyTo(&buf, interest->name->full_name, interest->name->len);
 
+    ccnustat_sent_interest(interest);
     int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
-	ccnustat_sent_interest(interest);
 
     free(buf.buf);
 
@@ -202,8 +205,8 @@ int ccnudnb_fwd_data(struct content_obj * content, int hops_taken)
     net_buffer_putInt(&buf, content->size);
     net_buffer_copyTo(&buf, content->data, content->size);
 
-    int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
 	ccnustat_sent_data(content);
+    int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
 
     free(buf.buf);
 

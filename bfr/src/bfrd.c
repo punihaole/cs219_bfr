@@ -194,8 +194,12 @@ void bfr_handle_ipc(struct listener_args * ipc_args)
             pthread_mutex_lock(&g_bfr.bfr_lock);
                 /* need to recompute the cluster Ids on all levels */
                 int i;
+                unsigned old;
                 for (i = 0; i < g_bfr.num_levels; i++) {
+                    old = g_bfr.clusterIds[i];
                     g_bfr.clusterIds[i] = grid_cluster(i + 1, x, y);
+                    log_print(g_log, "handle_ipc: level %u, old cluster = %u, new cluster = %u",
+                              i+1, old, g_bfr.clusterIds[i]);
                 }
                 g_bfr.x = x;
                 g_bfr.y = y;

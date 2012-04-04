@@ -1,5 +1,7 @@
 #!/usr/bin/python
 
-import Bfr
+import Loc
 
-Bfr.sendLoc(99.88, 8.2888)
+locFH = open("/tmp/pycore.36851/n5.xy")
+x,y = Loc.readLoc(locFH)
+print "(" + repr(x) + "," + repr(y) + ")\n"

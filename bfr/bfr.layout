@@ -2,22 +2,22 @@
 <CodeBlocks_layout_file>
 	<ActiveTarget name="Release" />
 	<File name="src/bfr.c" open="0" top="0" tabpos="6">
-		<Cursor position="7660" topLine="279" />
+		<Cursor position="338" topLine="171" />
 	</File>
-	<File name="src/bfr_listener.c" open="0" top="0" tabpos="3">
-		<Cursor position="9994" topLine="333" />
+	<File name="src/bfr_listener.c" open="1" top="1" tabpos="1">
+		<Cursor position="14286" topLine="455" />
 	</File>
-	<File name="src/bfr_stats.c" open="1" top="0" tabpos="1">
+	<File name="src/bfr_stats.c" open="0" top="0" tabpos="1">
 		<Cursor position="1912" topLine="44" />
 	</File>
 	<File name="src/bfrd.c" open="0" top="0" tabpos="4">
-		<Cursor position="274" topLine="9" />
+		<Cursor position="1498" topLine="120" />
 	</File>
 	<File name="src/bfrd_main.c" open="0" top="0" tabpos="1">
 		<Cursor position="4434" topLine="136" />
 	</File>
-	<File name="src/cluster.c" open="0" top="0" tabpos="0">
-		<Cursor position="4803" topLine="171" />
+	<File name="src/cluster.c" open="1" top="0" tabpos="2">
+		<Cursor position="5627" topLine="202" />
 	</File>
 	<File name="src/include/bfr_stats.h" open="0" top="0" tabpos="3">
 		<Cursor position="255" topLine="0" />
@@ -25,7 +25,7 @@
 	<File name="src/include/bfrd.h" open="0" top="0" tabpos="2">
 		<Cursor position="2087" topLine="68" />
 	</File>
-	<File name="src/include/bfrd_constants.h" open="1" top="0" tabpos="5">
+	<File name="src/include/bfrd_constants.h" open="0" top="0" tabpos="5">
 		<Cursor position="208" topLine="0" />
 	</File>
 	<File name="src/include/cluster.h" open="0" top="0" tabpos="0">

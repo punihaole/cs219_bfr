@@ -1,0 +1,5 @@
+Using BFR
+Retrieving /flow1/string...
+Got content: /flow1/string
+TEST STRING
+Took 0.167798 sec.

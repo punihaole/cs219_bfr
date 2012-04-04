@@ -27,4 +27,4 @@ while True:
 		print repr(node) + " sending location update: <" + repr(x) + "," + repr(y) + ">\n"
 		Bfr.sendLoc(x, y)
 		locFH.close()
-		time.sleep(10)
+		time.sleep(2)

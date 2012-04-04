@@ -12,6 +12,7 @@
 
 #include <math.h>
 
+#include "content.h"
 #include "content_name.h"
 #include "hash.h"
 #include "ts.h"
@@ -289,10 +290,21 @@ static void * fwd_query_response(void * arg)
    	double y = g_bfr.y;
 	pthread_mutex_unlock(&g_bfr.bfr_lock);
 
+    struct content_name * name = content_name_create(full_name);
     if (clus_get_clusterId(dest_level) == dest_clusterId) {
         /* this is a intra-cluster message. We use the distance table rather
          * than the distance from center metric */
-        myDist = (double)dtab_getHops(full_name);
+        char * prefix = full_name;
+        if (content_is_segmented(name)) {
+            prefix = content_prefix(name);
+            myDist = (double)dtab_getHops(prefix);
+            free(prefix);
+        } else {
+            myDist = (double)dtab_getHops(prefix);
+        }
+
+        myDist = (double)dtab_getHops(prefix);
+
         if (myDist < 0) {
             rv = -1;
             myDist = -1 * MAX_HOPS;
@@ -320,19 +332,31 @@ static void * fwd_query_response(void * arg)
 	unsigned up_dest_level;
 	unsigned up_dest_clusterId;
 
-	struct content_name * name = content_name_create(full_name);
 	int found_clus = clus_findCluster(name, &up_dest_level, &up_dest_clusterId);
 	content_name_delete(name);
 	int calc_dist = -1;
 	bool_t use_update;
 	if (found_clus == 0) {
 		double up_distance;
-		calc_dist = grid_distance(up_dest_level, up_dest_clusterId, x, y, &up_distance);
-		if ((calc_dist == 0) && ((up_distance < myDist) || (myDist < 0))) {
-			myDist = up_distance;
-			log_print(g_log, "fwd_query_response: updating cluster level and Id = (%u,%u) for content=%s",
-				up_dest_level, up_dest_clusterId, full_name);
-			use_update = TRUE;
+		if (up_dest_clusterId == clus_get_clusterId(up_dest_level)) {
+            char * prefix = full_name;
+            if (content_is_segmented(name)) {
+                prefix = content_prefix(name);
+                myDist = (double)dtab_getHops(prefix);
+                free(prefix);
+            } else {
+                myDist = (double)dtab_getHops(prefix);
+            }
+            up_distance = dtab_getHops(prefix);
+            use_update = 1;
+		} else {
+            calc_dist = grid_distance(up_dest_level, up_dest_clusterId, x, y, &up_distance);
+            if ((calc_dist == 0) && ((up_distance < myDist) || (myDist < 0))) {
+                myDist = up_distance;
+                log_print(g_log, "fwd_query_response: updating cluster level and Id = (%u,%u) for content=%s",
+                    up_dest_level, up_dest_clusterId, full_name);
+                use_update = TRUE;
+            }
 		}
 	}
 
@@ -455,11 +479,21 @@ static void * dest_query_response(void * arg)
                    dest_level, dest_clusterId, name->full_name);
         }
 
-        grid_distance(dest_level, dest_clusterId, g_bfr.x, g_bfr.y, &distance);
-    pthread_mutex_unlock(&g_bfr.bfr_lock);
+        if (dest_clusterId == clus_get_clusterId(dest_level)) {
+            char * prefix = name->full_name;
+            if (content_is_segmented(name)) {
+                prefix = content_prefix(name);
+                distance = (double)dtab_getHops(prefix);
+                free(prefix);
+            } else {
+                distance = (double)dtab_getHops(prefix);
+            }
 
-    log_print(g_log, "dest_query_response: for %s - %u:%u -> %u:%u",
-              name->full_name, orig_level, orig_clusterId, dest_level, dest_clusterId);
+            if (distance > 0)
+                distance *= -1;
+        } else
+            grid_distance(dest_level, dest_clusterId, g_bfr.x, g_bfr.y, &distance);
+    pthread_mutex_unlock(&g_bfr.bfr_lock);
 
     /* send the response */
     if (send(sock2, &orig_level, sizeof(unsigned), 0) == -1) {
@@ -483,6 +517,7 @@ static void * dest_query_response(void * arg)
     }
 
     uint64_t distance_754 = pack_ieee754_64(distance);
+    log_print(g_log, "dest_query_response: sending distance_754");
     if (send(sock2, &distance_754, sizeof(uint64_t), 0) == -1) {
         log_print(g_log, "send: %s", strerror(errno));
         goto END_DEST_QRY;

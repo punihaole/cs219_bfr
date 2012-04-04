@@ -137,8 +137,8 @@ int ccnfdnb_fwd_interest(struct ccnf_interest_pkt * interest)
     net_buffer_putInt(&buf, interest->name->len);
     net_buffer_copyTo(&buf, interest->name->full_name, interest->name->len);
 
+    ccnfstat_sent_interest(interest);
     int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
-	ccnfstat_sent_interest(interest);
 
     free(buf.buf);
 
@@ -162,8 +162,8 @@ int ccnfdnb_fwd_data(struct content_obj * content, int hops_taken)
     net_buffer_putInt(&buf, content->size);
     net_buffer_copyTo(&buf, content->data, content->size);
 
+    ccnfstat_sent_data(content);
     int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
-	ccnfstat_sent_data(content);
 
     free(buf.buf);
 

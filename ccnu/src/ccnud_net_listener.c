@@ -182,11 +182,12 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
     snprintf(proc, 256, "hi%u", g_nodeId);
     prctl(PR_SET_NAME, proc, 0, 0, 0);
     int rv = 0;
-	
+
 	ccnustat_rcvd_interest(interest);
-    log_print(g_log, "handle_interest: %s from %u:%u->%u:%u",
+    log_print(g_log, "handle_interest: %s from %u:%u->%u:%u %5.5f, %d",
               interest->name->full_name, interest->orig_level, interest->orig_clusterId,
-              interest->dest_level, interest->dest_clusterId);
+              interest->dest_level, interest->dest_clusterId,
+              unpack_ieee754_64(interest->distance), interest->distance);
 
     struct content_obj * content = CS_get(interest->name);
     if (content) {
@@ -264,7 +265,6 @@ static void * handle_data(struct ccnu_data_pkt * data)
     snprintf(proc, 256, "hd%u", g_nodeId);
     prctl(PR_SET_NAME, proc, 0, 0, 0);
 
-	ccnustat_rcvd_data(data);
     log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
               data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);
 
@@ -288,9 +288,11 @@ static void * handle_data(struct ccnu_data_pkt * data)
     CS_put(obj);
 
     if (pe < 0) {
+        ccnustat_rcvd_data_unsolicited(data);
         log_print(g_log, "%s unsolicited data", obj->name->full_name);
         /* unsolicited data */
     } else {
+        ccnustat_rcvd_data(data);
         handed = PIT_hand_data(pe, obj);
         log_print(g_log, "%s handing data to PIT", obj->name->full_name);
         if (handed < 0) goto END;

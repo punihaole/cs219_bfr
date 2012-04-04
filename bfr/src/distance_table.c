@@ -54,7 +54,7 @@ int dtab_init(int size)
 int dtab_getHops(char * name)
 {
     int index = HASH(name) % g_dist_tab.size;
-    int hops = -1;
+    int hops = -MAX_HOPS;
 
     pthread_mutex_lock(&g_dist_tab.table_lock);
     if (bit_test(g_dist_tab.valid, index) == 1) {
