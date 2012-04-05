@@ -14,6 +14,7 @@
  *
  * Interest
  *     +packet_type = 0 : byte
+ *     +nonce : short
  *     +ttl : byte
  *     +orig_level : byte
  *     +orig_clusterId : short
@@ -34,8 +35,9 @@
  *     +payload : byte[size]
  **/
 
-#define MIN_INTEREST_PKT_SIZE 20 /* bytes */
+#define MIN_INTEREST_PKT_SIZE 24 /* bytes */
 struct ccnu_interest_pkt {
+    uint16_t nonce;
     uint8_t ttl;
     uint8_t orig_level;
     uint16_t orig_clusterId;

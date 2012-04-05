@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/prctl.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -143,6 +144,11 @@ int main(int argc, char ** argv)
     }
 
     g_bfr.nodeId = nodeId;
+
+    char proc[256];
+    snprintf(proc, 256, "bfrd%u", g_bfr.nodeId);
+    prctl(PR_SET_NAME, proc, 0, 0, 0);
+
     char * home_env = getenv("HOME");
     char home[256];
     if (!home_env) {

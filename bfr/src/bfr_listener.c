@@ -167,10 +167,10 @@ int bfr_accept(struct bfr_msg * msg)
     /* copied the bytes over the socket into msg struct */
     switch (hdr->type) {
         case MSG_IPC_LOCATION_UPDATE:
-            log_print(g_log, "bfr_accept: rcvd LOCATION_UPDATE");
+            //log_print(g_log, "bfr_accept: rcvd LOCATION_UPDATE");
             break;
         case MSG_IPC_DISTANCE_UPDATE:
-            log_print(g_log, "bfr_accept: rcvd DISTANCE_UPDATE");
+            //log_print(g_log, "bfr_accept: rcvd DISTANCE_UPDATE");
             break;
         default:
             log_print(g_log, "bfr_accept: rcvd msg of type = %d -- IGNORING", hdr->type);
@@ -224,6 +224,10 @@ void * bfr_listener_service(void * arg)
 
 static void * fwd_query_response(void * arg)
 {
+    char proc[256];
+    snprintf(proc, 256, "fwd_qry_resp%u", g_bfr.nodeId);
+    prctl(PR_SET_NAME, proc, 0, 0, 0);
+
     int sock2;
     memcpy(&sock2, (int * )arg, sizeof(int));
     free(arg);
@@ -280,18 +284,19 @@ static void * fwd_query_response(void * arg)
     double myDist;
     int rv;
 
-    ///@TODO add, Bloom filter checking to do route updating */
-
-    log_print(g_log, "fwd_query_response: INTEREST_FWD_QUERY (%d, %s, %d:%d, %d:%d, %10.2f).",
+    log_print(g_log, "fwd_query_response: INTEREST_FWD_QUERY (%d, %s, %d:%d, %d:%d, %5.5f).",
            name_len, full_name, orig_level, orig_clusterId, dest_level, dest_clusterId, dist);
 
     pthread_mutex_lock(&g_bfr.bfr_lock);
-	double x = g_bfr.x;
-   	double y = g_bfr.y;
+        double x = g_bfr.x;
+        double y = g_bfr.y;
+        unsigned my_leaf = clus_leaf_clusterId();
+        unsigned num_levels = g_bfr.num_levels;
+        bool_t am_dest_cluster_head = amClusterHead(dest_level);
 	pthread_mutex_unlock(&g_bfr.bfr_lock);
 
     struct content_name * name = content_name_create(full_name);
-    if (clus_get_clusterId(dest_level) == dest_clusterId) {
+    if ((dest_level == num_levels) && (my_leaf == dest_clusterId)) {
         /* this is a intra-cluster message. We use the distance table rather
          * than the distance from center metric */
         char * prefix = full_name;
@@ -303,8 +308,6 @@ static void * fwd_query_response(void * arg)
             myDist = (double)dtab_getHops(prefix);
         }
 
-        myDist = (double)dtab_getHops(prefix);
-
         if (myDist < 0) {
             rv = -1;
             myDist = -1 * MAX_HOPS;
@@ -312,18 +315,8 @@ static void * fwd_query_response(void * arg)
             rv = 0;
             myDist *= -1; /* a dist < 0 indicates hop count, not geographic */
         }
-
     } else {
-        /* this is an inter-cluster message. We use the route to center
-         * metric. */
-        if (clus_get_clusterHead(orig_level) == g_bfr.nodeId) {
-            /* we reached the cluster head */
-            dest_clusterId = clus_get_clusterHead(dest_level - 1);
-            dest_level = orig_level - 1;
-        }
-
-        if ((rv = grid_distance(g_bfr.num_levels, dest_clusterId,
-                                x, y, &myDist))!= 0) {
+        if ((rv = grid_distance(num_levels, dest_clusterId, x, y, &myDist))!= 0) {
             log_print(g_log, "fwd_query_response: failed to calculate distance, must be invalid parameters.");
         }
     }
@@ -332,33 +325,46 @@ static void * fwd_query_response(void * arg)
 	unsigned up_dest_level;
 	unsigned up_dest_clusterId;
 
+    pthread_mutex_lock(&g_bfr.bfr_lock);
 	int found_clus = clus_findCluster(name, &up_dest_level, &up_dest_clusterId);
-	content_name_delete(name);
+	pthread_mutex_unlock(&g_bfr.bfr_lock);
 	int calc_dist = -1;
-	bool_t use_update;
+	bool_t use_update = FALSE;
+	double up_distance = INFINITY;
 	if (found_clus == 0) {
-		double up_distance;
-		if (up_dest_clusterId == clus_get_clusterId(up_dest_level)) {
+        if ((up_dest_clusterId == my_leaf) && (up_dest_level == num_levels)) {
+            /* new destination is in my cluster */
             char * prefix = full_name;
+            int hops = -1;
             if (content_is_segmented(name)) {
                 prefix = content_prefix(name);
-                myDist = (double)dtab_getHops(prefix);
+                hops = dtab_getHops(prefix);
                 free(prefix);
             } else {
-                myDist = (double)dtab_getHops(prefix);
+                hops = dtab_getHops(prefix);
             }
-            up_distance = dtab_getHops(prefix);
-            use_update = 1;
+
+            if (hops < 0) {
+                up_distance = -1.0 * MAX_HOPS;
+            } else {
+                up_distance = -1.0 * (double)hops;
+            }
+
+            if ((dist > 0)) {
+                log_print(g_log, "fwd_query_response: updating cluster level and Id = (%u,%u - %5.5f) for content=%s",
+                          up_dest_level, up_dest_clusterId, up_distance, full_name);
+                use_update = TRUE;
+            }
 		} else {
             calc_dist = grid_distance(up_dest_level, up_dest_clusterId, x, y, &up_distance);
-            if ((calc_dist == 0) && ((up_distance < myDist) || (myDist < 0))) {
-                myDist = up_distance;
-                log_print(g_log, "fwd_query_response: updating cluster level and Id = (%u,%u) for content=%s",
-                    up_dest_level, up_dest_clusterId, full_name);
+            if ((calc_dist == 0) && ((myDist < 0 ) || (up_distance < myDist))) {
+                log_print(g_log, "fwd_query_response: updating cluster level and Id = (%u,%u - %5.5f) for content=%s",
+                          up_dest_level, up_dest_clusterId, myDist, full_name);
                 use_update = TRUE;
             }
 		}
 	}
+	content_name_delete(name);
 
 	/* fwd if:
      * 1. Inter-cluster and closer
@@ -372,24 +378,32 @@ static void * fwd_query_response(void * arg)
     unsigned my_leaf_cluster = clus_leaf_clusterId();
     pthread_mutex_unlock(&g_bfr.bfr_lock);
 
-    bool_t same_cluster = intra && (my_leaf_cluster == orig_clusterId);
+    bool_t same_cluster = intra && (my_leaf_cluster == orig_clusterId) && (g_bfr.num_levels == dest_level);
 
     bool_t closer = abs(myDist) < abs(dist);
+    if (intra && (myDist == -MAX_HOPS)) //flood intra if not sure
+        closer = TRUE;
 
     log_print(g_log, "intra = %d", intra);
     log_print(g_log, "inter = %d", inter);
     log_print(g_log, "same_cluster = %d", same_cluster);
     log_print(g_log, "closer = %d", closer);
     log_print(g_log, "myDist = %5.5f, lastHop = %5.5f", myDist, dist);
-    log_print(g_log, "use_update = %d", use_update);
+    log_print(g_log, "use_update = %d, updated_distanace = %5.5f", use_update, up_distance);
 
     int response = 0;
 
-    if ((inter && closer) || (intra && use_update) || (intra && same_cluster && closer)) {
+    if (!found_clus) {
+        if (closer) {
+            response = 1;
+            log_print(g_log, "fwd_query_response: responded to interest forward query with YES.");
+        }
+    } else if ((inter && closer) || (intra && same_cluster && closer) || (intra && !same_cluster && use_update)) {
         /* we are closer or we aren't sure */
         if (use_update) {
             dest_level = up_dest_level;
 			dest_clusterId = up_dest_clusterId;
+            myDist = up_distance;
         }
         response = 1;
         log_print(g_log, "fwd_query_response: responded to interest forward query with YES.");
@@ -438,6 +452,10 @@ static void * fwd_query_response(void * arg)
 
 static void * dest_query_response(void * arg)
 {
+    char proc[256];
+    snprintf(proc, 256, "dest_qry_resp%u", g_bfr.nodeId);
+    prctl(PR_SET_NAME, proc, 0, 0, 0);
+
     int sock2;
     memcpy(&sock2, (int * )arg, sizeof(int));
     free(arg);
@@ -468,31 +486,62 @@ static void * dest_query_response(void * arg)
         unsigned dest_clusterId;
         double distance = INFINITY;
 		log_print(g_log, "dest_query_response: %s", name->full_name);
-        if (clus_findCluster(name, &dest_level, &dest_clusterId) != 0) {
-            log_print(g_log, "dest_query_response: failed to find cluster level/Id for content=%s",
-                   name->full_name);
-            /* set to defaults */
-           dest_level = g_bfr.num_levels;
-           dest_clusterId = clus_get_clusterId(dest_level);
-        } else {
-           log_print(g_log, "dest_query_response: found cluster level and Id = (%u,%u) for content=%s",
-                   dest_level, dest_clusterId, name->full_name);
-        }
-
-        if (dest_clusterId == clus_get_clusterId(dest_level)) {
-            char * prefix = name->full_name;
-            if (content_is_segmented(name)) {
-                prefix = content_prefix(name);
-                distance = (double)dtab_getHops(prefix);
-                free(prefix);
-            } else {
-                distance = (double)dtab_getHops(prefix);
+		int rv = clus_findCluster(name, &dest_level, &dest_clusterId);
+        if (rv < 0) {
+            int i;
+            int decided = 0;
+            for (i = g_bfr.num_levels; i > 1; i--) {
+                if (!amClusterHead(i)) {
+                    dest_level = i;
+                    dest_clusterId = clus_get_clusterId(i);
+                    grid_distance(dest_level, dest_clusterId, g_bfr.x, g_bfr.y, &distance);
+                    log_print(g_log, "dest_query_response: failed to find cluster level/Id for content=%s, fwding to (%u:%u)",
+                        name->full_name, dest_level, dest_clusterId);
+                    decided = 1;
+                } else if (!amClusterHead(i-1)) {
+                    /* see if we can forward to the next level */
+                    dest_level = i - 1;
+                    dest_clusterId = clus_get_clusterId(dest_level);
+                    grid_distance(dest_level, dest_clusterId, g_bfr.x, g_bfr.y, &distance);
+                    decided = 1;
+                }
             }
 
-            if (distance > 0)
-                distance *= -1;
-        } else
-            grid_distance(dest_level, dest_clusterId, g_bfr.x, g_bfr.y, &distance);
+            if (!decided) {
+                double center_x, center_y;
+                grid_dimensions(1, &center_x, &center_y);
+                dest_level = 1;
+                dest_clusterId = grid_cluster(dest_level, center_x, center_y);
+                if (dest_clusterId == clus_get_clusterId(dest_level)) {
+                    if (dest_clusterId % 2 == 0)
+                        dest_clusterId++;
+                    else
+                        dest_clusterId--;
+                }
+                grid_distance(dest_level, dest_clusterId, g_bfr.x, g_bfr.y, &distance);
+                log_print(g_log, "dest_query_response: failed to find cluster, route to center (%u:%u:%5.5f) for content=%s",
+                          dest_level, dest_clusterId, distance, name->full_name);
+            }
+
+        } else {
+            if ((dest_clusterId == clus_get_clusterId(g_bfr.num_levels)) && (dest_level == g_bfr.num_levels)) {
+                char * prefix = name->full_name;
+                if (content_is_segmented(name)) {
+                    prefix = content_prefix(name);
+                    distance = (double)dtab_getHops(prefix);
+                    free(prefix);
+                } else {
+                    distance = (double)dtab_getHops(prefix);
+                }
+
+                if (distance > 0)
+                    distance *= -1;
+            } else
+                grid_distance(dest_level, dest_clusterId, g_bfr.x, g_bfr.y, &distance);
+
+            log_print(g_log, "dest_query_response: found cluster level and Id = (%u:%u - %5.5f) for content=%s",
+                   dest_level, dest_clusterId, distance, name->full_name);
+        }
     pthread_mutex_unlock(&g_bfr.bfr_lock);
 
     /* send the response */
@@ -517,7 +566,6 @@ static void * dest_query_response(void * arg)
     }
 
     uint64_t distance_754 = pack_ieee754_64(distance);
-    log_print(g_log, "dest_query_response: sending distance_754");
     if (send(sock2, &distance_754, sizeof(uint64_t), 0) == -1) {
         log_print(g_log, "send: %s", strerror(errno));
         goto END_DEST_QRY;

@@ -2,6 +2,6 @@
 
 import Loc
 
-locFH = open("/tmp/pycore.36851/n5.xy")
+locFH = open("/tmp/pycore.51312/n1.xy")
 x,y = Loc.readLoc(locFH)
 print "(" + repr(x) + "," + repr(y) + ")\n"

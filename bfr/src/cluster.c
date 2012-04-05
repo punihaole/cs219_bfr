@@ -3,12 +3,13 @@
 #include "cluster.h"
 #include "bloom_filter.h"
 #include "log.h"
+#include "grid.h"
 
 extern struct log * g_log;
 
 int clus_get_level(unsigned level_id, struct bfr_level ** level)
 {
-    if (level_id > g_bfr.num_levels && level_id != 0)
+    if (level_id > g_bfr.num_levels || (level_id == 0))
         return -1;
 
     *level = &g_bfr.levels[level_id-1];
@@ -17,7 +18,7 @@ int clus_get_level(unsigned level_id, struct bfr_level ** level)
 
 int clus_get_cluster(unsigned level_id, unsigned cluster_id, struct cluster ** clus)
 {
-    if ((level_id > g_bfr.num_levels) && (level_id != 0))
+    if ((level_id > g_bfr.num_levels) || (level_id == 0))
         return -1;
     if ((level_id == g_bfr.num_levels) && (cluster_id == clus_get_clusterId(level_id))) {
         *clus = &g_bfr.leaf_cluster;
@@ -51,6 +52,19 @@ int clus_add_cluster(struct cluster * clus)
 
 int clus_get_node(unsigned cluster_id, uint32_t node_id, struct node ** _node)
 {
+    if (cluster_id == clus_leaf_clusterId()) {
+        struct cluster * c = &g_bfr.leaf_cluster;
+        int j;
+        for (j = 0; j < c->nodes->len; j++) {
+            struct node * n = (struct node * ) linked_list_get(c->nodes, j);
+            if (!n)
+                continue;
+            if (n->nodeId == node_id) {
+                *_node = n;
+                return 0;
+            }
+        }
+    }
     struct bfr_level * level = &g_bfr.levels[g_bfr.num_levels-1];
 
     int i;
@@ -75,6 +89,27 @@ int clus_get_node(unsigned cluster_id, uint32_t node_id, struct node ** _node)
     return -1;
 }
 
+int clus_add_node(unsigned cluster_id, struct node * _node)
+{
+    if (cluster_id == clus_leaf_clusterId()) {
+        struct cluster * c = &g_bfr.leaf_cluster;
+        linked_list_append(c->nodes, _node);
+    }
+
+    struct bfr_level * level = &g_bfr.levels[g_bfr.num_levels-1];
+
+    int i;
+    for (i = 0; i < level->clusters->len; i++) {
+        struct cluster * c = (struct cluster * ) linked_list_get(level->clusters, i);
+        if (c->id == cluster_id) {
+            linked_list_append(c->nodes, _node);
+            return 0;
+        }
+    }
+
+    return -1;
+}
+
 int clus_compute_aggregate(struct cluster * clus)
 {
     if (!clus)
@@ -87,11 +122,28 @@ int clus_compute_aggregate(struct cluster * clus)
     memset(clus->agg_filter->vector->map, 0, clus->agg_filter->vector->num_words);
 
     int i;
-    for (i = 0; i < clus->nodes->len; i++) {
-        struct node * _node = (struct node * ) linked_list_get(clus->nodes, i);
-        if (!_node || !_node->filter)
-            continue;
-        bloom_or(clus->agg_filter, _node->filter, clus->agg_filter);
+    if ((clus->level == g_bfr.num_levels) && (clus->id == clus_leaf_clusterId())) {
+        /* leaf aggregates are calculated from the individual nodes' BFs */
+        for (i = 0; i < clus->nodes->len; i++) {
+            struct node * _node = (struct node * ) linked_list_get(clus->nodes, i);
+            if (!_node || !_node->filter)
+                continue;
+            bloom_or(clus->agg_filter, _node->filter, clus->agg_filter);
+        }
+    } else {
+        /* aggregate is calculated from other aggregates */
+        struct bfr_level * level = NULL;
+        if (clus_get_level(clus->level, &level) < 0) return -1;
+
+        for (i = 0; i < level->clusters->len; i++) {
+            unsigned converted_clusterId;
+            struct cluster * agg_clus = linked_list_get(level->clusters, i);
+            if (grid_convertCluster(agg_clus->level, agg_clus->id, clus->level, &converted_clusterId) < 0)
+                continue;
+            if (converted_clusterId != clus->id)
+                continue;
+            bloom_or(clus->agg_filter, agg_clus->agg_filter, clus->agg_filter);
+        }
     }
 
     return 0;
@@ -105,7 +157,7 @@ unsigned clus_get_clusterId(unsigned level)
     return g_bfr.clusterIds[level - 1];
 }
 
-unsigned clus_get_clusterHead(unsigned level)
+unsigned clus_get_priorityheadCluster(unsigned level)
 {
     if (level > g_bfr.num_levels)
         level = g_bfr.num_levels;
@@ -184,7 +236,7 @@ int clus_findCluster(struct content_name * name, unsigned * level, unsigned * cl
     unsigned lm_clusterId = g_bfr.clusterIds[lm_level - 1];
 
     for (i = g_bfr.num_levels-1; i >= 0; i--) {
-        log_print(g_log, "level = %d, clusters = %d", i, g_bfr.levels[i].clusters->len);
+        log_print(g_log, "level = %d, clusters = %d", i+1, g_bfr.levels[i].clusters->len);
 
         int j;
         for (j = 0; j < g_bfr.levels[i].clusters->len; j++) {
@@ -195,35 +247,23 @@ int clus_findCluster(struct content_name * name, unsigned * level, unsigned * cl
             struct bloom * filter = c->agg_filter;
             if (!filter) continue;
 
-            log_print(g_log, "cluster = %d, searching aggregate filter", c->id);
+            log_print(g_log, "cluster = %d:%d, searching aggregate filter", c->level, c->id);
             if ((matches = search_bloom(filter, name)) > longest_match) {
-                lm_level = i;
+                log_print(g_log, "cluster: found matches = %d", matches);
+                lm_level = i+1;
                 lm_clusterId = c->id;
                 longest_match = matches;
-                goto END;
             }
         }
     }
-
-    END:
 
     if (longest_match > 0) {
         *level = lm_level;
         *clusterId = lm_clusterId;
         log_print(g_log, "decided: found match, fwd to (%u:%u)", *level, *clusterId);
     } else {
-        /* we didn't find the content name in any of the bloom filters we have */
-        if (amClusterHead(g_bfr.num_levels)) {
-            /* I am the cluster head, I forward the message up one level */
-            *level = g_bfr.num_levels - 1;
-            *clusterId = clus_get_clusterHead(g_bfr.num_levels - 1);
-            log_print(g_log, "decided: fwd up one level (%u:%u)", *level, *clusterId);
-        } else {
-            /* I forward to my cluster head */
-            *level = g_bfr.num_levels;
-            *clusterId = clus_get_clusterId(g_bfr.num_levels);
-            log_print(g_log, "decided: fwd to my cluster head (%u:%u)", *level, *clusterId);
-        }
+        log_print(g_log, "decided: match not found");
+        return -1;
     }
 
     return 0;

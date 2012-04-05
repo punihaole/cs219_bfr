@@ -19,7 +19,7 @@
 	"bfrd.h"
 	"net_lib.h"
 
-1333471225 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_listener.c
+1333605438 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_listener.c
 	<errno.h>
 	<errno.h>
 	<pthread.h>
@@ -32,6 +32,7 @@
 	<sys/un.h>
 	<netinet/in.h>
 	<math.h>
+	"content.h"
 	"content_name.h"
 	"hash.h"
 	"ts.h"
@@ -45,7 +46,7 @@
 	"distance_table.h"
 	"thread_pool.h"
 
-1332288056 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_net_listener.c
+1333583860 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_net_listener.c
 	<stdlib.h>
 	<errno.h>
 	<pthread.h>
@@ -58,6 +59,7 @@
 	<sys/un.h>
 	<netinet/in.h>
 	<arpa/inet.h>
+	<fcntl.h>
 	"bfr.h"
 	"bfrd.h"
 	"net_lib.h"
@@ -66,7 +68,7 @@
 	"synch_queue.h"
 	"log.h"
 
-1333495644 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd.c
+1333609467 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd.c
 	<stdlib.h>
 	<string.h>
 	<errno.h>
@@ -94,11 +96,12 @@
 	"ccnu.h"
 	"distance_table.h"
 
-1333318306 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd_main.c
+1333504746 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd_main.c
 	<sys/types.h>
 	<sys/stat.h>
 	<errno.h>
 	<fcntl.h>
+	<sys/prctl.h>
 	<pthread.h>
 	<signal.h>
 	<stdio.h>
@@ -118,13 +121,14 @@
 	"strategy.h"
 	"synch_queue.h"
 
-1333042434 source:/home/tom/projects/cs219_bfr/bfr/src/cluster.c
+1333608172 source:/home/tom/projects/cs219_bfr/bfr/src/cluster.c
 	<math.h>
 	"cluster.h"
 	"bloom_filter.h"
 	"log.h"
+	"grid.h"
 
-1333502557 source:/home/tom/projects/cs219_bfr/bfr/src/distance_table.c
+1333558768 source:/home/tom/projects/cs219_bfr/bfr/src/distance_table.c
 	<stdlib.h>
 	<string.h>
 	<errno.h>
@@ -141,13 +145,13 @@
 	"distance_table.h"
 	"ts.h"
 
-1332288058 source:/home/tom/projects/cs219_bfr/bfr/src/grid.c
+1333578665 source:/home/tom/projects/cs219_bfr/bfr/src/grid.c
 	"grid.h"
 	<math.h>
 	<stdlib.h>
 	"log.h"
 
-1333128701 source:/home/tom/projects/cs219_bfr/bfr/src/strategy.c
+1333607990 source:/home/tom/projects/cs219_bfr/bfr/src/strategy.c
 	<stdlib.h>
 	<string.h>
 	<stdio.h>

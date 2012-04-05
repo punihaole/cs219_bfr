@@ -9,6 +9,7 @@
 #include <sys/un.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include <fcntl.h>
 
 #include "ccnud_net_broadcaster.h"
 
@@ -92,6 +93,7 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
     }
 
 	struct ccnu_interest_pkt interest;
+	interest.nonce = 0; // set before each tx
 	interest.ttl = ttl;
 	interest.orig_level = (uint8_t) orig_level_u;
     interest.orig_clusterId = (uint16_t) orig_clusterId_u;
@@ -126,6 +128,7 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
                       name->full_name);
         }
         PIT_refresh(pe);
+        interest.nonce = ccnudnb_gen_nonce();
         ccnudnb_fwd_interest(&interest);
         /* now that we registered and sent the interest we wait */
         while (!*data) {
@@ -162,6 +165,27 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
     return rv;
 }
 
+uint16_t ccnudnb_gen_nonce()
+{
+    char * dev = "/dev/random";
+    int fp = open(dev, O_RDONLY);
+    uint16_t rand;
+
+    if (!fp) {
+        log_print(g_log, "read_rand: could not open %s.", dev);
+        return -1;
+    }
+
+    if (read(fp, &rand, sizeof(uint16_t)) != sizeof(uint16_t)) {
+        log_print(g_log, "read_rand: read failed - %s", strerror(errno));
+        close(fp);
+        return -1;
+    }
+
+    close(fp);
+    return rand;
+}
+
 int ccnudnb_fwd_interest(struct ccnu_interest_pkt * interest)
 {
     /* we just forward the thing. Whoever calls this upstream set the params */
@@ -169,8 +193,8 @@ int ccnudnb_fwd_interest(struct ccnu_interest_pkt * interest)
 
     struct net_buffer buf;
     net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
-
     net_buffer_putByte(&buf, PACKET_TYPE_INTEREST);
+    net_buffer_putShort(&buf, interest->nonce);
     net_buffer_putByte(&buf, interest->ttl);
     net_buffer_putByte(&buf, interest->orig_level);
     net_buffer_putShort(&buf, interest->orig_clusterId);

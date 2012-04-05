@@ -17,7 +17,6 @@ sub parseLine($);
 sub dateToStamp($);
 
 my $filename = shift;
-
 open(FH, $filename) or die print STDERR "Can't open file: $!\n";
 
 my $currentSec = -1;
@@ -53,12 +52,14 @@ while($line = <FH>) {
 	my $timestamp = dateToStamp($str);
 	my $t = $timestamp - $startTime;
 
-	if ($event =~ m/DATA_RCVD/) {
+	if (($event =~ m/DATA_RCVD/) || ($event =~ m/DATA_SENT/)) {
 		if (defined $goodput{$t}) {
 		$goodput{$t} += $size;
 		} else {
 			$goodput{$t} = $size;
 		}
+	} elsif ($event =~ m/UNSOLICITED/) {
+		#ignore
 	} else {
 		if (defined $overhead{$t}) {
 			$overhead{$t} += $size;
@@ -72,14 +73,14 @@ while($line = <FH>) {
 close(FH);
 
 print "$node\n";
-print "goodput:\n";
+print "goodput (bytes/sec):\n";
 foreach (sort { $a<=>$b } keys %goodput) {
-	print "$_: $goodput{$_} bytes/sec\n";
+	print "$_: $goodput{$_}\n";
 }
 
-print "\noverhead:\n";
+print "\noverhead (bytes/sec):\n";
 foreach (sort { $a<=>$b } keys %overhead) {
-	print "$_: $overhead{$_} bytes/sec\n";
+	print "$_: $overhead{$_}\n";
 }
 
 sub parseLine($)

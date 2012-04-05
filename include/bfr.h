@@ -47,8 +47,9 @@ struct bfr_msg {
     struct bfr_payload payload;
 };
 
-#define BLOOM_MSG_MIN_SIZE (sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint64_t) + sizeof(uint16_t))
+#define BLOOM_MSG_MIN_SIZE (sizeof(uint16_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint64_t) + sizeof(uint16_t))
 struct bloom_msg {
+	uint16_t nonce;
     uint8_t origin_level;
     uint16_t origin_clusterId;
     uint8_t dest_level;

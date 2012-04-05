@@ -1,7 +1,7 @@
 /**
  * grid.h
  *
- * Used for managing the grid. We can map an (x,y) choord. to a cluster ID.
+ * Used for managing the grid. We can map an (x,y) coord. to a cluster ID.
  * The grid is a hierarchially arranged space like so:
  * ------------------------  ------------------------
  * |           |          |  |           |          |
@@ -83,5 +83,12 @@ int grid_dimensions(unsigned int level,
  * neighborIds is a list of unsigned ints of size 3!
  **/
 int grid_3neighbors(unsigned level, unsigned clusterId, unsigned neighborIds[]);
+
+/*
+ * Converts a cluster ID to another clusterID.
+ * I.e Converts 2:0, 2:1, 2:4, 2:5 to 1:0 if we set other_level to 1.
+ * other_clusterId, overwritten by the calculated value if rv = 0.
+ */
+int grid_convertCluster(unsigned level, unsigned clusterId, unsigned other_level, unsigned * other_clusterId);
 
 #endif // GRID_H_INCLUDED

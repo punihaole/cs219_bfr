@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    if (ccnudnl_init(interest_pipeline) < 0) {
+    if (ccnudnl_init(interest_pipeline * 2) < 0) {
         log_print(g_log, "ccnud net listener failed to initalize.");
         exit(EXIT_FAILURE);
     }

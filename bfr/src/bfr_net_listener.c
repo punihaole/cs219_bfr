@@ -10,6 +10,7 @@
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 
 #include "bfr.h"
 #include "bfrd.h"
@@ -88,8 +89,8 @@ void * bfr_net_listener_service(void * arg)
 	    msg->payload.data = malloc(msg->hdr.payload_size);
 	    net_buffer_copyFrom(&buf, msg->payload.data, msg->hdr.payload_size);
 
-	    log_print(g_log, "rcvd msg of type %d from node %u (IP:port = %s:%d)",
-               msg->hdr.type, msg->hdr.nodeId, inet_ntoa(remote_addr.sin_addr), ntohs(remote_addr.sin_port));
+	    /*log_print(g_log, "rcvd msg of type %d from node %u (IP:port = %s:%d)",
+               msg->hdr.type, msg->hdr.nodeId, inet_ntoa(remote_addr.sin_addr), ntohs(remote_addr.sin_port));*/
 		synch_enqueue(net_args->queue, (void * ) msg);
 
 		/* notify the daemon to wake up and check the queues */

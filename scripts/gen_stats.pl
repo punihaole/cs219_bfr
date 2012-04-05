@@ -70,12 +70,12 @@ foreach (@files) {
 print "Summary:\n";
 print "goodput:\n";
 foreach (sort { $a<=>$b } keys %goodput) {
-	print "$_: $goodput{$_} bytes/sec\n";
+	print "$_: $goodput{$_}\n";
 }
 
 print "\noverhead:\n";
 foreach (sort { $a<=>$b } keys %overhead) {
-	print "$_: $overhead{$_} bytes/sec\n";
+	print "$_: $overhead{$_}\n";
 }
 
 exit 0;
@@ -83,7 +83,7 @@ exit 0;
 sub parseLine($)
 {
 	my $line = shift;
-	if ($line =~ m/^(\d+): (\d+) bytes\/sec$/) {
+	if ($line =~ m/^(\d+): (\d+)$/) {
 		return ($1, $2);
 	} else {
 		return (-1, -1);

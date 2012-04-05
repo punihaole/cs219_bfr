@@ -184,7 +184,7 @@ int main(int argc, char ** argv)
 	int interval = 1000;
 	
 	int c;
-	while ((c = getopt(argc, argv, "-h?fn:s:d:")) != -1) {
+	while ((c = getopt(argc, argv, "-h?fn:s:d:i:")) != -1) {
 		switch (c) {
 		case 'f':
 			flood = 1;

@@ -1,0 +1,5 @@
+Using interest flooding
+Retrieving /flow8/string...
+Got content: /flow8/string
+TEST STRING
+Took 0.275764 sec.

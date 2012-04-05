@@ -40,6 +40,12 @@ typedef enum {
     SEND_FILTER
 } stategy_state_t;
 
+struct bf_handler_arg
+{
+    struct bloom_msg bmsg;
+    uint32_t nodeId;
+};
+
 struct strategy {
     unsigned long cluster_interval_ms;
     unsigned long bloom_interval_ms;
@@ -63,6 +69,9 @@ struct strategy {
     int summary_size; /* num bits in our Bloom filters, calcualted by bfrd */
 
     thread_pool_t handler_pool;
+
+    pthread_mutex_t nonce_lock;
+    struct bitmap * seen_nonces;
 };
 
 /* the pending and matching lists keep track of join msgs we have seen.
@@ -102,7 +111,7 @@ static int parse_as_pill_msg(struct bfr_msg * msg, struct sleeping_pill_msg * ta
 
 static void filter_msgs(struct linked_list * putIn, uint8_t type);
 
-static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId);
+static void * handle_bloom_msg(void * arg);
 static void * handle_cluster_join_msg(void * arg);
 
 int strategy_init(unsigned num_levels)
@@ -138,6 +147,9 @@ int strategy_init(unsigned num_levels)
         return -1;
     }
 
+    pthread_mutex_init(&_strategy.nonce_lock, NULL);
+    _strategy.seen_nonces = bit_create(65535);
+
     return 0;
 }
 
@@ -163,7 +175,7 @@ struct timespec * calc_next_event(struct linked_list * events)
 void * strategy_service(void * ignore)
 {
     prctl(PR_SET_NAME, "strategy", 0, 0, 0);
-    log_print(g_log, "strategy_service: starting...");
+    //log_print(g_log, "strategy_service: starting...");
 
     bloom();
 
@@ -182,7 +194,7 @@ void * strategy_service(void * ignore)
     time_t rawtime;
 	time(&rawtime);
 	unsigned long diff = next_event->tv_sec - rawtime;
-	log_print(g_log, "strategy_service: scheduled next event in %u seconds", diff);
+	//log_print(g_log, "strategy_service: scheduled next event in %u seconds", diff);
 
     int rv;
     while (1) {
@@ -218,7 +230,7 @@ void * strategy_service(void * ignore)
 			time_t rawtime;
 			time(&rawtime);
 			unsigned long diff = next_event->tv_sec - rawtime;
-			log_print(g_log, "strategy_service: scheduled next event in %u seconds", diff);
+			//log_print(g_log, "strategy_service: scheduled next event in %u seconds", diff);
 
             /* check if we got any messages as well */
             pthread_mutex_lock(&_strategy.lock);
@@ -228,19 +240,29 @@ void * strategy_service(void * ignore)
 
         while (msg) {
             if (msg->hdr.type == MSG_NET_BLOOMFILTER_UPDATE) {
-                struct bloom_msg bmsg;
-                bmsg.vector = NULL;
-                if (parse_as_bloom_msg(msg, &bmsg) < 0) {
-                    log_print(g_log, "strategy_service: parse_as_bloom_msg failed.");
+                struct bf_handler_arg * barg = malloc(sizeof(struct bf_handler_arg));
+                barg->nodeId = msg->hdr.nodeId;
+                barg->bmsg.vector = NULL;
+
+                if (parse_as_bloom_msg(msg, &barg->bmsg) < 0) {
+                    //log_print(g_log, "strategy_service: parse_as_bloom_msg failed.");
                 } else {
-                    handle_bloom_msg(&bmsg, msg->hdr.nodeId);
+                    pthread_mutex_lock(&_strategy.nonce_lock);
+                    int seen = bit_test(_strategy.seen_nonces, barg->bmsg.nonce);
+                    if (!seen) {
+                        bit_set(_strategy.seen_nonces, barg->bmsg.nonce);
+                    }
+                    pthread_mutex_unlock(&_strategy.nonce_lock);
+                    if (!seen) {
+                        tpool_add_job(&_strategy.handler_pool, handle_bloom_msg, barg, TPOOL_NO_RV, NULL, NULL);
+                    } else {
+                        //log_print(g_log, "strategy_service: dropping bloom with duplicate nonce (%u)", barg->bmsg.nonce);
+                    }
                 }
-                free(bmsg.vector);
             } else if (msg->hdr.type == MSG_NET_CLUSTER_JOIN) {
-                struct cluster_join_msg * jmsg;
-                jmsg = (struct cluster_join_msg * ) malloc(sizeof(struct cluster_join_msg));
+                struct cluster_join_msg * jmsg = malloc(sizeof(struct cluster_join_msg));
                 if (parse_as_join_msg(msg, jmsg) < 0) {
-                    log_print(g_log, "strategy_service: parse_as_join_msg failed.");
+                    //log_print(g_log, "strategy_service: parse_as_join_msg failed.");
                 } else {
                     tpool_add_job(&_strategy.handler_pool, handle_cluster_join_msg, jmsg, TPOOL_NO_RV, NULL, NULL);
                 }
@@ -255,7 +277,7 @@ void * strategy_service(void * ignore)
                 struct cluster_msg * response;
                 response = (struct cluster_msg * ) malloc(sizeof(struct cluster_msg));
                 if (parse_as_cluster_msg(msg, response) < 0) {
-                    log_print(g_log, "strategy_service: failed to parse MSG_NET_CLUSTER_RESPONSE -- IGNORING");
+                    //log_print(g_log, "strategy_service: failed to parse MSG_NET_CLUSTER_RESPONSE -- IGNORING");
                 } else {
                     bfrstat_rcvd_cluster(response);
 
@@ -274,7 +296,6 @@ void * strategy_service(void * ignore)
                     pthread_mutex_unlock(&pending_joins_lock);
 
                     if (found) {
-                        log_print(g_log, "strategy_service: matched MSG_NET_CLUSTER_RESPONSE to pending join.");
                         pthread_mutex_lock(&matching_responses_lock);
                             linked_list_append(matching_responses, response);
                         pthread_mutex_unlock(&matching_responses_lock);
@@ -326,10 +347,10 @@ static int cluster(unsigned level)
     struct bfr_msg * msg;
     int distance = 0;
 
-    log_print(g_log, "cluster(%d): beginning procedure for %u:%u...", level, join.cluster_level, join.cluster_id);
+    //log_print(g_log, "cluster(%d): beginning procedure for %u:%u...", level, join.cluster_level, join.cluster_id);
 
     wait = backoff_period();
-    log_print(g_log, "cluster(%d): waiting for %ld ms.", level, wait);
+    //log_print(g_log, "cluster(%d): waiting for %ld ms.", level, wait);
     msleep(wait);
 
     pthread_mutex_lock(&g_bfr.bfr_lock);
@@ -340,12 +361,12 @@ static int cluster(unsigned level)
             /* backoff incase join failed from congestion */
             wait = backoff_period();
             msleep(wait);
-            log_print(g_log, "cluster(%d): retrying join attempt.", level);
+            //log_print(g_log, "cluster(%d): retrying join attempt.", level);
         }
 
         broadcast_join_msg(&join);
         wait = join_period(join.cluster_level, join.cluster_id);
-        log_print(g_log, "cluster(%d): waiting for response for %ld ms.", level, wait);
+        //log_print(g_log, "cluster(%d): waiting for response for %ld ms.", level, wait);
         msleep(wait);
         filter_msgs(cluster_responses, MSG_NET_CLUSTER_RESPONSE);
 
@@ -363,7 +384,7 @@ static int cluster(unsigned level)
                 if ((response.cluster_level == join.cluster_level) &&
                     (response.cluster_id == join.cluster_id) &&
                     (response.cluster_id < candidate_id)) {
-                    log_print(g_log, "cluster(%d): got response, cluster head = %u.", level, response.cluster_head);
+                    //log_print(g_log, "cluster(%d): got response, cluster head = %u.", level, response.cluster_head);
                     cluster_head = response.cluster_head;
                     candidate_id = cluster_head;
                     distance = response.hops;
@@ -396,8 +417,8 @@ static int cluster(unsigned level)
 		ts_addms(&g_bfr.leaf_head.stale,
 		         _strategy.cluster_freshness_interval_ms);
 
-		log_print(g_log, "cluster(%d): set leaf cluster head to %u.", level, cluster_head);
-		log_print(g_log, "cluster(%d): distance from head = %u.", level, distance);
+		//log_print(g_log, "cluster(%d): set leaf cluster head to %u.", level, cluster_head);
+		//log_print(g_log, "cluster(%d): distance from head = %u.", level, distance);
 
 		g_bfr.leaf_cluster.id = join.cluster_id;
 		g_bfr.leaf_head.nodeId = cluster_head;
@@ -412,32 +433,32 @@ static int cluster(unsigned level)
 			_cluster->agg_filter = bloom_create(_strategy.summary_size, BLOOM_ARGS);
 			_cluster->id = clus_get_clusterId(level);
 			_cluster->level = level;
+			//log_print(g_log, "cluster: adding my cluster (%u:%u)", _cluster->level, _cluster->id);
 			clus_add_cluster(_cluster);
 		}
-
 	}
-
-	bit_clear(g_bfr.is_cluster_head, level);
 
     if (cluster_head == g_bfr.nodeId) {
     	if (level == _strategy.num_levels ) {
 			/* we are the leaf cluster head */
 		    g_bfr.leaf_cluster.agg_filter = bloom_create(_strategy.summary_size, BLOOM_ARGS);
 		    g_bfr.leaf_head.distance = 0;
-			bit_set(g_bfr.is_cluster_head, level-1);
     	} else {
 			/* we are the cluster head for this level */
 			struct cluster * _cluster = NULL;
 			clus_get_cluster(level, clus_get_clusterId(level), &_cluster);
-			bit_set(g_bfr.is_cluster_head, level-1);
     	}
+    	bit_set(g_bfr.is_cluster_head, level-1);
+    	//log_print(g_log, "cluster: setting is_cluster_head[%d]", level-1);
+    } else {
+        bit_clear(g_bfr.is_cluster_head, level-1);
     }
 
     pthread_mutex_unlock(&g_bfr.bfr_lock);
 
     ts_fromnow(&_strategy.ts_next_cluster[level - 1]);
     ts_addms(&_strategy.ts_next_cluster[level - 1], _strategy.cluster_interval_ms);
-    log_print(g_log, "cluster(%d): done.", level);
+    //log_print(g_log, "cluster(%d): done.", level);
 
     return 0;
 }
@@ -452,32 +473,32 @@ static double frac_change(struct bloom * a, struct bloom * b)
 
 static int bloom()
 {
-    log_print(g_log, "bloom: beginning procedure...");
+    //log_print(g_log, "bloom: beginning procedure...");
 
-    pthread_mutex_lock(&g_bfr.bfr_lock);
-
-    struct bloom * old_filter = g_bfr.my_node.filter;
+    struct bloom * filter = NULL;
     /* update our bloom filter */
-    if (ccnu_cs_summary(&g_bfr.my_node.filter) != 0) {
-        log_print(g_log, "bloom: failed to retrieve Bloom filter from CS daemon!");
-        pthread_mutex_unlock(&g_bfr.bfr_lock);
+    if (ccnu_cs_summary(&filter) != 0) {
+        //log_print(g_log, "bloom: failed to retrieve Bloom filter from CS daemon!");
         return -1;
     }
-    struct bloom * filter = g_bfr.my_node.filter;
-    double frac = frac_change(old_filter, filter);
-    bloom_destroy(old_filter);
 
     long wait = backoff_period();
-    log_print(g_log, "bloom: waiting for %lu ms.", wait);
+    //log_print(g_log, "bloom: waiting for %lu ms.", wait);
     msleep(wait);
 
+    pthread_mutex_lock(&g_bfr.bfr_lock);
+    struct bloom * old_filter = g_bfr.my_node.filter;
+    double frac = frac_change(old_filter, filter);
+    bloom_destroy(old_filter);
+    g_bfr.my_node.filter = filter;
+
     int i;
-    for (i = g_bfr.num_levels; i > 1; i--) {
+    for (i = g_bfr.num_levels; i > 0; i--) {
         unsigned level = i;
         unsigned clusterId = clus_get_clusterId(level);
 
-        if (bit_test(g_bfr.is_cluster_head, i - 1)) {
-            log_print(g_log, "bloom: I am the cluster head for %u", i);
+        if (bit_test(g_bfr.is_cluster_head, level - 1)) {
+            //log_print(g_log, "bloom: I am the cluster head for %u:%u", level, clusterId);
             /* I am the cluster head */
             /* create an aggregate filter */
             struct cluster * _cluster = NULL;
@@ -493,24 +514,29 @@ static int bloom()
                 continue;
             };
 
+            bloom_or(_cluster->agg_filter, filter, _cluster->agg_filter);
+
             struct bloom_msg msg;
             msg.vector = NULL;
             double distance;
-            unsigned parent_clusterId = clus_get_clusterHead(level - 1);
-            if (grid_distance(level-1, parent_clusterId, g_bfr.x, g_bfr.y, &distance) != 0) {
-                log_print(g_log, "bloom: failed to calculate distance to %u:%u",
-                          level, parent_clusterId);
-                continue;
-            }
-            log_print(g_log, "bloom: calculated distance to %u:%u = %5.5f", distance);
+            if (level > 1) {
+                unsigned parent_clusterId = clus_get_clusterId(level - 1);
+                if (grid_distance(level-1, parent_clusterId, g_bfr.x, g_bfr.y, &distance) != 0) {
+                    log_print(g_log, "bloom: failed to calculate distance to %u:%u",
+                              level, parent_clusterId);
+                    continue;
+                }
+                //log_print(g_log, "bloom: calculated distance to %u:%u = %5.5f", level, parent_clusterId, distance);
 
-            /* we're sending a bloom msg to our parent cluster head */
-            if (!bit_test(g_bfr.is_cluster_head, i - 1)) {
-                /* send our aggegated filter up the chain if we are not the next head */
-                create_bloom_msg(&msg, level, clusterId, level-1, parent_clusterId, distance, _cluster->agg_filter);
-                broadcast_bloom_msg(&msg);
-                free(msg.vector);
-                msg.vector = NULL;
+                /* we're sending a bloom msg to our parent cluster head */
+                if (!bit_test(g_bfr.is_cluster_head, i - 1)) {
+                    /* send our aggegated filter up the chain if we are not the next head */
+                    //log_print(g_log, "bloom: forwarding aggregate filter to level %u cluster head", i-1);
+                    create_bloom_msg(&msg, level, clusterId, level-1, parent_clusterId, distance, _cluster->agg_filter);
+                    broadcast_bloom_msg(&msg);
+                    free(msg.vector);
+                    msg.vector = NULL;
+                }
             }
 
             //Send to neighboring cluster Ids
@@ -523,7 +549,7 @@ static int bloom()
                               level, neighbors[k]);
                     continue;
                 }
-                log_print(g_log, "bloom: calculated distance to %u:%u = %5.5f", distance);
+                //log_print(g_log, "bloom: forwarding aggregate filter to neighbor %u:%u", level, neighbors[k]);
                 create_bloom_msg(&msg, level, clusterId, level, neighbors[k], distance, _cluster->agg_filter);
                 broadcast_bloom_msg(&msg);
                 free(msg.vector);
@@ -535,13 +561,13 @@ static int bloom()
             msg.vector = NULL;
             double distance = -1 * g_bfr.leaf_head.distance - 1;
             /* we're sending a bloom msg to our own cluster head */
+            //log_print(g_log, "bloom: forwarding aggregate filter to cluster head");
             create_bloom_msg(&msg, level, clusterId, level, clusterId, distance, filter);
             broadcast_bloom_msg(&msg);
             free(msg.vector);
             break;
         }
     }
-
     pthread_mutex_unlock(&g_bfr.bfr_lock);
 
     ts_fromnow(&_strategy.ts_next_bloom);
@@ -550,9 +576,30 @@ static int bloom()
                    (int) (((double)_strategy.bloom_interval_ms / 2.0) * frac);
     ts_addms(&_strategy.ts_next_bloom, interval);
 
-    log_print(g_log, "bloom: done.");
+    //log_print(g_log, "bloom: done.");
 
     return 0;
+}
+
+static uint16_t gen_nonce()
+{
+    char * dev = "/dev/urandom";
+    int fp = open(dev, O_RDONLY);
+    uint16_t rand;
+
+    if (!fp) {
+        //log_print(g_log, "read_rand: could not open %s.", dev);
+        return -1;
+    }
+
+    if (read(fp, &rand, sizeof(uint16_t)) != sizeof(uint16_t)) {
+        //log_print(g_log, "read_rand: read failed - %s", strerror(errno));
+        close(fp);
+        return -1;
+    }
+
+    close(fp);
+    return rand;
 }
 
 static long join_period(unsigned level, unsigned clusterId)
@@ -560,7 +607,7 @@ static long join_period(unsigned level, unsigned clusterId)
     long rand = 0;
 
     if (read_rand("/dev/urandom", &rand) != 0) {
-        log_print(g_log, "cluster: failed to generate a random!");
+        //log_print(g_log, "cluster: failed to generate a random!");
     }
 
     rand = abs(rand % _strategy.join_timeout);
@@ -607,6 +654,7 @@ static int parse_as_bloom_msg(struct bfr_msg * msg, struct bloom_msg * bmsg)
     struct net_buffer * buffer;
     buffer = net_buffer_createFrom(msg->payload.data,
                                    msg->hdr.payload_size);
+    bmsg->nonce = net_buffer_getShort(buffer);
     bmsg->origin_level = net_buffer_getByte(buffer);
     bmsg->origin_clusterId = net_buffer_getShort(buffer);
     bmsg->dest_level = net_buffer_getByte(buffer);
@@ -667,25 +715,26 @@ static int create_bloom_msg(struct bloom_msg * msg,
                             double distance, struct bloom * bf)
 {
     if (!msg) {
-        log_print(g_log, "create_bloom_msg: msg not allocated -- IGNORING!");
+        //log_print(g_log, "create_bloom_msg: msg not allocated -- IGNORING!");
         return -1;
     }
 
     if (msg->vector) {
-        log_print(g_log, "create_bloom_msg: vector already allocated? Do not do this...continuing with caution.");
+        //log_print(g_log, "create_bloom_msg: vector already allocated? Do not do this...continuing with caution.");
     }
 
     if (!bf) {
-        log_print(g_log, "create_bloom_msg: Bloom filter not allocated -- IGNORING!");
+        //log_print(g_log, "create_bloom_msg: Bloom filter not allocated -- IGNORING!");
         return -1;
     }
 
     if ((origin_level > 0xff) || (origin_clusterId > 0xffff) ||
         (dest_level > 0xff) || (dest_clusterId > 0xffff)) {
-        log_print(g_log, "create_bloom_msg: invalid parameter value(s) -- IGNORING");
+        //log_print(g_log, "create_bloom_msg: invalid parameter value(s) -- IGNORING");
         return -1;
     }
 
+    msg->nonce = gen_nonce();
     msg->origin_level = (uint8_t) origin_level;
     msg->origin_clusterId = (uint16_t) origin_clusterId;
     msg->dest_level = (uint8_t) dest_level;
@@ -696,7 +745,7 @@ static int create_bloom_msg(struct bloom_msg * msg,
     msg->vector = (uint32_t * ) malloc(vec_len * sizeof(uint32_t));
 
     if (!msg->vector) {
-        log_print(g_log, "create_bloom_msg: couldn't allocate vector %s.", strerror(errno));
+        //log_print(g_log, "create_bloom_msg: couldn't allocate vector %s.", strerror(errno));
         return -1;
     }
 
@@ -707,19 +756,16 @@ static int create_bloom_msg(struct bloom_msg * msg,
 static int broadcast_bloom_msg(struct bloom_msg * msg)
 {
     if (!msg) {
-        log_print(g_log, "send_bloom: tried to send NULL packet -- IGNORING!");
+        //log_print(g_log, "send_bloom: tried to send NULL packet -- IGNORING!");
         return -1;
     }
 
     if (!msg->vector) {
-        log_print(g_log, "send_bloom: tried to send Bloom filter with no vector -- IGNORING!");
+        //log_print(g_log, "send_bloom: tried to send Bloom filter with no vector -- IGNORING!");
         return -1;
     }
 
     bfrstat_sent_bloom(msg);
-    log_print(g_log, "broadcast_bloom_msg: sending bloom msg %u:%u -> %u:%u (lhd = %5.2f, %lu)",
-              msg->origin_level,  msg->origin_clusterId, msg->dest_level, msg->dest_clusterId,
-              unpack_ieee754_64(msg->lastHopDistance), msg->lastHopDistance);
 
     int size = BLOOM_MSG_MIN_SIZE;
     int vec_size = (int)ceil((double)msg->vector_bits / 8.0);
@@ -733,6 +779,7 @@ static int broadcast_bloom_msg(struct bloom_msg * msg)
     net_buffer_putInt(&buf, g_bfr.nodeId);
     net_buffer_putInt(&buf, size);
     /*pack the payload (bloom filter msg) */
+    net_buffer_putShort(&buf, msg->nonce);
     net_buffer_putByte(&buf, msg->origin_level);
     net_buffer_putShort(&buf, msg->origin_clusterId);
     net_buffer_putByte(&buf, msg->dest_level);
@@ -742,7 +789,7 @@ static int broadcast_bloom_msg(struct bloom_msg * msg)
     net_buffer_copyTo(&buf, msg->vector, vec_size);
 
     if ((rv = net_buffer_send(&buf, g_bfr.sock, &g_bfr.bcast_addr)) < 0) {
-        log_print(g_log, "broadcast_bloom_msg: net_buffer_send failed!");
+        //log_print(g_log, "broadcast_bloom_msg: net_buffer_send failed!");
     }
 
     free(buf.buf);
@@ -753,12 +800,11 @@ static int broadcast_bloom_msg(struct bloom_msg * msg)
 static int broadcast_join_msg(struct cluster_join_msg * msg)
 {
     if (!msg) {
-        log_print(g_log, "broadcast_join_msg: tried to send NULL packet -- IGNORING!");
+        //log_print(g_log, "broadcast_join_msg: tried to send NULL packet -- IGNORING!");
         return -1;
     }
 
     bfrstat_sent_join(msg);
-    log_print(g_log, "broadcast_join_msg: sending join msg.");
 
     int size = CLUSTER_JOIN_MSG_SIZE;
     struct net_buffer buf;
@@ -775,7 +821,7 @@ static int broadcast_join_msg(struct cluster_join_msg * msg)
 
     int rv;
     if ((rv = net_buffer_send(&buf, g_bfr.sock, &g_bfr.bcast_addr)) < 0) {
-        log_print(g_log, "broadcast_join_msg: net_buffer_send failed!");
+        //log_print(g_log, "broadcast_join_msg: net_buffer_send failed!");
     }
 
     free(buf.buf);
@@ -786,12 +832,11 @@ static int broadcast_join_msg(struct cluster_join_msg * msg)
 static int broadcast_cluster_msg(struct cluster_msg * msg)
 {
     if (!msg) {
-        log_print(g_log, "broadcast_cluster_msg: tried to send NULL packet -- IGNORING!");
+        //log_print(g_log, "broadcast_cluster_msg: tried to send NULL packet -- IGNORING!");
         return -1;
     }
 
     bfrstat_sent_cluster(msg);
-    log_print(g_log, "broadcast_cluster_msg: sending cluster msg.");
 
     int size = CLUSTER_RESPONSE_MSG_SIZE;
     struct net_buffer buf;
@@ -809,7 +854,7 @@ static int broadcast_cluster_msg(struct cluster_msg * msg)
 
     int rv;
     if ((rv = net_buffer_send(&buf, g_bfr.sock, &g_bfr.bcast_addr)) < 0) {
-        log_print(g_log, "broadcast_cluster_msg: net_buffer_send failed!");
+        //log_print(g_log, "broadcast_cluster_msg: net_buffer_send failed!");
     }
 
     free(buf.buf);
@@ -820,10 +865,9 @@ static int broadcast_cluster_msg(struct cluster_msg * msg)
 static int broadcast_pill_msg(struct sleeping_pill_msg * msg)
 {
 	if (!msg) {
-        log_print(g_log, "broadcast_pill_msg: tried to send NULL packet -- IGNORING!");
+        //log_print(g_log, "broadcast_pill_msg: tried to send NULL packet -- IGNORING!");
         return -1;
     }
-    log_print(g_log, "broadcast_pill_msg: sending sleeping pill msg.");
 
     int size = SLEEPING_PILL_MSG_SIZE;
     struct net_buffer buf;
@@ -842,7 +886,7 @@ static int broadcast_pill_msg(struct sleeping_pill_msg * msg)
 
     int rv;
     if ((rv = net_buffer_send(&buf, g_bfr.sock, &g_bfr.bcast_addr)) < 0) {
-        log_print(g_log, "broadcast_cluster_msg: net_buffer_send failed!");
+        //log_print(g_log, "broadcast_cluster_msg: net_buffer_send failed!");
     }
 
     free(buf.buf);
@@ -877,26 +921,45 @@ static void filter_msgs(struct linked_list * putIn, uint8_t type)
     linked_list_delete(save);
 }
 
-static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
+static void * unregister_nonce(void * arg)
 {
+    uint16_t nonce;
+    memcpy(&nonce, arg, sizeof(uint16_t));
+    free(arg);
+
+    msleep(100);
+    pthread_mutex_lock(&_strategy.nonce_lock);
+        bit_clear(_strategy.seen_nonces, nonce);
+    pthread_mutex_unlock(&_strategy.nonce_lock);
+
+    return NULL;
+}
+
+static void * handle_bloom_msg(void * arg)
+{
+    struct bf_handler_arg * barg = (struct bf_handler_arg * ) arg;
+    struct bloom_msg * msg = &barg->bmsg;
+    uint32_t origin_nodeId = barg->nodeId;
+    uint16_t * nonce = malloc(sizeof(uint16_t));
+    *nonce = msg->nonce;
+
     bfrstat_rcvd_bloom(msg);
-    log_print(g_log, "handle_bloom_msg: from %u@%u:%u for (%u:%u), lhd = %5.2f, %lu.",
+    /*log_print(g_log, "handle_bloom_msg: from %u@%u:%u for (%u:%u), lhd = %5.2f.",
               origin_nodeId, msg->origin_level, msg->origin_clusterId,
               msg->dest_level, msg->dest_clusterId,
-              unpack_ieee754_64(msg->lastHopDistance), msg->lastHopDistance);
+              unpack_ieee754_64(msg->lastHopDistance));*/
     struct bloom * filter = bloom_createFromVector(msg->vector_bits, msg->vector, BLOOM_ARGS);
-    if (!filter) return -1;
+    if (!filter) goto CLEANUP;
 
-
-    log_print(g_log, "filter->size = %d", filter->size);
-    log_print(g_log, "filter->vector->num_words = %d", filter->vector->num_words);
-    log_print(g_log, "filter->vector->num_bits = %d", filter->vector->num_bits);
     /*
-    log_print(g_log, "\torigin_level=%d", msg->origin_level);
-    log_print(g_log, "\torigin_clusterId=%d", msg->origin_clusterId);
-    log_print(g_log, "\tdest_level=%d", msg->dest_level);
-    log_print(g_log, "\tdest_clusterId=%d", msg->dest_clusterId);
-    log_print(g_log, "\tlastHopDistance=%6.5f", msg->vector_bits);
+    //log_print(g_log, "filter->size = %d", filter->size);
+    //log_print(g_log, "filter->vector->num_words = %d", filter->vector->num_words);
+    //log_print(g_log, "filter->vector->num_bits = %d", filter->vector->num_bits);
+    //log_print(g_log, "\torigin_level=%d", msg->origin_level);
+    //log_print(g_log, "\torigin_clusterId=%d", msg->origin_clusterId);
+    //log_print(g_log, "\tdest_level=%d", msg->dest_level);
+    //log_print(g_log, "\tdest_clusterId=%d", msg->dest_clusterId);
+    //log_print(g_log, "\tlastHopDistance=%6.5f", msg->vector_bits);
     int words = ceil(msg->vector_bits/32);
     char str[words];
     int i;
@@ -904,8 +967,8 @@ static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
         sprintf(str+i, "%d", msg->vector[i]);
     }
     str[words-1] = '\0';
-    log_print(g_log, "\tvector = ");
-    log_print(g_log, "%s", str);
+    //log_print(g_log, "\tvector = ");
+    //log_print(g_log, "%s", str);
     */
 
     /* we use overhead bloom filters */
@@ -914,19 +977,53 @@ static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
 
     pthread_mutex_lock(&g_bfr.bfr_lock);
 
-    if (clus_get_cluster(msg->origin_level, msg->origin_clusterId, &clus) != 0) {
+    bool_t intra = (msg->origin_level == msg->dest_level) &&
+                       (msg->origin_clusterId == msg->dest_clusterId);
+    bool_t myLeaf = (msg->dest_level == g_bfr.num_levels) &&
+                    (msg->dest_clusterId == clus_leaf_clusterId());
+
+    if (intra && !myLeaf) {
+        //ignore it
+        pthread_mutex_unlock(&g_bfr.bfr_lock);
+        bloom_destroy(filter);
+        goto CLEANUP;
+    } else if (clus_get_cluster(msg->origin_level, msg->origin_clusterId, &clus) != 0) {
         /* we've never seen this cluster before, insert it in the tree */
-        log_print(g_log, "handle_bloom_msg: discovered a new cluster.");
+        log_print(g_log, "handle_bloom_msg: discovered a new cluster (%u:%u).",
+                  msg->origin_level, msg->origin_clusterId);
         clus = (struct cluster *) malloc(sizeof(struct cluster));
         clus->nodes = NULL;
         clus->agg_filter = filter;
         clus->id = msg->origin_clusterId;
         clus->level = msg->origin_level;
-        clus_add_cluster(clus);
+        if (clus_add_cluster(clus) < 0) {
+            log_print(g_log, "handle_bloom_msg: failed to add new cluster? (%u:%u)",
+                      clus->level, clus->id);
+        }
     } else {
-    	bloom_destroy(clus->agg_filter);
-    	clus->agg_filter = filter;
-        log_print(g_log, "handle_bloom_msg: previously seen cluster.");
+        if (intra && myLeaf) {
+            //intra in my cluster
+            //record that node
+            struct node * _node = NULL;
+            if (clus_get_node(msg->origin_clusterId, origin_nodeId, &_node) < 0) {
+                _node = malloc(sizeof(struct node));
+                _node->nodeId = origin_nodeId;
+                _node->filter = filter;
+                if (clus_add_node(msg->origin_clusterId, _node) < 0) {
+                    log_print(g_log, "handle_bloom_msg: failed to add node (%u@%u)", origin_nodeId, msg->origin_clusterId);
+                }
+            } else if (_node) {
+                bloom_destroy(_node->filter);
+                _node->filter = filter;
+            }
+            log_print(g_log, "recording node filter (%u@%u:%u)", origin_nodeId, msg->origin_level, msg->origin_clusterId);
+        } else {
+            //inter, update that aggregate
+            log_print(g_log, "updating aggregate filter (%u:%u)", clus->level, clus->id);
+            bloom_destroy(clus->agg_filter);
+            clus->agg_filter = filter;
+        }
+        //log_print(g_log, "handle_bloom_msg: previously seen cluster.");
     }
 
     /* figure out if we need to forward */
@@ -934,8 +1031,8 @@ static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
         /* we are in the local cluster */
         if (bit_test(g_bfr.is_cluster_head, msg->dest_level - 1)) {
             /* we are the cluster head, msg destined to us */
-            log_print(g_log, "handle_bloom_msg: rcvd aggregate filter for %u:%u.",
-                      msg->origin_level, msg->origin_clusterId);
+            /*log_print(g_log, "handle_bloom_msg: rcvd aggregate filter for %u:%u.",
+                      msg->origin_level, msg->origin_clusterId);*/
         } else {
             /* we need to forward to our cluster head */
             double lastHop = unpack_ieee754_64(msg->lastHopDistance);
@@ -944,15 +1041,14 @@ static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
                  * taken negative so we can differentiate */
                 msg->lastHopDistance = pack_ieee754_64(-1 * g_bfr.leaf_head.distance);
                 fwd = TRUE;
-                log_print(g_log, "handle_bloom: fwding bloom msg to cluster head, distance = %5.5", msg->lastHopDistance);
+                //log_print(g_log, "handle_bloom: fwding bloom msg to cluster head, distance = %5.5", msg->lastHopDistance);
             } else if (abs(lastHop) > g_bfr.leaf_head.distance) {
                 msg->lastHopDistance = pack_ieee754_64(-1 * g_bfr.leaf_head.distance);
                 fwd = TRUE;
-                log_print(g_log, "handle_bloom: fwding bloom msg to cluster head, distance = %5.5", msg->lastHopDistance);
+                //log_print(g_log, "handle_bloom: fwding bloom msg to cluster head, distance = %5.5", msg->lastHopDistance);
             } else {
                 /* no fwd */
                 fwd = FALSE;
-		log_print(g_log, "handle_bloom: not fwding bloom msg to cluster head");
             }
         }
     } else {
@@ -964,7 +1060,7 @@ static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
             log_print(g_log, "handle_bloom_msg: failed to calculate distance to %u:%u from %10.2f:%10.2f",
                    msg->dest_level, msg->dest_clusterId, g_bfr.x, g_bfr.y);
             pthread_mutex_unlock(&g_bfr.bfr_lock);
-            return -1;
+            goto CLEANUP;
         }
 
         double prev_distance = unpack_ieee754_64(msg->lastHopDistance);
@@ -979,13 +1075,17 @@ static int handle_bloom_msg(struct bloom_msg * msg, uint32_t origin_nodeId)
     pthread_mutex_unlock(&g_bfr.bfr_lock);
 
     if (fwd) {
-        log_print(g_log, "handle_bloom_msg: fwding aggregate filter from %u:%u to %u:%u (dist = %5.5f)",
+        /*log_print(g_log, "handle_bloom_msg: fwding aggregate filter from %u:%u to %u:%u (dist = %5.5f)",
                   msg->origin_level, msg->origin_clusterId, msg->dest_level, msg->dest_clusterId,
-                  unpack_ieee754_64(msg->lastHopDistance));
+                  unpack_ieee754_64(msg->lastHopDistance));*/
         broadcast_bloom_msg(msg);
     }
 
-    return 0;
+    CLEANUP:
+    tpool_add_job(&_strategy.handler_pool, (job_fun_t)unregister_nonce, nonce, TPOOL_NO_RV, NULL, NULL);
+    free(msg->vector);
+
+    return NULL;
 }
 
 static int parse_as_join_msg(struct bfr_msg * msg, struct cluster_join_msg * jmsg)
@@ -1027,6 +1127,7 @@ static void * handle_cluster_join_msg(void * arg)
 
     pthread_mutex_lock(&g_bfr.bfr_lock);
         uint32_t cluster_head = g_bfr.leaf_head.nodeId;
+        uint32_t my_nodeId = g_bfr.nodeId;
         uint8_t hops = g_bfr.leaf_head.distance + 1;
         unsigned my_cluster = clus_get_clusterId(jmsg->cluster_level);
         struct timespec ts_stale;
@@ -1035,14 +1136,14 @@ static void * handle_cluster_join_msg(void * arg)
 
     /* check if we should respond */
     if (my_cluster == jmsg->cluster_id) {
-        log_print(g_log, "handle_cluster_join_msg: rcvd a CLUSTER_JOIN msg for our cluster Id.");
+        ////log_print(g_log, "handle_cluster_join_msg: rcvd a CLUSTER_JOIN msg for our cluster Id.");
 
         /* if our cluster head is stale we ignore */
         struct timespec ts_now;
         ts_fromnow(&ts_now);
 
-        if (ts_compare(&ts_now, &ts_stale)) {
-            log_print(g_log, "handle_cluster_join_msg: out cluster head is stale, do not respond.");
+        if (ts_compare(&ts_now, &ts_stale) && (cluster_head != my_nodeId)) {
+            ////log_print(g_log, "handle_cluster_join_msg: our cluster head is stale, do not respond.");
         } else if ((unsigned )jmsg->cluster_level <= g_bfr.num_levels) {
             /* we respond with the cluster head */
             struct cluster_msg response;
@@ -1054,10 +1155,10 @@ static void * handle_cluster_join_msg(void * arg)
             /* wait a random period of time, and check for a response */
             long wait = RESPONSE_MAX_WAIT_TIME_MS;
             if (read_rand("/dev/urandom", &wait) != 0) {
-                log_print(g_log, "handle_cluster_join_msg: failed to generate a random!");
+                //log_print(g_log, "handle_cluster_join_msg: failed to generate a random!");
             }
             wait = abs(wait % (RESPONSE_MAX_WAIT_TIME_MS));
-            log_print(g_log, "handle_cluster_join_msg: waiting for %ld ms.", wait);
+            ////log_print(g_log, "handle_cluster_join_msg: waiting for %ld ms.", wait);
             msleep(wait);
             int match = 0;
 
@@ -1070,7 +1171,7 @@ static void * handle_cluster_join_msg(void * arg)
                 if ((rmsg->cluster_id == jmsg->cluster_id) &&
                     (rmsg->cluster_level == jmsg->cluster_level)) {
                     /* received a match! */
-                    log_print(g_log, "handle_cluster_join_msg: detected another response -- DROPPING.");
+                    ////log_print(g_log, "handle_cluster_join_msg: detected another response -- DROPPING.");
                     match = 1;
                     linked_list_remove(matching_responses, i);
                     free(rmsg);
@@ -1080,7 +1181,7 @@ static void * handle_cluster_join_msg(void * arg)
             pthread_mutex_unlock(&matching_responses_lock);
 
             if (!match) {
-                log_print(g_log, "handle_cluster_join_msg: no response detected -- RESPONDING.");
+                ////log_print(g_log, "handle_cluster_join_msg: no response detected -- RESPONDING.");
                 broadcast_cluster_msg(&response);
             }
         }
@@ -1093,7 +1194,7 @@ static void * handle_cluster_join_msg(void * arg)
     int i;
     for (i = 0; i < pending_joins->len; i++) {
         if (linked_list_get(pending_joins, i) == jmsg) {
-            log_print(g_log, "handle_cluster_join_msg: removed entry from pending join list.");
+            ////log_print(g_log, "handle_cluster_join_msg: removed entry from pending join list.");
             linked_list_remove(pending_joins, i);
             break;
         }

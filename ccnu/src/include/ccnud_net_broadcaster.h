@@ -62,6 +62,8 @@ typedef struct ccnudnb_options {
 int ccnudnb_express_interest(struct content_name * name, struct content_obj ** content_ptr,
                              int use_opt, struct ccnudnb_options * opt);
 
+uint16_t ccnudnb_gen_nonce();
+
 /* forwards an interest. We don't do anything clever, like update the routing
  * parameters or add PIT entry, etc. All we do here is take a interest and
  * put it on the wire.

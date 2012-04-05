@@ -1,14 +1,18 @@
 #!/usr/bin/perl
 
-my $filename = shift;
+use strict;
+use warnings;
 
-open(FH, $filename) or die "Could not open $!\n";
+my $dir = shift;
+my @filenames = `ls $dir/flow*.txt`;
 
-while (<FH>) {
-	if ($_ =~ m/Took (\d+\.\d+)/g) {
-		print "$1\n";
+foreach my $filename (@filenames) {
+	open(FH, $filename) or die "Could not open $!\n";
+	while (<FH>) {
+		if ($_ =~ m/Took (\d+\.\d+)/g) {
+			print "$1\n";
+		}
 	}
+	close(FH);
 }
-
-close(FH);
 

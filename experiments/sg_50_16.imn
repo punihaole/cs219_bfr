@@ -10,8 +10,8 @@ node n1 {
 	!
     }
     canvas c1
-    iconcoords {864.000001 1238.000001}
-    labelcoords {864.000001 1238.000001}
+    iconcoords {798.396315263069 1220.0181643328506}
+    labelcoords {798.396315263069  1244.0181643328506}
     interface-peer {eth0 n51}
 }
 
@@ -27,8 +27,8 @@ node n2 {
 	!
     }
     canvas c1
-    iconcoords {760.000001 1062.000001}
-    labelcoords {760.000001 1062.000001}
+    iconcoords {815.4794018598076 1284.9993609947617}
+    labelcoords {815.4794018598076  1308.9993609947617}
     interface-peer {eth0 n51}
 }
 
@@ -44,8 +44,8 @@ node n3 {
 	!
     }
     canvas c1
-    iconcoords {966.000001 1225.000001}
-    labelcoords {966.000001 1225.000001}
+    iconcoords {793.3604005483575 1177.4576358050942}
+    labelcoords {793.3604005483575  1201.4576358050942}
     interface-peer {eth0 n51}
 }
 
@@ -61,8 +61,8 @@ node n4 {
 	!
     }
     canvas c1
-    iconcoords {756.000001 1045.000001}
-    labelcoords {756.000001 1045.000001}
+    iconcoords {793.1415799497654 1059.221069057252}
+    labelcoords {793.1415799497654  1083.221069057252}
     interface-peer {eth0 n51}
 }
 
@@ -78,8 +78,8 @@ node n5 {
 	!
     }
     canvas c1
-    iconcoords {728.000001 948.000001}
-    labelcoords {728.000001 948.000001}
+    iconcoords {779.5561963421567 1366.8092327930995}
+    labelcoords {779.5561963421567  1390.8092327930995}
     interface-peer {eth0 n51}
 }
 
@@ -95,8 +95,8 @@ node n6 {
 	!
     }
     canvas c1
-    iconcoords {855.000001 1493.000001}
-    labelcoords {855.000001 1493.000001}
+    iconcoords {838.8839168674068 1362.271223578572}
+    labelcoords {838.8839168674068  1386.271223578572}
     interface-peer {eth0 n51}
 }
 
@@ -112,8 +112,8 @@ node n7 {
 	!
     }
     canvas c1
-    iconcoords {731.000001 1464.000001}
-    labelcoords {731.000001 1464.000001}
+    iconcoords {907.9082594591407 1235.8411948073901}
+    labelcoords {907.9082594591407  1259.8411948073901}
     interface-peer {eth0 n51}
 }
 
@@ -129,8 +129,8 @@ node n8 {
 	!
     }
     canvas c1
-    iconcoords {863.000001 1155.000001}
-    labelcoords {863.000001 1155.000001}
+    iconcoords {747.5277191742629 1395.0377132325123}
+    labelcoords {747.5277191742629  1419.0377132325123}
     interface-peer {eth0 n51}
 }
 
@@ -146,8 +146,8 @@ node n9 {
 	!
     }
     canvas c1
-    iconcoords {641.000001 1283.000001}
-    labelcoords {641.000001 1283.000001}
+    iconcoords {857.9186240410829 1139.2231042645246}
+    labelcoords {857.9186240410829  1163.2231042645246}
     interface-peer {eth0 n51}
 }
 
@@ -163,8 +163,8 @@ node n10 {
 	!
     }
     canvas c1
-    iconcoords {802.000001 1217.000001}
-    labelcoords {802.000001 1217.000001}
+    iconcoords {677.9859455514058 1329.0276171398436}
+    labelcoords {677.9859455514058  1353.0276171398436}
     interface-peer {eth0 n51}
 }
 
@@ -180,8 +180,8 @@ node n11 {
 	!
     }
     canvas c1
-    iconcoords {600.000001 1471.000001}
-    labelcoords {600.000001 1471.000001}
+    iconcoords {634.7076374771766 1242.0360035037318}
+    labelcoords {634.7076374771766  1266.0360035037318}
     interface-peer {eth0 n51}
 }
 
@@ -197,8 +197,8 @@ node n12 {
 	!
     }
     canvas c1
-    iconcoords {568.000001 1102.000001}
-    labelcoords {568.000001 1102.000001}
+    iconcoords {714.7627383673972 1332.2340144122743}
+    labelcoords {714.7627383673972  1356.2340144122743}
     interface-peer {eth0 n51}
 }
 
@@ -214,8 +214,8 @@ node n13 {
 	!
     }
     canvas c1
-    iconcoords {651.000001 1314.000001}
-    labelcoords {651.000001 1314.000001}
+    iconcoords {573.712725693902 1302.571819826497}
+    labelcoords {573.712725693902  1326.571819826497}
     interface-peer {eth0 n51}
 }
 
@@ -231,8 +231,8 @@ node n14 {
 	!
     }
     canvas c1
-    iconcoords {620.000001 1275.000001}
-    labelcoords {620.000001 1275.000001}
+    iconcoords {955.1058592294689 1112.3794540764202}
+    labelcoords {955.1058592294689  1136.3794540764202}
     interface-peer {eth0 n51}
 }
 
@@ -248,8 +248,8 @@ node n15 {
 	!
     }
     canvas c1
-    iconcoords {936.000001 1272.000001}
-    labelcoords {936.000001 1272.000001}
+    iconcoords {920.719968780827 1329.3617260797332}
+    labelcoords {920.719968780827  1353.3617260797332}
     interface-peer {eth0 n51}
 }
 
@@ -265,8 +265,8 @@ node n16 {
 	!
     }
     canvas c1
-    iconcoords {959.000001 1180.000001}
-    labelcoords {959.000001 1180.000001}
+    iconcoords {828.8926535209466 1218.6531219471806}
+    labelcoords {828.8926535209466  1242.6531219471806}
     interface-peer {eth0 n51}
 }
 
@@ -282,8 +282,8 @@ node n17 {
 	!
     }
     canvas c1
-    iconcoords {986.000001 1245.000001}
-    labelcoords {986.000001 1245.000001}
+    iconcoords {631.7182055539032 985.0569752729452}
+    labelcoords {631.7182055539032  1009.0569752729452}
     interface-peer {eth0 n51}
 }
 
@@ -299,8 +299,8 @@ node n18 {
 	!
     }
     canvas c1
-    iconcoords {591.000001 1154.000001}
-    labelcoords {591.000001 1154.000001}
+    iconcoords {772.2362969061805 1105.68053015626}
+    labelcoords {772.2362969061805  1129.68053015626}
     interface-peer {eth0 n51}
 }
 
@@ -316,8 +316,8 @@ node n19 {
 	!
     }
     canvas c1
-    iconcoords {620.000001 1052.000001}
-    labelcoords {620.000001 1052.000001}
+    iconcoords {885.0032290031644 1113.392213685894}
+    labelcoords {885.0032290031644  1137.392213685894}
     interface-peer {eth0 n51}
 }
 
@@ -333,8 +333,8 @@ node n20 {
 	!
     }
     canvas c1
-    iconcoords {1043.000001 1069.000001}
-    labelcoords {1043.000001 1069.000001}
+    iconcoords {712.0990463473571 1205.1648547155487}
+    labelcoords {712.0990463473571  1229.1648547155487}
     interface-peer {eth0 n51}
 }
 
@@ -350,8 +350,8 @@ node n21 {
 	!
     }
     canvas c1
-    iconcoords {719.000001 1378.000001}
-    labelcoords {719.000001 1378.000001}
+    iconcoords {744.9228532715858 1050.9983248018734}
+    labelcoords {744.9228532715858  1074.9983248018734}
     interface-peer {eth0 n51}
 }
 
@@ -367,8 +367,8 @@ node n22 {
 	!
     }
     canvas c1
-    iconcoords {579.000001 1054.000001}
-    labelcoords {579.000001 1054.000001}
+    iconcoords {955.2232576059712 1099.2235567578125}
+    labelcoords {955.2232576059712  1123.2235567578125}
     interface-peer {eth0 n51}
 }
 
@@ -384,8 +384,8 @@ node n23 {
 	!
     }
     canvas c1
-    iconcoords {819.000001 1025.000001}
-    labelcoords {819.000001 1025.000001}
+    iconcoords {933.411907769514 1131.081670760961}
+    labelcoords {933.411907769514  1155.081670760961}
     interface-peer {eth0 n51}
 }
 
@@ -401,8 +401,8 @@ node n24 {
 	!
     }
     canvas c1
-    iconcoords {841.000001 1060.000001}
-    labelcoords {841.000001 1060.000001}
+    iconcoords {965.000001 1139.000001}
+    labelcoords {965.000001  1163.000001}
     interface-peer {eth0 n51}
 }
 
@@ -418,8 +418,8 @@ node n25 {
 	!
     }
     canvas c1
-    iconcoords {972.000001 1140.000001}
-    labelcoords {972.000001 1140.000001}
+    iconcoords {661.203614050435 1189.389422064982}
+    labelcoords {661.203614050435  1213.389422064982}
     interface-peer {eth0 n51}
 }
 
@@ -435,8 +435,8 @@ node n26 {
 	!
     }
     canvas c1
-    iconcoords {769.000001 1107.000001}
-    labelcoords {769.000001 1107.000001}
+    iconcoords {679.5019033576585 1348.5075008948259}
+    labelcoords {679.5019033576585  1372.5075008948259}
     interface-peer {eth0 n51}
 }
 
@@ -452,8 +452,8 @@ node n27 {
 	!
     }
     canvas c1
-    iconcoords {606.000001 1208.000001}
-    labelcoords {606.000001 1208.000001}
+    iconcoords {810.3091634492162 1141.515271748694}
+    labelcoords {810.3091634492162  1165.515271748694}
     interface-peer {eth0 n51}
 }
 
@@ -469,8 +469,8 @@ node n28 {
 	!
     }
     canvas c1
-    iconcoords {953.000001 1222.000001}
-    labelcoords {953.000001 1222.000001}
+    iconcoords {850.4479543992541 1276.0026010824251}
+    labelcoords {850.4479543992541  1300.0026010824251}
     interface-peer {eth0 n51}
 }
 
@@ -486,8 +486,8 @@ node n29 {
 	!
     }
     canvas c1
-    iconcoords {752.000001 1381.000001}
-    labelcoords {752.000001 1381.000001}
+    iconcoords {572.7597957546117 1040.9903136309497}
+    labelcoords {572.7597957546117  1064.9903136309497}
     interface-peer {eth0 n51}
 }
 
@@ -503,8 +503,8 @@ node n30 {
 	!
     }
     canvas c1
-    iconcoords {549.000001 893.000001}
-    labelcoords {549.000001 893.000001}
+    iconcoords {623.6704087893469 1268.7386914149247}
+    labelcoords {623.6704087893469  1292.7386914149247}
     interface-peer {eth0 n51}
 }
 
@@ -520,8 +520,8 @@ node n31 {
 	!
     }
     canvas c1
-    iconcoords {677.000001 1168.000001}
-    labelcoords {677.000001 1168.000001}
+    iconcoords {736.1309537730649 1260.482431113824}
+    labelcoords {736.1309537730649  1284.482431113824}
     interface-peer {eth0 n51}
 }
 
@@ -537,8 +537,8 @@ node n32 {
 	!
     }
     canvas c1
-    iconcoords {845.000001 1132.000001}
-    labelcoords {845.000001 1132.000001}
+    iconcoords {717.5915956363276 1366.94450612052}
+    labelcoords {717.5915956363276  1390.94450612052}
     interface-peer {eth0 n51}
 }
 
@@ -554,8 +554,8 @@ node n33 {
 	!
     }
     canvas c1
-    iconcoords {580.000001 1287.000001}
-    labelcoords {580.000001 1287.000001}
+    iconcoords {648.5244030338184 1161.483461897481}
+    labelcoords {648.5244030338184  1185.483461897481}
     interface-peer {eth0 n51}
 }
 
@@ -571,8 +571,8 @@ node n34 {
 	!
     }
     canvas c1
-    iconcoords {555.000001 1022.000001}
-    labelcoords {555.000001 1022.000001}
+    iconcoords {992.1448150040541 1196.2210181773494}
+    labelcoords {992.1448150040541  1220.2210181773494}
     interface-peer {eth0 n51}
 }
 
@@ -588,8 +588,8 @@ node n35 {
 	!
     }
     canvas c1
-    iconcoords {1176.000001 1244.000001}
-    labelcoords {1176.000001 1244.000001}
+    iconcoords {916.7009897563308 1413.0706763978196}
+    labelcoords {916.7009897563308  1437.0706763978196}
     interface-peer {eth0 n51}
 }
 
@@ -605,8 +605,8 @@ node n36 {
 	!
     }
     canvas c1
-    iconcoords {756.000001 1467.000001}
-    labelcoords {756.000001 1467.000001}
+    iconcoords {622.7471324576239 1119.6887611373793}
+    labelcoords {622.7471324576239  1143.6887611373793}
     interface-peer {eth0 n51}
 }
 
@@ -622,8 +622,8 @@ node n37 {
 	!
     }
     canvas c1
-    iconcoords {665.000001 1275.000001}
-    labelcoords {665.000001 1275.000001}
+    iconcoords {800.7919110599659 1378.8872941005748}
+    labelcoords {800.7919110599659  1402.8872941005748}
     interface-peer {eth0 n51}
 }
 
@@ -639,8 +639,8 @@ node n38 {
 	!
     }
     canvas c1
-    iconcoords {778.000001 1465.000001}
-    labelcoords {778.000001 1465.000001}
+    iconcoords {1261.5554123357779 638.9630268281664}
+    labelcoords {1261.5554123357779  662.9630268281664}
     interface-peer {eth0 n51}
 }
 
@@ -656,8 +656,8 @@ node n39 {
 	!
     }
     canvas c1
-    iconcoords {1367.000001 593.000001}
-    labelcoords {1367.000001 593.000001}
+    iconcoords {741.0282444817285 1252.7912055379234}
+    labelcoords {741.0282444817285  1276.7912055379234}
     interface-peer {eth0 n51}
 }
 
@@ -673,8 +673,8 @@ node n40 {
 	!
     }
     canvas c1
-    iconcoords {585.000001 1211.000001}
-    labelcoords {585.000001 1211.000001}
+    iconcoords {659.4238422938237 1349.0369543367271}
+    labelcoords {659.4238422938237  1373.0369543367271}
     interface-peer {eth0 n51}
 }
 
@@ -690,8 +690,8 @@ node n41 {
 	!
     }
     canvas c1
-    iconcoords {566.000001 1478.000001}
-    labelcoords {566.000001 1478.000001}
+    iconcoords {668.7626487801524 1094.3790413792826}
+    labelcoords {668.7626487801524  1118.3790413792826}
     interface-peer {eth0 n51}
 }
 
@@ -707,8 +707,8 @@ node n42 {
 	!
     }
     canvas c1
-    iconcoords {516.000001 1137.000001}
-    labelcoords {516.000001 1137.000001}
+    iconcoords {543.1077391579744 1253.5694045749524}
+    labelcoords {543.1077391579744  1277.5694045749524}
     interface-peer {eth0 n51}
 }
 
@@ -724,8 +724,8 @@ node n43 {
 	!
     }
     canvas c1
-    iconcoords {704.000001 1258.000001}
-    labelcoords {704.000001 1258.000001}
+    iconcoords {668.076231934633 1431.176270856476}
+    labelcoords {668.076231934633  1455.176270856476}
     interface-peer {eth0 n51}
 }
 
@@ -741,8 +741,8 @@ node n44 {
 	!
     }
     canvas c1
-    iconcoords {799.000001 1333.000001}
-    labelcoords {799.000001 1333.000001}
+    iconcoords {664.3356350146685 1203.100764802079}
+    labelcoords {664.3356350146685  1227.100764802079}
     interface-peer {eth0 n51}
 }
 
@@ -758,8 +758,8 @@ node n45 {
 	!
     }
     canvas c1
-    iconcoords {599.000001 1050.000001}
-    labelcoords {599.000001 1050.000001}
+    iconcoords {718.1384410553278 1272.5772782597764}
+    labelcoords {718.1384410553278  1296.5772782597764}
     interface-peer {eth0 n51}
 }
 
@@ -775,8 +775,8 @@ node n46 {
 	!
     }
     canvas c1
-    iconcoords {592.000001 1379.000001}
-    labelcoords {592.000001 1379.000001}
+    iconcoords {719.3002050936018 1178.839558333747}
+    labelcoords {719.3002050936018  1202.839558333747}
     interface-peer {eth0 n51}
 }
 
@@ -792,8 +792,8 @@ node n47 {
 	!
     }
     canvas c1
-    iconcoords {633.000001 1132.000001}
-    labelcoords {633.000001 1132.000001}
+    iconcoords {892.3650239602719 1035.9638541416662}
+    labelcoords {892.3650239602719  1059.9638541416662}
     interface-peer {eth0 n51}
 }
 
@@ -809,8 +809,8 @@ node n48 {
 	!
     }
     canvas c1
-    iconcoords {997.000001 1154.000001}
-    labelcoords {997.000001 1154.000001}
+    iconcoords {333.79617387671345 240.08094254247686}
+    labelcoords {333.79617387671345  264.08094254247686}
     interface-peer {eth0 n51}
 }
 
@@ -826,8 +826,8 @@ node n49 {
 	!
     }
     canvas c1
-    iconcoords {227.000001 215.000001}
-    labelcoords {227.000001 215.000001}
+    iconcoords {717.2500140509196 1366.2083626103263}
+    labelcoords {717.2500140509196  1390.2083626103263}
     interface-peer {eth0 n51}
 }
 
@@ -857,19 +857,19 @@ node n51 {
 	 ipv6 address 2001:0::0/128
 	 ip address 10.0.0.0/8
 	!
+	scriptfile
+	/home/tom/projects/cs219_bfr/experiments/bfr_sg_50_16_trace.txt
+	!
 	mobmodel
 	coreapi
 	basic_range
-	!
-	scriptfile
-	/home/tom/projects/cs219_bfr/experiments/bfr_sg_50_16_trace.txt
 	!
     }
     custom-config {
 	custom-config-id basic_range
 	custom-command {3 3 9 9 9}
 	config {
-	150
+	125
 	54000000
 	0
 	20000
@@ -1133,6 +1133,9 @@ link l50 {
 
 canvas c1 {
     name {Canvas1}
+    refpt {0 0 47.5791667 -122.132322 2.0}
+    scale 100.0
+    size {2000 2000}
 }
 
 option global {

@@ -186,3 +186,14 @@ int grid_3neighbors(unsigned level, unsigned clusterId, unsigned neighborIds[])
 
     return 0;
 }
+
+int grid_convertCluster(unsigned level, unsigned clusterId, unsigned other_level, unsigned * other_clusterId)
+{
+    double x, y;
+    if (grid_center(level, clusterId, &x, &y) < 0) return -1;
+    unsigned rv;
+    if ((rv = grid_cluster(level, x, y)) < 0) return -1;
+
+    *other_clusterId = rv;
+    return 0;
+}

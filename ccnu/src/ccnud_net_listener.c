@@ -22,6 +22,7 @@
 #include "ccnud_net_listener.h"
 
 #include "linked_list.h"
+#include "bitmap.h"
 
 #include "log.h"
 #include "net_buffer.h"
@@ -35,6 +36,8 @@ struct ccnud_net_s {
     thread_pool_t packet_pipeline;
     pthread_mutex_t segments_lock;
     struct linked_list * segments;
+    pthread_mutex_t nonce_lock;
+    struct bitmap * seen_nonces;
 };
 
 struct ccnud_net_s _net;
@@ -61,7 +64,6 @@ int ccnudnl_init(int pipeline_size)
         return -1;
     }
 
-    //pipeline_size = 1;
     if (tpool_create(&_net.packet_pipeline, pipeline_size) < 0) {
         log_print(g_log, "tpool_create: could not create interest thread pool!");
         return -1;
@@ -69,6 +71,8 @@ int ccnudnl_init(int pipeline_size)
 
     pthread_mutex_init(&_net.segments_lock, NULL);
     _net.segments = linked_list_init(NULL);
+    pthread_mutex_init(&_net.nonce_lock, NULL);
+    _net.seen_nonces = bit_create(65535);
 
     return 0;
 }
@@ -109,7 +113,21 @@ void * ccnudnl_service(void * arg)
         uint8_t type = net_buffer_getByte(&buf);
 
         if (type == PACKET_TYPE_INTEREST) {
+            uint16_t nonce = net_buffer_getShort(&buf);
+            pthread_mutex_lock(&_net.nonce_lock);
+            int seen = bit_test(_net.seen_nonces, nonce);
+            if (!seen) {
+                bit_set(_net.seen_nonces, nonce);
+            }
+            pthread_mutex_unlock(&_net.nonce_lock);
+            if (seen){
+                log_print(g_log, "ccnudnl_service: dropping interest with duplicate nonce (%u)", nonce);
+                continue;
+            } else {
+                log_print(g_log, "ccnudnl_service: adding interest with nonce (%u)", nonce);
+            }
             struct ccnu_interest_pkt * interest = malloc(sizeof(struct ccnu_interest_pkt));
+            interest->nonce = nonce;
             interest->ttl = net_buffer_getByte(&buf);
             interest->orig_level = net_buffer_getByte(&buf);
             interest->orig_clusterId = net_buffer_getShort(&buf);
@@ -123,6 +141,7 @@ void * ccnudnl_service(void * arg)
             net_buffer_copyFrom(&buf, str, name_len);
             str[name_len] = '\0';
             interest->name = content_name_create(str);
+
             tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_interest, interest, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
         } else if (type == PACKET_TYPE_DATA) {
             struct ccnu_data_pkt * data = malloc(sizeof(struct ccnu_data_pkt));
@@ -176,12 +195,29 @@ static _segment_q_t * match_segment(struct content_name * name)
     return NULL;
 }
 
+static void * unregister_nonce(void * arg)
+{
+    uint16_t nonce;
+    memcpy(&nonce, arg, sizeof(uint16_t));
+    free(arg);
+
+    msleep(100);
+    pthread_mutex_lock(&_net.nonce_lock);
+        bit_clear(_net.seen_nonces, nonce);
+    pthread_mutex_unlock(&_net.nonce_lock);
+
+    return NULL;
+}
+
 static void * handle_interest(struct ccnu_interest_pkt * interest)
 {
     char proc[256];
     snprintf(proc, 256, "hi%u", g_nodeId);
     prctl(PR_SET_NAME, proc, 0, 0, 0);
     int rv = 0;
+
+    uint16_t * nonce = malloc(sizeof(uint16_t));
+    *nonce = interest->nonce;
 
 	ccnustat_rcvd_interest(interest);
     log_print(g_log, "handle_interest: %s from %u:%u->%u:%u %5.5f, %d",
@@ -254,6 +290,7 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
     }
 
     END:
+    tpool_add_job(&_net.packet_pipeline, (job_fun_t)unregister_nonce, nonce, TPOOL_NO_RV, NULL, NULL);
     log_print(g_log, "handle_interest: done");
 
     return NULL;

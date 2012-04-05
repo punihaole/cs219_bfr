@@ -15,6 +15,8 @@ int clus_add_cluster(struct cluster * clus);
 
 int clus_get_node(unsigned cluster_id, uint32_t node_id, struct node ** _node);
 
+int clus_add_node(unsigned cluster_id, struct node * _node);
+
 /* clears and recomputes the aggregate bloom filter for that cluster */
 int clus_compute_aggregate(struct cluster * clus);
 
@@ -22,7 +24,7 @@ int clus_compute_aggregate(struct cluster * clus);
 unsigned clus_get_clusterId(unsigned level);
 
 /* returns the leaf cluster id where the cluster head for the given level resides */
-unsigned clus_get_clusterHead(unsigned level);
+unsigned clus_get_priorityheadCluster(unsigned level);
 
 void clus_destroy_cluster(struct cluster * clus);
 
