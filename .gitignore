@@ -14,6 +14,7 @@
 *.o
 *.so
 a.out
+*.pyc
 
 # Packages #
 ############
