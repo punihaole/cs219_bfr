@@ -114,12 +114,12 @@ static void filter_msgs(struct linked_list * putIn, uint8_t type);
 static void * handle_bloom_msg(void * arg);
 static void * handle_cluster_join_msg(void * arg);
 
-int strategy_init(unsigned num_levels)
+int strategy_init(unsigned num_levels, int bloom_interval_ms, int cluster_interval_ms)
 {
 	if (num_levels == 0)
 		return -1;
-    _strategy.cluster_interval_ms = DEFAULT_CLUSTER_INTERVAL_SEC * 1000;
-    _strategy.bloom_interval_ms = DEFAULT_BLOOM_INTERVAL_SEC * 1000;
+    _strategy.cluster_interval_ms = cluster_interval_ms;
+    _strategy.bloom_interval_ms = bloom_interval_ms;
     _strategy.backoff_interval_ms = DEFAULT_BACKOFF_INTERVAL_MS;
     _strategy.join_timeout = JOIN_TIMEOUT_MS;
     _strategy.max_join_attempts = JOIN_MAX_ATTEMPTS;

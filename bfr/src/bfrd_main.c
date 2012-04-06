@@ -43,6 +43,10 @@ static void print_usage(char * argv_0)
     printf("      -c\tSet the starting position of the node, format:\n");
     printf("        \t\t%%d,%%d (ex. -s 10,10)\n");
     printf("      -s\tSet the stat file.\n");
+    printf("      -b\tSet the bloom sharing interval in ms.\n");
+    printf("        \t\t%%d (ex. -b 20000)");
+    printf("      -j\tSet the cluster join interval in ms.\n");
+    printf("        \t\t%%d (ex. -j 10000)");
     printf("\n");
 }
 
@@ -58,7 +62,6 @@ static void signal_handler(int signal)
             bfr_net_listener_close();
             strategy_close();
             log_close(g_log);
-
             exit(EXIT_SUCCESS);
             break;
         case SIGUSR1:
@@ -87,6 +90,8 @@ int main(int argc, char ** argv)
     int nodeId = DEFAULT_NODE_ID, levels = DEFAULT_NUM_LEVELS;
     unsigned int width = DEFAULT_GRID_WIDTH, height = DEFAULT_GRID_HEIGHT,
     startX = DEFAULT_GRID_STARTX, startY = DEFAULT_GRID_STARTY;
+    int bloom_interval_ms = DEFAULT_BLOOM_INTERVAL_SEC * 1000;
+    int cluster_interval_ms = DEFAULT_CLUSTER_INTERVAL_SEC * 1000;
 
     read_config(&nodeId, &levels, &width, &height, &startX, &startY);
 
@@ -100,23 +105,24 @@ int main(int argc, char ** argv)
     signal(SIGUSR2, signal_handler);
 
     int c;
-    while ((c = getopt(argc, argv, "-h?tn:l:g:s:c:")) != -1) {
+    while ((c = getopt(argc, argv, "-h?tn:l:g:s:c:b:j:")) != -1) {
         switch (c) {
             case 'h':
             case '?':
                 print_usage(argv[0]);
                 exit(EXIT_SUCCESS);
+            case 'b':
+            	bloom_interval_ms = atoi(optarg);
+            	if (bloom_interval_ms <= 0) {
+        		    bloom_interval_ms = DEFAULT_BLOOM_INTERVAL_SEC * 1000;
+            		printf("error parsing bloom sharing interval! defaulting to %d.\n", bloom_interval_ms);
+            	} else {
+	            	printf("set bloom sharing interval to %d ms.\n", bloom_interval_ms);
+	            }
+            	break;
             case 'c':
                 sscanf(optarg, "%d,%d", &startX, &startY);
-                fprintf(stderr, "set start pos = (%d, %d).\n", startX, startY);
-                break;
-            case 'n':
-                nodeId = atoi(optarg);
-                fprintf(stderr, "set node ID = %u.\n", nodeId);
-                break;
-            case 'l':
-                levels = atoi(optarg);
-                fprintf(stderr, "set levels = %d.\n", levels);
+                printf("set start pos = (%d, %d).\n", startX, startY);
                 break;
             case 'f':
                 strncpy(optarg, log_file, 256);
@@ -125,7 +131,24 @@ int main(int argc, char ** argv)
                 break;
             case 'g':
                 sscanf(optarg, "%dx%d", &height, &width);
-                fprintf(stderr, "set grid dim: %d X %d.\n", height, width);
+                printf("set grid dim: %d X %d.\n", height, width);
+                break;
+            case 'j':
+            	cluster_interval_ms = atoi(optarg);
+            	if (cluster_interval_ms <= 0) {
+        		    cluster_interval_ms = DEFAULT_CLUSTER_INTERVAL_SEC * 1000;
+            		printf("error parsing cluster join interval default to %d.\n", cluster_interval_ms);
+            	} else {
+	            	printf("set cluster join interval to %d ms.\n", cluster_interval_ms);
+	            }
+            	break;
+           	case 'l':
+                levels = atoi(optarg);
+                printf("set levels = %d.\n", levels);
+                break;
+            case 'n':
+                nodeId = atoi(optarg);
+                printf("set node ID = %u.\n", nodeId);
                 break;
             case 's':
                 strncpy(optarg, stat_file, 256);
@@ -216,7 +239,7 @@ int main(int argc, char ** argv)
         exit(EXIT_FAILURE);
     }
 
-    if (strategy_init(levels) < 0) {
+    if (strategy_init(levels, bloom_interval_ms, cluster_interval_ms) < 0) {
         log_print(g_log, "stategy_init: error initializing.");
         exit(EXIT_FAILURE);
     }

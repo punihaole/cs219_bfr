@@ -12,7 +12,7 @@
 #define JOIN_TIMEOUT_MS 100 /* ms */
 #define JOIN_MAX_ATTEMPTS 4
 
-int strategy_init();
+int strategy_init(unsigned num_levels, int bloom_interval_ms, int cluster_interval_ms);
 
 void strategy_close();
 
