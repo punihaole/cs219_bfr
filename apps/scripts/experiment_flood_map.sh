@@ -38,43 +38,43 @@ case "$HOST" in
 		;;
 	n5)
 		sleep 20
-		$MYDIR/../bin/cftp /map/flow1 $MYDIR/../flow1_bfr.txt -f
+		$MYDIR/../bin/cftp /map/flow1 $MYDIR/../flow1_flood.txt -f
 		;;
 	n9)
 		sleep 20
-		$MYDIR/../bin/cftp /map/flow2 $MYDIR/../flow2_bfr.txt -f
+		$MYDIR/../bin/cftp /map/flow2 $MYDIR/../flow2_flood.txt -f
 		;;
 	n47)
 		sleep 20
-		$MYDIR/../bin/cftp /map/flow3 $MYDIR/../flow3_bfr.txt -f
+		$MYDIR/../bin/cftp /map/flow3 $MYDIR/../flow3_flood.txt -f
 		;;
 	n22)
 		sleep 20
-		$MYDIR/../bin/cftp /map/flow4 $MYDIR/../flow4_bfr.txt -f
+		$MYDIR/../bin/cftp /map/flow4 $MYDIR/../flow4_flood.txt -f
 		;;
 	n35)
 		sleep 20
-		$MYDIR/../bin/cftp /map/flow5 $MYDIR/../flow5_bfr.txt -f
+		$MYDIR/../bin/cftp /map/flow5 $MYDIR/../flow5_flood.txt -f
 		;;
 	n6)
 		sleep 20
-		$MYDIR/../bin/cftp /map/flow6 $MYDIR/../flow6_bfr.txt -f
+		$MYDIR/../bin/cftp /map/flow6 $MYDIR/../flow6_flood.txt -f
 		;;
 	n10)
 		sleep 20
-		$MYDIR/../bin/cftp /map/flow7 $MYDIR/../flow7_bfr.txt -f
+		$MYDIR/../bin/cftp /map/flow7 $MYDIR/../flow7_flood.txt -f
 		;;
 	n24)
 		sleep 20
-		$MYDIR/../bin/cftp /map/flow8 $MYDIR/../flow8_bfr.txt -f
+		$MYDIR/../bin/cftp /map/flow8 $MYDIR/../flow8_flood.txt -f
 		;;
 	n12)
 		sleep 20
-		$MYDIR/../bin/cftp /map/flow9 $MYDIR/../flow9_bfr.txt -f
+		$MYDIR/../bin/cftp /map/flow9 $MYDIR/../flow9_flood.txt -f
 		;;
 	n36)
 		sleep 20
-		$MYDIR/../bin/cftp /map/flow10 $MYDIR/../flow10_bfr.txt -f
+		$MYDIR/../bin/cftp /map/flow10 $MYDIR/../flow10_flood.txt -f
 		;;
 	*)
 		exit 0

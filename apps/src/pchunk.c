@@ -48,7 +48,6 @@ int main(int argc, char ** argv)
 	int offset = 0;
 	int can_write = ccnu_max_payload_size(con.name);
 	if (strcmp(data_src, "-") == 0) {
-		
 		while (can_write > 0) {
 			int n = read(0, input, 1024);
 			if (n > 0) {

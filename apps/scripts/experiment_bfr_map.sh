@@ -2,7 +2,6 @@
 
 HOST=$(hostname)
 MYDIR=$(dirname $0)
-CONTENT='TEST STRING'
 
 sleep 10
 

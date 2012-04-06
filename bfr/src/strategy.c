@@ -516,6 +516,11 @@ static int bloom()
 
             bloom_or(_cluster->agg_filter, filter, _cluster->agg_filter);
 
+            if (bit_allClear(_cluster->agg_filter->vector)) {
+                // the filter is empty, no need to transmit
+                continue;
+            }
+
             struct bloom_msg msg;
             msg.vector = NULL;
             double distance;
@@ -557,6 +562,10 @@ static int bloom()
             }
         } else {
             /* I am not the cluster head */
+            if (bit_allClear(filter->vector)) {
+                //my filter is empty, no need to tx
+                continue;
+            }
             struct bloom_msg msg;
             msg.vector = NULL;
             double distance = -1 * g_bfr.leaf_head.distance - 1;
@@ -565,7 +574,6 @@ static int bloom()
             create_bloom_msg(&msg, level, clusterId, level, clusterId, distance, filter);
             broadcast_bloom_msg(&msg);
             free(msg.vector);
-            break;
         }
     }
     pthread_mutex_unlock(&g_bfr.bfr_lock);

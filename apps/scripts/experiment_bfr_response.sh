@@ -1,41 +1,45 @@
 #!/bin/sh
 
+#test script that measures the response time of downloading a short string
+
 HOST=$(hostname)
 MYDIR=$(dirname $0)
-CONTENT='TEST STRING'
 
 sleep 10
 
+#producers: 25 32 11 33 34 19 43 40 41 7
+#consumers: 5  9  47 22 35 6  10 24 12 36
+
 case "$HOST" in
 	n25)
-		$MYDIR/../bin/pchunk /flow1/string "$CONTENT"
+		dd if=/dev/urandom bs=1000 count=1 2>/dev/null | $MYDIR/../bin/pchunk /flow1/string -
 		;;
 	n32)
-		$MYDIR/../bin/pchunk /flow2/string "$CONTENT"
+		dd if=/dev/urandom bs=1000 count=1 2>/dev/null | $MYDIR/../bin/pchunk /flow2/string -
 		;;
 	n11)
-		$MYDIR/../bin/pchunk /flow3/string "$CONTENT"
+		dd if=/dev/urandom bs=1000 count=1 2>/dev/null | $MYDIR/../bin/pchunk /flow3/string -
 		;;
 	n33)
-		$MYDIR/../bin/pchunk /flow4/string "$CONTENT"
+		dd if=/dev/urandom bs=1000 count=1 2>/dev/null | $MYDIR/../bin/pchunk /flow4/string -
 		;;
 	n34)
-		$MYDIR/../bin/pchunk /flow5/string "$CONTENT"
+		dd if=/dev/urandom bs=1000 count=1 2>/dev/null | $MYDIR/../bin/pchunk /flow5/string -
 		;;
 	n19)
-		$MYDIR/../bin/pchunk /flow6/string "$CONTENT"
+		dd if=/dev/urandom bs=1000 count=1 2>/dev/null | $MYDIR/../bin/pchunk /flow6/string -
 		;;
 	n43)
-		$MYDIR/../bin/pchunk /flow7/string "$CONTENT"
+		dd if=/dev/urandom bs=1000 count=1 2>/dev/null | $MYDIR/../bin/pchunk /flow7/string -
 		;;
 	n40)
-		$MYDIR/../bin/pchunk /flow8/string "$CONTENT"
+		dd if=/dev/urandom bs=1000 count=1 2>/dev/null | $MYDIR/../bin/pchunk /flow8/string -
 		;;
 	n41)
-		$MYDIR/../bin/pchunk /flow9/string "$CONTENT"
+		dd if=/dev/urandom bs=1000 count=1 2>/dev/null | $MYDIR/../bin/pchunk /flow9/string -
 		;;
 	n7) 
-		$MYDIR/../bin/pchunk /flow10/string "$CONTENT"
+		dd if=/dev/urandom bs=1000 count=1 2>/dev/null | $MYDIR/../bin/pchunk /flow10/string -
 		;;
 	n5)
 		sleep 20

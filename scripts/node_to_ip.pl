@@ -9,5 +9,4 @@ for (my $i = 0; $i < @ARGV; $i=$i+1) {
 	my $node = $ARGV[$i];
 	my $ip = $baseIp + $node;
 	printf "%-4s -> %d\n", $node, $ip;
-	close(FH);
 }

@@ -58,9 +58,7 @@ while($line = <FH>) {
 		} else {
 			$goodput{$t} = $size;
 		}
-	} elsif ($event =~ m/UNSOLICITED/) {
-		#ignore
-	} else {
+	} elsif ($event =~ m/SENT$/) {
 		if (defined $overhead{$t}) {
 			$overhead{$t} += $size;
 		} else {
