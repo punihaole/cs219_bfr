@@ -1,24 +1,22 @@
 #!/bin/bash
 
-_ip=$(ifconfig eth0 | grep 'inet addr:' | cut -d: -f2 | cut -d " " -f1)
-ip route add table local broadcast 255.255.255.255 dev eth0 proto kernel scope link src $_ip
-echo "0" > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
+#_ips=( $(ifconfig | grep 'inet addr:' | cut -d: -f2 | cut -d " " -f1) )
+#_devs=( $(ifconfig | egrep -o ".+ Link encap" | cut -d" " -f1) )
+#ip route add table local broadcast 255.255.255.255 dev eth0 proto kernel scope link src $_ip
+#echo "0" > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
+#total=${#_ips[@]}
+#for (( i=1; i<=$total; i++ ))
+#do
+#	_dev=_devs[$i]
+#	_ip=_ips[$i]
+#	ifconfig $_dev -arp promisc up $_ip
+#	ipfwadm -O -a deny -P all -S 0/0 -D 0/0 -W $_dev
+#	ipfwadm -I -a deny -P all -S 0/0 -D 0/0 -W $_dev
+#done
 
-_x=2000
-_y=2000
-_grid="$_x"'x'"$_y"
+_dir="/home/tom/projects/cs219_bfr"
+$_dir/bin/ccnfd -p 0.01
 
-su tom
-_dir="$HOME/projects/cs219_bfr"
-echo $_dir
-$_dir/bin/ccnud -p 0.01
 sleep 0.5
-$_dir/bin/bfrd -g $_grid
+$_dir/apps/scripts/experiment_flood.sh
 
-pycore=$(ls /tmp | egrep 'pycore\.[0-9]+' | cut -d. -f2)
-_baseDir="/tmp/pycore.$pycore"
-
-sleep 0.5
-$_dir/apps/scripts/experiment_bfr.sh &
-
-`python $_dir/scripts/NodeStart.py $_baseDir $_x $_y`

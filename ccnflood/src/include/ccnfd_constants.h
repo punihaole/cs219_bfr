@@ -15,6 +15,11 @@
 #define MAX_TTL 6
 #define LISTEN_PORT 8282
 #define SOCK_QUEUE 5
+#define MAX_INTERFACES 5
+#define FRAME_LEN 1500
+#define CCNF_ETHER_PROTO 0x88b5
+#define CCNU_ETHER_PROTO 0x88b5
+#define BFR_ETHER_PROTO 0x88b6
 
 #define CCNU_USE_SLIDING_WINDOW
 typedef enum {

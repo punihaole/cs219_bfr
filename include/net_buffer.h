@@ -38,10 +38,16 @@ int net_buffer_copyFrom(struct net_buffer * src, void * dst, int size);
 
 int net_buffer_copyTo(struct net_buffer * dst, void * src, int size);
 
+int net_buffer_reset(struct net_buffer * buf);
+
+/* 
+ * @Deprecated - use sendto(sock, buf->buf, buf->size, ...)
+ */
 int net_buffer_send(struct net_buffer * buf, int sock, struct sockaddr_in * addr);
 
+/* 
+ * @Deprecated - use recvfrom(sock, buf->buf, buf->size, ...)
+ */
 int net_buffer_recv(struct net_buffer * buf, int sock, struct sockaddr_in * addr);
-
-int net_buffer_reset(struct net_buffer * buf);
 
 #endif // NET_BUFFER_H_INCLUDED

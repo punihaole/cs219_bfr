@@ -357,10 +357,10 @@ static void * publish_response(void * arg)
         log_print(g_log, "recv: %s.", strerror(errno));
         goto END_PUBLISH_RESP;
     }
-    log_print(g_log, "Successfully published content:\n");
-    log_print(g_log, "     name = %s\n", name);
-    log_print(g_log, "     timestamp = %d\n", timestamp);
-    log_print(g_log, "     data size = %d\n", size);
+    log_print(g_log, "Successfully published content:");
+    log_print(g_log, "\tname = %s", name);
+    log_print(g_log, "\ttimestamp = %d", timestamp);
+    log_print(g_log, "\tdata size = %d", size);
 
     END_PUBLISH_RESP:
 
@@ -525,10 +525,10 @@ static void * seq_publish(void * arg)
         goto END_PUBLISH_RESP;
     }
 
-    log_print(g_log, "Successfully published segment:\n");
-    log_print(g_log, "     name = %s\n", index_chunk->name->full_name);
-    log_print(g_log, "     timestamp = %d\n", timestamp);
-    log_print(g_log, "     num chunks = %d\n", num_chunks);
+    log_print(g_log, "Successfully published segment:");
+    log_print(g_log, "\tname = %s", index_chunk->name->full_name);
+    log_print(g_log, "\ttimestamp = %d", timestamp);
+    log_print(g_log, "\tnum chunks = %d", num_chunks);
 
     END_PUBLISH_RESP:
 

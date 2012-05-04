@@ -236,7 +236,7 @@ uint32_t IP4_to_nodeId()
     void * in_addr;
     char str[INET_ADDRSTRLEN];
     const uint32_t lo_ip = 2130706433;
-    uint32_t can_ip = 0;
+    uint32_t can_ip = 0xffffffff;
 
     if (getifaddrs(&myaddrs) != 0) {
         syslog(LOG_ERR, "IP4_to_nodeId: failed to set node ID - %s.", strerror(errno));
@@ -284,7 +284,7 @@ uint32_t IP4_to_nodeId()
             ip += oct_1 << 8;
             ip += oct_0;
 
-            if (ip != lo_ip)
+            if ((ip != lo_ip) && (ip < can_ip))
                 can_ip = ip;
         }
     }

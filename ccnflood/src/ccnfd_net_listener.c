@@ -9,7 +9,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <netinet/in.h>
+
+#include <netinet/ether.h>
 
 #include "ccnu.h"
 #include "ccnfd.h"
@@ -29,17 +30,22 @@
 #include "thread_pool.h"
 
 struct ccnfd_net_s {
-    int in_sock; /* udp socket */
+    //int in_sock; /* udp socket */
     thread_pool_t packet_pipeline;
     pthread_mutex_t segments_lock;
     struct linked_list * segments;
 };
+
+extern int sockfd[MAX_INTERFACES];
+extern struct sockaddr_ll eth_addr[MAX_INTERFACES];
+extern int faces;
 
 struct ccnfd_net_s _net;
 
 static void * handle_interest(struct ccnf_interest_pkt * interest);
 static void * handle_data(struct ccnf_data_pkt * data);
 
+/*
 int ccnfdnl_init(int pipeline_size)
 {
     if ((_net.in_sock = broadcast_socket()) == -1) {
@@ -69,10 +75,66 @@ int ccnfdnl_init(int pipeline_size)
 
     return 0;
 }
+*/
+
+int ccnfdnl_init(int pipeline_size)
+{
+    /*
+    struct ifaddrs * ifa, * p;
+
+    if (getifaddrs(&ifa) != 0) {
+        log_print(g_log, "ccnfdnl_init: getifaddrs: %s", strerror(errno));
+        return -1;
+    }
+
+    faces = 0;
+    for (p = ifa; p != NULL; p = p->ifa_next) {
+        if (p == NULL) continue;
+        if (strcmp(p->ifa_name, "lo") == 0) {
+            log_print(g_log, "ccnfdnl_init: skipping lo");
+            continue;
+        }
+
+        sockfd[faces] = socket(PF_PACKET, SOCK_RAW, htons(CCNF_ETHER_PROTO));
+        if (sockfd[faces] < 0) {
+            log_print(g_log, "ccnfdnl_init: socket: %s", strerror(errno));
+            return -1;
+        }
+
+        memset(&eth_addr[faces], '\0', sizeof(eth_addr[faces]));
+        eth_addr[faces].sll_protocol = htons(CCNF_ETHER_PROTO);
+        eth_addr[faces].sll_ifindex = if_nametoindex(p->ifa_name);
+
+        if (bind(sockfd[faces], (struct sockaddr * ) &eth_addr[faces], sizeof(struct sockaddr)) != 0) {
+            log_print(g_log, "ccnfdnl_init: bind(%s): %s", p->ifa_name, strerror(errno));
+            return -1;
+        }
+
+        struct packet_mreq mr;
+        memset (&mr, 0, sizeof (mr));
+        mr.mr_ifindex = if_nametoindex(p->ifa_name);
+        mr.mr_type = PACKET_MR_PROMISC;
+        setsockopt(sockfd[faces], SOL_PACKET,PACKET_ADD_MEMBERSHIP, &mr, sizeof (mr));
+
+        faces++;
+    }
+
+    freeifaddrs(ifa);
+    */
+
+    if (tpool_create(&_net.packet_pipeline, pipeline_size) < 0) {
+        log_print(g_log, "tpool_create: could not create interest thread pool!");
+        return -1;
+    }
+
+    pthread_mutex_init(&_net.segments_lock, NULL);
+    _net.segments = linked_list_init(NULL);
+
+    return 0;
+}
 
 int ccnfdnl_close()
 {
-    close(_net.in_sock);
     tpool_shutdown(&_net.packet_pipeline);
     return 0;
 }
@@ -80,22 +142,26 @@ int ccnfdnl_close()
 void * ccnfdnl_service(void * arg)
 {
     prctl(PR_SET_NAME, "ccnfd_net", 0, 0, 0);
-    //struct listener_args * net_args = (struct listener_args * )arg;
+    struct listener_args * net_args = (struct listener_args * )arg;
+    int face = net_args->opt;
+    free(net_args);
 
-    log_print(g_log, "ccnfdnl_service: listening...");
+    log_print(g_log, "ccnfdnl_service: listening on %s...", g_face_name[face]);
 
     int rcvd;
-    struct sockaddr_in remote_addr;
     struct net_buffer buf;
     net_buffer_init(CCNF_MAX_PACKET_SIZE, &buf);
 	while (1) {
 	    net_buffer_reset(&buf);
-        rcvd = net_buffer_recv(&buf, _net.in_sock, &remote_addr);
+        rcvd = recvfrom(g_sockfd[face], buf.buf, buf.size, 0, NULL, NULL);
 
-        if ((uint32_t) ntohl(remote_addr.sin_addr.s_addr) == g_nodeId) {
-            /* self msg */
-            continue;
-        }
+        // strip off the ethernet header
+        struct ether_header eh;
+        net_buffer_copyFrom(&buf, &eh, sizeof(eh));
+        log_print(g_log, "ccnfdnl_service: rcvd %d bytes from %02x:%02x:%02x:%02x:%02x:%02x",
+                  rcvd,
+                  eh.ether_shost[0], eh.ether_shost[1], eh.ether_shost[2],
+                  eh.ether_shost[3], eh.ether_shost[4], eh.ether_shost[5]);
 
         if (rcvd <= 0) {
             log_print(g_log, "ccnfdnl_service: recv failed -- trying to stay alive!");

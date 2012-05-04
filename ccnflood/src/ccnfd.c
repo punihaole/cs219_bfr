@@ -11,6 +11,20 @@
 #include <unistd.h>
 #include <math.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/time.h>
+#include <sys/ioctl.h>
+
+//#include <netinet/in.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+
+//#include <linux/if_packet.h>
+//#include <linux/if_ether.h>
+//#include <linux/if_arp.h>
+
 #include "ccnf.h"
 #include "ccnfd_listener.h"
 #include "ccnfd_net_broadcaster.h"
@@ -32,12 +46,15 @@ int g_timeout_ms;
 int g_interest_attempts;
 pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 
+int g_sockfd[MAX_INTERFACES];
+struct sockaddr_ll g_eth_addr[MAX_INTERFACES];
+char g_face_name[IFNAMSIZ][MAX_INTERFACES];
+int g_faces;
+
 static pthread_t idp_listener;
 static pthread_t net_listener;
 static pthread_mutex_t ccnfd_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  ccnfd_var   = PTHREAD_COND_INITIALIZER;
-static struct listener_args ipc_args;
-static struct listener_args net_args;
 
 void print_usage(char * argv_0)
 {
@@ -71,8 +88,91 @@ void signal_handler(int signal)
     }
 }
 
+static int net_init()
+{
+    memset(g_face_name, 0, sizeof(g_face_name));
+
+    struct ifaddrs * ifa, * p;
+
+    if (getifaddrs(&ifa) != 0) {
+        log_print(g_log, "net_init: getifaddrs: %s", strerror(errno));
+        return -1;
+    }
+
+    g_faces = 0;
+    int family;
+    for (p = ifa; p != NULL; p = p->ifa_next) {
+        family = p->ifa_addr->sa_family;
+        if ((p == NULL) || (p->ifa_addr == NULL)) continue;
+        log_print(g_log, "net_init: found face: %s, address family: %d%s",
+                  p->ifa_name, family,
+                  (family == AF_PACKET) ? " (AF_PACKET)" :
+                  (family == AF_INET) ?   " (AF_INET)" :
+                  (family == AF_INET6) ?  " (AF_INET6)" : "");
+
+        if (family != AF_PACKET) continue;
+
+        if (strcmp(p->ifa_name, "lo") == 0) {
+            log_print(g_log, "net_init: skipping lo");
+            continue;
+        }
+
+        /*
+        int i;
+        int found = 0;
+        for (i = 0; i < g_faces; i++) {
+            // weird bug where we discover the same faces multiple times
+            if (strcmp(p->ifa_name, g_face_name[i]) == 0) {
+                found = 1;
+                break;
+            }
+        }
+
+        if (found) continue;
+        */
+
+        char * opt = p->ifa_name;
+        strcpy(g_face_name[g_faces], opt);
+
+        g_sockfd[g_faces] = socket(AF_PACKET, SOCK_RAW, htons(CCNF_ETHER_PROTO));
+        if (g_sockfd[g_faces] < 0) {
+            log_print(g_log, "net_init: socket: %s", strerror(errno));
+            return -1;
+        }
+
+        /*
+        struct ifreq if_mac;
+        // read the current ethernet card flags
+        strncpy(if_mac.ifr_name, g_face_name[g_faces], IFNAMSIZ);
+        if (ioctl(g_sockfd[g_faces], SIOCGIFFLAGS, &if_mac) < 0) {
+            log_print(g_log, "net_init: ioctl: %s", strerror(errno));
+            return -1;
+        }
+        // add the promiscuous flag and set it in the device
+        if_mac.ifr_flags |= IFF_PROMISC;
+        if (ioctl(g_sockfd[g_faces], SIOCSIFFLAGS, &if_mac) < 0) {
+            log_print(g_log, "net_init: ioctl: %s", strerror(errno));
+            return -1;
+        }
+        */
+
+        g_faces++;
+    }
+
+    log_print(g_log, "net_init: found %d faces", g_faces);
+
+    freeifaddrs(ifa);
+
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
+    if (getuid() != 0) {
+        fprintf(stderr, "uid must be 0");
+        exit(EXIT_FAILURE);
+    }
+
     pid_t pid, sid;
     char log_file[256];
     char stat_file[256];
@@ -225,6 +325,11 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+    if (net_init() < 0) {
+        log_print(g_log, "ccnfd net init failed.");
+        exit(EXIT_FAILURE);
+    }
+
     if (ccnfdnl_init(interest_pipeline) < 0) {
         log_print(g_log, "ccnfd net listener failed to initalize.");
         exit(EXIT_FAILURE);
@@ -236,6 +341,7 @@ int main(int argc, char *argv[])
     }
 
     /* initialize the ipc listener */
+    struct listener_args ipc_args;
     ipc_args.lock = &ccnfd_mutex;
     ipc_args.cond = &ccnfd_var;
     ipc_args.queue = synch_queue_init();
@@ -243,11 +349,17 @@ int main(int argc, char *argv[])
     pthread_create(&idp_listener, NULL, ccnfdl_service, &ipc_args);
 
     /* initialize the net listener */
-    net_args.lock = &ccnfd_mutex;
-    net_args.cond = &ccnfd_var;
-    net_args.queue = synch_queue_init();
 
-    pthread_create(&net_listener, NULL, ccnfdnl_service, &net_args);
+
+    int i = 0;
+    for (i = 0; i < g_faces; i++) {
+        struct listener_args * net_args = malloc(sizeof(struct listener_args));
+        net_args->lock = NULL;
+        net_args->cond = NULL;
+        net_args->queue = NULL;
+        net_args->opt = i;
+        pthread_create(&net_listener, NULL, ccnfdnl_service, net_args);
+    }
 
     while (1) {
         /* for efficiency we sleep until someone wakes us up */
