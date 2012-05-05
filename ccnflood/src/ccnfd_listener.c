@@ -698,17 +698,16 @@ static int retrieve_segment(struct segment * seg)
     pthread_mutex_unlock(&g_lock);
     int ttl = MAX_TTL;
 
-    if ((seg->opts->mode & CCNUDNB_USE_RETRIES) == CCNUDNB_USE_RETRIES) {
+    if ((seg->opts->mode & CCNFDNB_USE_RETRIES) == CCNFDNB_USE_RETRIES) {
         retries = seg->opts->retries;
     }
-    if ((seg->opts->mode & CCNUDNB_USE_TIMEOUT) == CCNUDNB_USE_TIMEOUT) {
+    if ((seg->opts->mode & CCNFDNB_USE_TIMEOUT) == CCNFDNB_USE_TIMEOUT) {
         timeout_ms = seg->opts->timeout_ms;
     }
-    if ((seg->opts->mode & CCNUDNB_USE_TTL) == CCNUDNB_USE_TTL) {
+    if ((seg->opts->mode & CCNFDNB_USE_TTL) == CCNFDNB_USE_TTL) {
         ttl = seg->opts->ttl;
     }
 
-#ifdef CCNU_USE_SLIDING_WINDOW
     struct chunk chunk_window[MAX_INTEREST_PIPELINE];
     PENTRY _pit_handles[MAX_INTEREST_PIPELINE];
     int pit_to_chunk[PIT_SIZE];
@@ -744,7 +743,7 @@ static int retrieve_segment(struct segment * seg)
         tx = cwnd;
         window->num_bits = cwnd;
 
-        //log_print(g_log, "state = %d, cwnd = %d, ssthresh = %d", state, cwnd, ssthresh);
+        log_print(g_log, "state = %d, cwnd = %d, ssthresh = %d rtt_est = %d", state, cwnd, ssthresh, rtt_est);
 
         while (tx && (current_chunk < seg->num_chunks)) {
             snprintf(comp, MAX_NAME_LENGTH - seg->name->len, "/%d", current_chunk);
@@ -781,12 +780,12 @@ static int retrieve_segment(struct segment * seg)
             rv = pthread_cond_timedwait(&seg_q.cond, &seg_q.mutex, &wait);
             if ((rv == ETIMEDOUT) && !seg_q.rcv_chunks->len) {
                 /* we timed out, we need to rtx */
-                rtt_est += rtt_est / 2.0;
+                rtt_est += rtt_est / 2;
                 if (rtt_est > PIT_LIFETIME_MS)
-                    rtt_est = PIT_LIFETIME_MS;
+                    rtt_est = PIT_LIFETIME_MS / 2;
             }
 
-            while (seg_q.rcv_chunks->len) {
+            while (seg_q.rcv_chunks->len > 0) {
                 PENTRY pe = linked_list_remove(seg_q.rcv_chunks, 0);
                 if (!pe) continue;
 
@@ -820,6 +819,7 @@ static int retrieve_segment(struct segment * seg)
                 _pit_handles[chunk_id] = NULL;
                 bit_clear(window, chunk_id);
                 bit_set(missing, chunk_window[chunk_id].seq_no);
+                log_print(g_log, "fulfilled interest %s", chunk_window[chunk_id].intr.name->full_name);
                 content_name_delete(chunk_window[chunk_id].intr.name);
                 chunk_window[chunk_id].intr.name = NULL;
                 cwnd++;
@@ -861,140 +861,11 @@ static int retrieve_segment(struct segment * seg)
         /*log_print(g_log, "cwnd = %d, ssthresh = %d", cwnd, ssthresh);*/
     }
 
-#else
-/*  this is the deprecated way to retrieve segments */
-
-    int min_window_size = DEFAULT_INTEREST_PIPELINE;
-    int max_window_size = MAX_INTEREST_PIPELINE;
-    int window_size = min_window_size;
-    struct bitmap * missing = bit_create(seg->num_chunks);
-    struct bitmap * window = bit_create(max_window_size);
-    window->num_bits = window_size;
-    struct chunk * chunk_window = calloc(sizeof(struct chunk), max_window_size);
-    PENTRY * _pit_handles = (PENTRY * ) calloc(sizeof(PENTRY), max_window_size);
-
-    char str[MAX_NAME_LENGTH], comp[MAX_NAME_LENGTH];
-    strncpy(str, seg->name->full_name, seg->name->len);
-
-    int i;
-    int current_chunk = 0;
-    int window_left = 0;
-    int csthresh = max_window_size;
-    while (!bit_allSet(missing)) {
-        window_left = window_size;
-
-        while (!bit_allSet(window)) {
-            i = bit_find(window);
-            if (i < 0) break;
-            current_chunk = bit_find(missing);
-            if (current_chunk == -1)
-                goto RET_ALL;
-            snprintf(comp, MAX_NAME_LENGTH - seg->name->len, "/%d", current_chunk);
-            strncpy(str + seg->name->len, comp, seg->name->len);
-            chunk_window[i].intr.name = content_name_create(str);
-            chunk_window[i].intr.ttl = ttl;
-            chunk_window[i].intr.orig_level = orig_level_u;
-            chunk_window[i].intr.orig_clusterId = orig_clusterId_u;
-            chunk_window[i].intr.dest_level = dest_level_u;
-            chunk_window[i].intr.dest_clusterId = dest_clusterId_u;
-            chunk_window[i].intr.distance = distance;
-            chunk_window[i].seq_no = current_chunk;
-            chunk_window[i].retries = retries;
-            _pit_handles[i] = PIT_get_handle(chunk_window[i].intr.name);
-            if (!_pit_handles[i]) {
-                log_print(g_log, "retrieve_segment: failed to create pit entry");
-                goto END;
-            }
-            pthread_mutex_unlock(_pit_handles[i]->mutex);
-            ccnfdnb_fwd_interest(&chunk_window[i].intr);
-            window_left--;
-        }
-
-        msleep(timeout_ms);
-
-        /* we filled the window */
-        int fullfilled = 0;
-        int lost = 0;
-        for (i = 0; i < max_window_size; i++) {
-            if (bit_test(window, i) == 0) {
-                continue;
-            }
-
-            pthread_mutex_lock(_pit_handles[i]->mutex);
-            if (*_pit_handles[i]->obj) {
-                if (chunk_window[i].seq_no == 0) {
-                    seg->obj->publisher = (*_pit_handles[i]->obj)->publisher;
-                    seg->obj->timestamp = (*_pit_handles[i]->obj)->timestamp;
-                }
-                int offset = chunk_window[i].seq_no * seg->chunk_size;
-                memcpy(seg->obj->data+offset, (*_pit_handles[i]->obj)->data, (*_pit_handles[i]->obj)->size);
-
-                PIT_release(_pit_handles[i]);
-                bit_clear(window, i);
-                bit_set(missing, chunk_window[i].seq_no);
-                content_name_delete(chunk_window[i].intr.name);
-                fullfilled++;
-            } else {
-                pthread_mutex_unlock(_pit_handles[i]->mutex);
-                if (PIT_is_expired(_pit_handles[i])) {
-                    /* we do not have the content yet, rtx interest */
-
-                    if (window_left) {
-                        PIT_refresh(_pit_handles[i]);
-                        chunk_window[i].retries--;
-                        ccnfdnb_fwd_interest(&chunk_window[i].intr);
-                        window_left--;
-                    }
-
-                    if (chunk_window[i].retries == 0) {
-                        lost++;
-                        chunk_window[i].retries = retries;
-                    }
-                }
-            }
-        }
-
-        for (i = 0; i < max_window_size; i++) {
-            if (bit_test(window, i) == 0) {
-                continue;
-            }
-
-            if (!window_left) break;
-
-            pthread_mutex_lock(_pit_handles[i]->mutex);
-            if (*_pit_handles[i]->obj && PIT_age(_pit_handles[i])) {
-                PIT_refresh(_pit_handles[i]);
-                ccnfdnb_fwd_interest(&chunk_window[i].intr);
-                window_left--;
-            }
-            pthread_mutex_unlock(_pit_handles[i]->mutex);
-        }
-
-        window_size += fullfilled;
-        if (window_size > csthresh)
-            window_size = csthresh;
-
-        if (lost) {
-            csthresh = window_size / 2;
-            if (window_size < min_window_size)
-                csthresh = min_window_size;
-            window_size = min_window_size;
-        } else if (csthresh < max_window_size) {
-            csthresh += min_window_size;
-        }
-
-        window->num_bits = window_size;
-        /*log_print(g_log, "window_size = %d, csthresh = %d", window_size, csthresh);*/
-        /*log_print(g_log, "window_left = %d", window_left);*/
-    }
-#endif
-
     log_print(g_log, "retrieve_segment: finished for %s[%d-%d]",
               seg->name->full_name, 0, seg->num_chunks-1);
 
     rv = 0;
 
-#ifdef CCNU_USE_SLIDING_WINDOW
     PIT_print();
     ccnfdnl_unreg_segment(&seg_q);
     pthread_mutex_destroy(&seg_q.mutex);
@@ -1007,12 +878,6 @@ static int retrieve_segment(struct segment * seg)
 
     bit_destroy(window);
     bit_destroy(missing);
-#else
-    bit_destroy(window);
-    bit_destroy(missing);
-    free(chunk_window);
-    free(_pit_handles);
-#endif
 
     return rv;
 }
@@ -1080,10 +945,7 @@ static void * seq_response(void * arg)
 
     /* tell the broadcaster not to query the strategy layer to lower overhead */
     ccnfdnb_opt_t opts;
-    opts.mode = CCNUDNB_USE_ROUTE | CCNUDNB_USE_TIMEOUT;
-    pthread_mutex_lock(&g_lock);
-    opts.timeout_ms = g_timeout_ms;
-    pthread_mutex_unlock(&g_lock);
+    opts.mode = 0;
 
     /* we add a dummy component of maximum length to make sure all the segment
      * names willl be valid.

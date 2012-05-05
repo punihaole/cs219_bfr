@@ -49,6 +49,7 @@ int ccnfdnb_init()
 
 int ccnfdnb_init()
 {
+    g_faces = 0;
     struct ifaddrs * ifa, * p;
 
     if (getifaddrs(&ifa) != 0) {
@@ -56,7 +57,6 @@ int ccnfdnb_init()
         return -1;
     }
 
-    int face = 0;
     int family;
     for (p = ifa; p != NULL; p = p->ifa_next) {
         family = p->ifa_addr->sa_family;
@@ -67,7 +67,7 @@ int ccnfdnb_init()
         struct ifreq if_mac;
         memset(&if_mac, 0, sizeof(struct ifreq));
         strncpy(if_mac.ifr_name, p->ifa_name, IFNAMSIZ-1);
-        if (ioctl(g_sockfd[face], SIOCGIFHWADDR, &if_mac) < 0) {
+        if (ioctl(g_sockfd, SIOCGIFHWADDR, &if_mac) < 0) {
             log_print(g_log, "net_init: ioctl: %s", strerror(errno));
             return -1;
         }
@@ -75,31 +75,31 @@ int ccnfdnb_init()
         /* dest: broadcast MAC addr
          * src: my NIC
          */
-        memset(&eh[face], 0, sizeof(struct ether_header));
-        eh[face].ether_shost[0] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[0];
-        eh[face].ether_shost[1] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[1];
-        eh[face].ether_shost[2] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[2];
-        eh[face].ether_shost[3] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[3];
-        eh[face].ether_shost[4] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[4];
-        eh[face].ether_shost[5] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[5];
-        eh[face].ether_dhost[0] = 0xff;
-        eh[face].ether_dhost[1] = 0xff;
-        eh[face].ether_dhost[2] = 0xff;
-        eh[face].ether_dhost[3] = 0xff;
-        eh[face].ether_dhost[4] = 0xff;
-        eh[face].ether_dhost[5] = 0xff;
-        eh[face].ether_type = htons(CCNF_ETHER_PROTO);
+        memset(&eh[g_faces], 0, sizeof(struct ether_header));
+        eh[g_faces].ether_shost[0] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[0];
+        eh[g_faces].ether_shost[1] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[1];
+        eh[g_faces].ether_shost[2] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[2];
+        eh[g_faces].ether_shost[3] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[3];
+        eh[g_faces].ether_shost[4] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[4];
+        eh[g_faces].ether_shost[5] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[5];
+        eh[g_faces].ether_dhost[0] = 0xff;
+        eh[g_faces].ether_dhost[1] = 0xff;
+        eh[g_faces].ether_dhost[2] = 0xff;
+        eh[g_faces].ether_dhost[3] = 0xff;
+        eh[g_faces].ether_dhost[4] = 0xff;
+        eh[g_faces].ether_dhost[5] = 0xff;
+        eh[g_faces].ether_type = htons(CCNF_ETHER_PROTO);
 
-        memset(&g_eth_addr[face], 0, sizeof(struct sockaddr_ll));
-        g_eth_addr[face].sll_ifindex = if_nametoindex(p->ifa_name);
-        g_eth_addr[face].sll_halen = ETH_ALEN;
-        g_eth_addr[face].sll_addr[0] = 0xff;
-        g_eth_addr[face].sll_addr[1] = 0xff;
-        g_eth_addr[face].sll_addr[2] = 0xff;
-        g_eth_addr[face].sll_addr[3] = 0xff;
-        g_eth_addr[face].sll_addr[4] = 0xff;
-        g_eth_addr[face].sll_addr[5] = 0xff;
-        face++;
+        memset(&g_eth_addr[g_faces], 0, sizeof(struct sockaddr_ll));
+        g_eth_addr[g_faces].sll_ifindex = if_nametoindex(p->ifa_name);
+        g_eth_addr[g_faces].sll_halen = ETH_ALEN;
+        g_eth_addr[g_faces].sll_addr[0] = 0xff;
+        g_eth_addr[g_faces].sll_addr[1] = 0xff;
+        g_eth_addr[g_faces].sll_addr[2] = 0xff;
+        g_eth_addr[g_faces].sll_addr[3] = 0xff;
+        g_eth_addr[g_faces].sll_addr[4] = 0xff;
+        g_eth_addr[g_faces].sll_addr[5] = 0xff;
+        g_faces++;
     }
 
     return 0;
@@ -126,13 +126,13 @@ int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** c
     int ttl = MAX_TTL;
 
     if (use_opt) {
-        if ((opt->mode & CCNUDNB_USE_RETRIES) == CCNUDNB_USE_RETRIES) {
+        if ((opt->mode & CCNFDNB_USE_RETRIES) == CCNFDNB_USE_RETRIES) {
             retries = opt->retries;
         }
-        if ((opt->mode & CCNUDNB_USE_TIMEOUT) == CCNUDNB_USE_TIMEOUT) {
+        if ((opt->mode & CCNFDNB_USE_TIMEOUT) == CCNFDNB_USE_TIMEOUT) {
             timeout_ms = opt->timeout_ms;
         }
-        if ((opt->mode & CCNUDNB_USE_TTL) == CCNUDNB_USE_TTL) {
+        if ((opt->mode & CCNFDNB_USE_TTL) == CCNFDNB_USE_TTL) {
             ttl = opt->ttl;
         }
     }
@@ -154,8 +154,8 @@ int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** c
      */
     int i;
     struct timespec ts;
-    for (i = 0; i < retries; i++) {
-        if (i > 0) {
+    for (i = 1; i <= retries; i++) {
+        if (i > 1) {
             log_print(g_log, "ccnfdnb_express_interest: retransmitting interest (%s),...",
                       name->full_name);
         }
@@ -180,9 +180,11 @@ int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** c
 
     rv = 0;
     if (!*pe->obj) {
-        log_print(g_log, "ccnfdnb_express_interest: rtx interest %d times with no data.",i);
+        log_print(g_log, "ccnfdnb_express_interest: rtx interest %d times with no data.", i-1);
         rv = -1;
         goto CLEANUP;
+    } else {
+        log_print(g_log, "ccnfdnb_express_interest:rcvd data after %d tries.", i);
     }
 
     CLEANUP:
@@ -215,7 +217,7 @@ int ccnfdnb_fwd_interest(struct ccnf_interest_pkt * interest)
         net_buffer_copyTo(&buf, interest->name->full_name, interest->name->len);
 
         int n = buf.buf_ptr - buf.buf;
-        int sent = sendto(g_sockfd[i], buf.buf, n, 0, (struct sockaddr *) &g_eth_addr[i], sizeof(g_eth_addr[i]));
+        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *) &g_eth_addr[i], sizeof(g_eth_addr[i]));
         if (sent == -1) {
             log_print(g_log, "ccnfdnb_fwd_interest: sendto(%d): %s", i, strerror(errno));
         } else if (sent != n) {
@@ -254,7 +256,7 @@ int ccnfdnb_fwd_data(struct content_obj * content, int hops_taken)
         net_buffer_copyTo(&buf, content->data, content->size);
 
         int n = buf.buf_ptr - buf.buf;
-        int sent = sendto(g_sockfd[i], buf.buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
+        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
         if (sent == -1) {
             log_print(g_log, "ccnfdnb_fwd_data: sendto(%d): %s", i, strerror(errno));
         } else if (sent != n) {

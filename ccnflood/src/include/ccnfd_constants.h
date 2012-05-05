@@ -21,7 +21,6 @@
 #define CCNU_ETHER_PROTO 0x88b5
 #define BFR_ETHER_PROTO 0x88b6
 
-#define CCNU_USE_SLIDING_WINDOW
 typedef enum {
     SLOW_START,
     CONG_AVOID

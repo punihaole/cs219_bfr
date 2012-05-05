@@ -142,27 +142,31 @@ int ccnfdnl_close()
 void * ccnfdnl_service(void * arg)
 {
     prctl(PR_SET_NAME, "ccnfd_net", 0, 0, 0);
+    /*
     struct listener_args * net_args = (struct listener_args * )arg;
     int face = net_args->opt;
     free(net_args);
-
-    log_print(g_log, "ccnfdnl_service: listening on %s...", g_face_name[face]);
+    log_print(g_log, "ccnfdnl_service(%d): listening on %s...", face, g_face_name[face]);
+    */
+    log_print(g_log, "ccnfdnl_service: listening...");
 
     int rcvd;
     struct net_buffer buf;
     net_buffer_init(CCNF_MAX_PACKET_SIZE, &buf);
 	while (1) {
 	    net_buffer_reset(&buf);
-        rcvd = recvfrom(g_sockfd[face], buf.buf, buf.size, 0, NULL, NULL);
+        //rcvd = recvfrom(g_sockfd[face], buf.buf, buf.size, 0, NULL, NULL);
+        rcvd = recvfrom(g_sockfd, buf.buf, buf.size, 0, NULL, NULL);
 
         // strip off the ethernet header
         struct ether_header eh;
         net_buffer_copyFrom(&buf, &eh, sizeof(eh));
-        log_print(g_log, "ccnfdnl_service: rcvd %d bytes from %02x:%02x:%02x:%02x:%02x:%02x",
+
+        /*log_print(g_log, "ccnfdnl_service: rcvd %d bytes from %02x:%02x:%02x:%02x:%02x:%02x",
                   rcvd,
                   eh.ether_shost[0], eh.ether_shost[1], eh.ether_shost[2],
                   eh.ether_shost[3], eh.ether_shost[4], eh.ether_shost[5]);
-
+        */
         if (rcvd <= 0) {
             log_print(g_log, "ccnfdnl_service: recv failed -- trying to stay alive!");
             sleep(1);
@@ -181,7 +185,8 @@ void * ccnfdnl_service(void * arg)
             net_buffer_copyFrom(&buf, str, name_len);
             str[name_len] = '\0';
             interest->name = content_name_create(str);
-            tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_interest, interest,TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
+            tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_interest,
+                          interest, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
         } else if (type == PACKET_TYPE_DATA) {
             struct ccnf_data_pkt * data = malloc(sizeof(struct ccnf_data_pkt));
             data->hops = net_buffer_getByte(&buf);
@@ -199,7 +204,8 @@ void * ccnfdnl_service(void * arg)
 
             net_buffer_copyFrom(&buf, data->payload, data->payload_len);
             if (data->publisher_id != g_nodeId) {
-                tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_data, data, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
+                tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_data,
+                              data, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
             }
         } else {
             log_print(g_log, "ccnfdnl_service: recvd unknown msg type - %u", type);
@@ -210,7 +216,6 @@ void * ccnfdnl_service(void * arg)
 	return NULL;
 }
 
-#ifdef CCNU_USE_SLIDING_WINDOW
 static _segment_q_t * match_segment(struct content_name * name)
 {
     struct content_name * base = content_name_create(name->full_name);
@@ -234,7 +239,6 @@ static _segment_q_t * match_segment(struct content_name * name)
     if (found) return seg;
     return NULL;
 }
-#endif
 
 static void * handle_interest(struct ccnf_interest_pkt * interest)
 {
@@ -243,41 +247,51 @@ static void * handle_interest(struct ccnf_interest_pkt * interest)
     prctl(PR_SET_NAME, proc, 0, 0, 0);
 
 	ccnfstat_rcvd_interest(interest);
-    log_print(g_log, "handle_interest: %s, ttl = %d",
+    /*log_print(g_log, "handle_interest: %s, ttl = %d",
               interest->name->full_name, interest->ttl);
-
+    */
     /* check the CS for data to match interest */
-    struct content_obj * content = CS_get(interest->name);
-    if (content) {
-        log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);
-        ccnfdnb_fwd_data(content, 1);
+
+    PENTRY pe = PIT_exact_match(interest->name);
+    if (pe) {
+
+        /* refresh the pit entry */
+        pthread_mutex_lock(&g_lock);
+        int timeout = g_timeout_ms;
+        pthread_mutex_unlock(&g_lock);
+        if (PIT_age(pe) >= timeout) {
+            log_print(g_log, "handle_interest: %s refreshing.",
+                      interest->name->full_name);
+            ccnfdnb_fwd_interest(interest);
+        }
+        PIT_refresh(pe);
+        /* we already saw this interest...drop it */
+        PIT_close(pe);
+
     } else {
-        /* fwd interest */
-        PENTRY pe = PIT_search(interest->name);
-        if (pe) {
-            /* refresh the pit entry */
-            pthread_mutex_lock(&g_lock);
-            int timeout = g_timeout_ms;
-            pthread_mutex_unlock(&g_lock);
-            if (PIT_age(pe) >= timeout) {
-                ccnfdnb_fwd_interest(interest);
-            }
-            PIT_refresh(pe);
-            /* we already saw this interest...drop it */
-            PIT_close(pe);
-            goto END;
+
+        // see if we can fullfill
+        struct content_obj * content = CS_get(interest->name);
+
+        if (content) {
+
+            log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);
+            ccnfdnb_fwd_data(content, 1);
+
         } else {
+
             ccnfdnb_fwd_interest(interest);
             log_print(g_log, "handle_interest: %s forwarding.",
                       interest->name->full_name);
 
             /* we fwded the interest, add it to the pit */
             PIT_add_entry(interest->name);
+
         }
+
     }
 
-    END:
-    log_print(g_log, "handle_interest: done");
+    //log_print(g_log, "handle_interest: done");
 
     return NULL;
 }
@@ -288,9 +302,9 @@ static void * handle_data(struct ccnf_data_pkt * data)
     snprintf(proc, 256, "hd%u", g_nodeId);
     prctl(PR_SET_NAME, proc, 0, 0, 0);
 
-    log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
+    /*log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
               data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);
-
+    */
     struct content_obj * obj;
     obj = (struct content_obj *) malloc(sizeof(struct content_obj));
 
@@ -301,64 +315,56 @@ static void * handle_data(struct ccnf_data_pkt * data)
     obj->data = data->payload;
 
     /* check if it fulfills a registered interest */
-    PENTRY pe = PIT_search(obj->name);
+    PENTRY pe = PIT_exact_match(obj->name);
     if (!pe) {
         log_print(g_log, "%s unsolicited data", obj->name->full_name);
         /* unsolicited data */
 		ccnfstat_rcvd_data_unsolicited(data);
-        goto END;
     } else {
 		ccnfstat_rcvd_data(data);
-	}
-
-    CS_put(obj);
-    if (!*pe->obj) {
-        *pe->obj = obj; /* hand them the data and wake them up*/
-    }
-
-    if (pe->registered) {
-        PIT_refresh(pe);
-        /* we fulfilled a pit, we need to notify the waiter */
-        /* no need to lock the pe, the pit_longest_match did it for us */
-        #ifdef CCNU_USE_SLIDING_WINDOW
-        _segment_q_t * seg = match_segment(obj->name);
-        if (seg) {
-            /* already locked */
-            pthread_mutex_unlock(pe->mutex);
-            linked_list_append(seg->rcv_chunks, pe);
-            seg->rcv_window++;
-            if (seg->rcv_window >= *seg->max_window / 2) {
-                seg->rcv_window = 0;
-                pthread_cond_signal(&seg->cond);
-            }
-            pthread_mutex_unlock(&seg->mutex);
-        } else {
-            log_print(g_log, "%s is a chunk, notifiying expresser thread", obj->name->full_name);
-            pthread_cond_signal(pe->cond);
-            pthread_mutex_unlock(pe->mutex);
-            free(pe);
+		log_print(g_log, "PUTTING");
+        CS_put(obj);
+        log_print(g_log, "PUT");
+        if (!*pe->obj) {
+            *pe->obj = obj; /* hand them the data and wake them up*/
         }
-        #else
-        pthread_cond_signal(pe->cond);
-        pthread_mutex_unlock(pe->mutex);
-        free(pe);
-        #endif
 
-    } else {
-        log_print(g_log, "%s fulfilling PIT, fwding data", obj->name->full_name);
-        /* we matched an interest rcvd over the net */
-        ccnfdnb_fwd_data(obj, data->hops + 1);
-        PIT_release(pe); /* release will unlock the lock */
+        if (pe->registered) {
+            PIT_refresh(pe);
+            /* we fulfilled a pit, we need to notify the waiter */
+            /* no need to lock the pe, the pit_longest_match did it for us */
+            _segment_q_t * seg = match_segment(obj->name);
+            if (seg) {
+                /* already locked */
+                pthread_mutex_unlock(pe->mutex);
+                linked_list_append(seg->rcv_chunks, pe);
+                seg->rcv_window++;
+                if (seg->rcv_window >= *seg->max_window) {
+                    log_print(g_log, "%s filled the window, notifiying expresser thread", obj->name->full_name);
+                    seg->rcv_window = 0;
+                    pthread_cond_signal(&seg->cond);
+                }
+                pthread_mutex_unlock(&seg->mutex);
+            } else {
+                log_print(g_log, "%s is a chunk, notifiying expresser thread", obj->name->full_name);
+                pthread_cond_signal(pe->cond);
+                pthread_mutex_unlock(pe->mutex);
+                free(pe);
+            }
+
+        } else {
+            log_print(g_log, "%s fulfilling PIT, fwding data", obj->name->full_name);
+            /* we matched an interest rcvd over the net */
+            ccnfdnb_fwd_data(obj, data->hops + 1);
+            PIT_release(pe); /* release will unlock the lock */
+        }
     }
 
-    END:
-
-    log_print(g_log, "handle_data: done");
+    //log_print(g_log, "handle_data: done");
 
     return NULL;
 }
 
-#ifdef CCNU_USE_SLIDING_WINDOW
 void ccnfdnl_reg_segment(_segment_q_t * seg)
 {
     pthread_mutex_lock(&_net.segments_lock);
@@ -383,4 +389,3 @@ void ccnfdnl_unreg_segment(_segment_q_t * seg)
         linked_list_remove(_net.segments, i);
     pthread_mutex_unlock(&_net.segments_lock);
 }
-#endif

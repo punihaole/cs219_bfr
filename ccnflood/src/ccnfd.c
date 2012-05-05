@@ -40,13 +40,17 @@
 
 extern int ccnf_net_test();
 
+/**
+ * Only place where globals may be defined! (Declare in header)
+ * Prefixed with g_
+ **/
 struct log * g_log;
 uint32_t g_nodeId;
 int g_timeout_ms;
 int g_interest_attempts;
 pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 
-int g_sockfd[MAX_INTERFACES];
+int g_sockfd;
 struct sockaddr_ll g_eth_addr[MAX_INTERFACES];
 char g_face_name[IFNAMSIZ][MAX_INTERFACES];
 int g_faces;
@@ -131,16 +135,16 @@ static int net_init()
         if (found) continue;
         */
 
-        char * opt = p->ifa_name;
-        strcpy(g_face_name[g_faces], opt);
+        //char * opt = p->ifa_name;
+        //strcpy(g_face_name[g_faces], opt);
 
+        /*
         g_sockfd[g_faces] = socket(AF_PACKET, SOCK_RAW, htons(CCNF_ETHER_PROTO));
         if (g_sockfd[g_faces] < 0) {
             log_print(g_log, "net_init: socket: %s", strerror(errno));
             return -1;
         }
 
-        /*
         struct ifreq if_mac;
         // read the current ethernet card flags
         strncpy(if_mac.ifr_name, g_face_name[g_faces], IFNAMSIZ);
@@ -156,10 +160,14 @@ static int net_init()
         }
         */
 
-        g_faces++;
+        g_sockfd = socket(AF_PACKET, SOCK_RAW, htons(CCNF_ETHER_PROTO));
+        if (g_sockfd < 0) {
+            log_print(g_log, "net_init: socket: %s", strerror(errno));
+            return -1;
+        }
     }
 
-    log_print(g_log, "net_init: found %d faces", g_faces);
+    //log_print(g_log, "net_init: found %d faces", g_faces);
 
     freeifaddrs(ifa);
 
@@ -349,8 +357,9 @@ int main(int argc, char *argv[])
     pthread_create(&idp_listener, NULL, ccnfdl_service, &ipc_args);
 
     /* initialize the net listener */
+    pthread_create(&net_listener, NULL, ccnfdnl_service, NULL);
 
-
+    /*
     int i = 0;
     for (i = 0; i < g_faces; i++) {
         struct listener_args * net_args = malloc(sizeof(struct listener_args));
@@ -360,6 +369,7 @@ int main(int argc, char *argv[])
         net_args->opt = i;
         pthread_create(&net_listener, NULL, ccnfdnl_service, net_args);
     }
+    */
 
     while (1) {
         /* for efficiency we sleep until someone wakes us up */

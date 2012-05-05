@@ -4,7 +4,7 @@
 	<File name="src/bfr.c" open="0" top="0" tabpos="6">
 		<Cursor position="338" topLine="171" />
 	</File>
-	<File name="src/bfr_listener.c" open="1" top="1" tabpos="1">
+	<File name="src/bfr_listener.c" open="0" top="0" tabpos="1">
 		<Cursor position="14336" topLine="416" />
 	</File>
 	<File name="src/bfr_stats.c" open="0" top="0" tabpos="1">
@@ -16,7 +16,7 @@
 	<File name="src/bfrd_main.c" open="0" top="0" tabpos="1">
 		<Cursor position="4434" topLine="136" />
 	</File>
-	<File name="src/cluster.c" open="1" top="0" tabpos="2">
+	<File name="src/cluster.c" open="0" top="0" tabpos="2">
 		<Cursor position="5627" topLine="202" />
 	</File>
 	<File name="src/include/bfr_stats.h" open="0" top="0" tabpos="3">
@@ -35,7 +35,7 @@
 		<Cursor position="274" topLine="0" />
 	</File>
 	<File name="src/strategy.c" open="0" top="0" tabpos="1">
-		<Cursor position="28505" topLine="803" />
+		<Cursor position="25070" topLine="680" />
 	</File>
 	<File name="src/tests/bfr_test.c" open="0" top="0" tabpos="0">
 		<Cursor position="2125" topLine="55" />

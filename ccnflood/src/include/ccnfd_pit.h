@@ -24,7 +24,6 @@ typedef struct {
     struct timespec * expires;
 } _pit_entry_s; /* no touching */
 
-#ifdef CCNU_USE_SLIDING_WINDOW
 typedef struct {
     pthread_mutex_t mutex;
     pthread_cond_t cond;
@@ -33,7 +32,6 @@ typedef struct {
     struct linked_list * rcv_chunks;
     struct content_name * base;
 } _segment_q_t;
-#endif
 
 struct pit;
 
@@ -48,13 +46,13 @@ PENTRY PIT_get_handle(struct content_name * name);
 int PIT_add_entry(struct content_name * name);
 
 /* returns the pit entry handle with that exact content name */
-PENTRY PIT_search(struct content_name * name);
+PENTRY PIT_exact_match(struct content_name * name);
 
 /* returns the pit entry with the longest prefix match to that content name.
  * the _pit_entry will be returned in the locked state. This prevents the
  * pit GC from stomping on us.
  */
-PENTRY PIT_longest_match(struct content_name * name);
+//PENTRY PIT_longest_match(struct content_name * name);
 
 /* returns 1 if the entry is expired */
 int PIT_is_expired(PENTRY _pe);

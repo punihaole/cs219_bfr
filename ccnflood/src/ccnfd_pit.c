@@ -44,7 +44,7 @@ int PIT_init()
         g_pit.pit_table[i].name = NULL;
         g_pit.pit_table[i].obj = NULL;
         g_pit.pit_table[i].registered = 0;
-        g_pit.pit_table[i].available = FALSE;
+        g_pit.pit_table[i].available = 0;
     }
 
     return 0;
@@ -126,10 +126,15 @@ PENTRY PIT_get_handle(struct content_name * name)
     g_pit.pit_table[index].expires = g_pit.pit_table[index].created;
     ts_addms(&g_pit.pit_table[index].expires, g_pit.pit_lifetime_ms);
     pe->expires = &g_pit.pit_table[index].expires;
+
     g_pit.pit_table[index].name = content_name_create(name->full_name);
     pe->index = index;
-    g_pit.pit_table[index].registered = pe->registered = 1;
-    g_pit.pit_table[index].available = TRUE;
+
+    g_pit.pit_table[index].registered = 1;
+    pe->registered = 1;
+
+    g_pit.pit_table[index].available = 1;
+
     pthread_mutex_lock(&g_pit.pit_table[index].mutex);
     pthread_mutex_unlock(&g_pit.pit_lock);
 
@@ -141,16 +146,16 @@ int PIT_add_entry(struct content_name * name)
     if (!name) return -1;
 
     pthread_mutex_lock(&g_pit.pit_lock);
-    /* bit find also set the bit it returns */
+    // bit find also set the bit it returns
     int index = bit_find(g_pit.pit_table_valid);
 
     if (index < 0) {
-        /* we need to try to drop the oldest pit entry, or clean out expired */
+        // we need to try to drop the oldest pit entry, or clean out expired
         index = evict();
         if (index == -1)
             return -1;
 
-        /* we can evict this pit entry */
+        // we can evict this pit entry
         if (g_pit.pit_table[index].obj) {
             g_pit.pit_table[index].obj = NULL;
         }
@@ -164,14 +169,14 @@ int PIT_add_entry(struct content_name * name)
     ts_addms(&g_pit.pit_table[index].expires, g_pit.pit_lifetime_ms);
     g_pit.pit_table[index].name = content_name_create(name->full_name);
     g_pit.pit_table[index].registered = 0;
-    g_pit.pit_table[index].available = TRUE;
+    g_pit.pit_table[index].available = 1;
 
     pthread_mutex_unlock(&g_pit.pit_lock);
 
     return 0;
 }
 
-PENTRY PIT_search(struct content_name * name)
+PENTRY PIT_exact_match(struct content_name * name)
 {
     int i;
     int match = 0;
@@ -190,7 +195,20 @@ PENTRY PIT_search(struct content_name * name)
     struct timespec now;
     ts_fromnow(&now);
 
-    if (match && ts_compare(&g_pit.pit_table[i].expires, &now) && g_pit.pit_table[i].available) {
+    int valid = 1;
+    if (match) {
+        pthread_mutex_lock(&g_pit.pit_table[i].mutex);
+        pthread_mutex_unlock(&g_pit.pit_lock);
+
+        if (ts_compare(&g_pit.pit_table[i].expires, &now) < 0) {
+            log_print(g_log, "EXPIRED: %s", name->full_name);
+            valid = 1;
+        } else if (g_pit.pit_table[i].available == 0) {
+            log_print(g_log, "BEING SERVICED: %s", name->full_name);
+            valid = 1;
+        }
+
+        log_print(g_log, "FOUND: %s", name->full_name);
         PENTRY pe = (PENTRY) malloc(sizeof(_pit_entry_s));
         pe->mutex = &g_pit.pit_table[i].mutex;
         pe->cond = &g_pit.pit_table[i].cond;
@@ -198,17 +216,22 @@ PENTRY PIT_search(struct content_name * name)
         pe->index = i;
         pe->registered = g_pit.pit_table[i].registered;
         pe->expires = &g_pit.pit_table[i].expires;
-        g_pit.pit_table[i].available = FALSE;
-        pthread_mutex_unlock(&g_pit.pit_lock);
-        pthread_mutex_lock(&g_pit.pit_table[i].mutex);
-        return pe;
+        g_pit.pit_table[i].available = 0;
+
+        if (valid) {
+            return pe;
+        } else {
+             pthread_mutex_unlock(&g_pit.pit_table[i].mutex);
+             free(pe);
+             return NULL;
+        }
     } else {
         pthread_mutex_unlock(&g_pit.pit_lock);
         return NULL;
     }
 }
 
-PENTRY PIT_longest_match(struct content_name * name)
+/*PENTRY PIT_longest_match(struct content_name * name)
 {
     int index = -1;
     int match_len = 0;
@@ -232,7 +255,9 @@ PENTRY PIT_longest_match(struct content_name * name)
     struct timespec now;
     ts_fromnow(&now);
 
-    if (index != -1 && ts_compare(&g_pit.pit_table[index].expires, &now) && g_pit.pit_table[index].available) {
+    if (index != -1 && ts_compare(&g_pit.pit_table[index].expires, &now)
+        && g_pit.pit_table[index].available) {
+
         PENTRY pe = (PENTRY) malloc(sizeof(_pit_entry_s));
         pe->mutex = &g_pit.pit_table[index].mutex;
         pe->cond = &g_pit.pit_table[index].cond;
@@ -240,15 +265,17 @@ PENTRY PIT_longest_match(struct content_name * name)
         pe->index = index;
         pe->registered = g_pit.pit_table[index].registered;
         pe->expires = &g_pit.pit_table[index].expires;
-        g_pit.pit_table[index].available = FALSE;
+        g_pit.pit_table[index].available = 0;
         pthread_mutex_unlock(&g_pit.pit_lock);
         pthread_mutex_lock(&g_pit.pit_table[index].mutex);
         return pe;
+
     } else {
+
         pthread_mutex_unlock(&g_pit.pit_lock);
         return NULL;
     }
-}
+}*/
 
 void PIT_release(PENTRY _pe)
 {
@@ -260,7 +287,7 @@ void PIT_release(PENTRY _pe)
         g_pit.pit_table[_pe->index].name = NULL;
         g_pit.pit_table[_pe->index].obj = NULL;
         g_pit.pit_table[_pe->index].registered = 0;
-        g_pit.pit_table[_pe->index].available = FALSE;
+        g_pit.pit_table[_pe->index].available = 0;
     pthread_mutex_unlock(&g_pit.pit_lock);
 
     free(_pe);
@@ -279,7 +306,7 @@ void PIT_close(PENTRY _pe)
 {
     pthread_mutex_unlock(_pe->mutex);
     pthread_mutex_lock(&g_pit.pit_lock);
-        g_pit.pit_table[_pe->index].available = TRUE;
+        g_pit.pit_table[_pe->index].available = 1;
     pthread_mutex_unlock(&g_pit.pit_lock);
     free(_pe);
 }

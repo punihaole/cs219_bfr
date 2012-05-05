@@ -21,10 +21,9 @@ int ccnfdnb_init();
 int ccnfdnb_close();
 
 /* used to specify options for the ccnfdnb_express_interest function */
-#define CCNUDNB_USE_ROUTE          0x1
-#define CCNUDNB_USE_RETRIES        0x2
-#define CCNUDNB_USE_TIMEOUT        0x4
-#define CCNUDNB_USE_TTL            0x8
+#define CCNFDNB_USE_RETRIES        0x1
+#define CCNFDNB_USE_TIMEOUT        0x2
+#define CCNFDNB_USE_TTL            0x4
 typedef struct ccnfdnb_options {
 	int mode;
 	double distance;
@@ -41,22 +40,19 @@ typedef struct ccnfdnb_options {
  * it will be ignored).
  * Make sure to set the mode mask of the opt parameter so that the parameters
  * specified will be used.
- * i.e. opt->mode = CCNUDNB_USE_ROUTE | CCNUDNB_USE_RETRIES |
- *                  CCNUDNB_USE_TIMEOUT | CCNUDNB_USE_TTL;
+ * i.e. opt->mode = CCNFDNB_USE_RETRIES |
+ *                  CCNFDNB_USE_TIMEOUT | CCNFDNB_USE_TTL;
  * will tell the function to use all the specified parameters.
  *
  * Any parameters that are not indicated to be used will be set to defaults
  * specified in the appropriate header file.
  *
- * CCNUDNB_USE_ROUTE - indicates to use the given distance, origin and dest-
- *                     ination clusters and not query the routing daemon for
- *                     a route.
- * CCNUDNB_USE_RETRIES - indicates to use the retries parameter which sets
+ * CCNFDNB_USE_RETRIES - indicates to use the retries parameter which sets
  *                       how many times to retry if an interest is not full-
  *                       filled within a timeout.
- * CCNUDNB_USE_TIMEOUT - indicates to use the timeout_ms parameter which sets
+ * CCNFDNB_USE_TIMEOUT - indicates to use the timeout_ms parameter which sets
  *                       how long to wait for an interest to be fullfilled.
- * CCNUDNB_USE_TTL - indicates to use the ttl parameter which sets how many
+ * CCNFDNB_USE_TTL - indicates to use the ttl parameter which sets how many
  *                   hops an interest stays alive.
  */
 int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** content_ptr,
