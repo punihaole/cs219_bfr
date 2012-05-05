@@ -62,6 +62,7 @@ int ccnfdnb_init()
         family = p->ifa_addr->sa_family;
         if ((p == NULL) || (p->ifa_addr == NULL)) continue;
         if (family != AF_PACKET) continue;
+        if (strcmp(p->ifa_name, "lo") == 0) continue;
 
         struct ifreq if_mac;
         memset(&if_mac, 0, sizeof(struct ifreq));
@@ -98,6 +99,7 @@ int ccnfdnb_init()
         g_eth_addr[face].sll_addr[3] = 0xff;
         g_eth_addr[face].sll_addr[4] = 0xff;
         g_eth_addr[face].sll_addr[5] = 0xff;
+        face++;
     }
 
     return 0;
@@ -215,7 +217,7 @@ int ccnfdnb_fwd_interest(struct ccnf_interest_pkt * interest)
         int n = buf.buf_ptr - buf.buf;
         int sent = sendto(g_sockfd[i], buf.buf, n, 0, (struct sockaddr *) &g_eth_addr[i], sizeof(g_eth_addr[i]));
         if (sent == -1) {
-            log_print(g_log, "ccnfdnb_fwd_interest: sendto: %s", strerror(errno));
+            log_print(g_log, "ccnfdnb_fwd_interest: sendto(%d): %s", i, strerror(errno));
         } else if (sent != n) {
             log_print(g_log, "ccnfdnb_fwd_interest: warning sent %d bytes, expected %d!", sent, n);
         }
@@ -254,7 +256,7 @@ int ccnfdnb_fwd_data(struct content_obj * content, int hops_taken)
         int n = buf.buf_ptr - buf.buf;
         int sent = sendto(g_sockfd[i], buf.buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
         if (sent == -1) {
-            log_print(g_log, "ccnfdnb_fwd_data: sendto: %s", strerror(errno));
+            log_print(g_log, "ccnfdnb_fwd_data: sendto(%d): %s", i, strerror(errno));
         } else if (sent != n) {
             log_print(g_log, "ccnfdnb_fwd_data: warning sent %d bytes, expected %d!", sent, n);
         }

@@ -2,11 +2,13 @@
 #define LOG_H_
 
 #include <stdio.h>
+#include <pthread.h>
 
 struct log {
 	FILE * log_fp;
 	char * log_name;
 	int pending_writes;
+	pthread_mutex_t lock;
 };
 
 #define LOG_APPEND    1 /* we append to log file if exists */

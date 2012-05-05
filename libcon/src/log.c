@@ -29,6 +29,7 @@ int log_init(char * log_name, char * filename, struct log * _log, int mode)
 	_log->log_name = (char * ) malloc(strlen(log_name));
 	_log->pending_writes = 0;
 	strcpy(_log->log_name, log_name);
+	pthread_mutex_init(&_log->lock, NULL);
 
 	return 0;
 }
@@ -40,6 +41,7 @@ int log_close(struct log * _log)
 	fclose(_log->log_fp);
 	free(_log->log_name);
 	free(_log);
+	pthread_mutex_destroy(&_log->lock);
 	_log = NULL;
 
 	return 0;
@@ -47,7 +49,9 @@ int log_close(struct log * _log)
 
 void log_flush(struct log * _log)
 {
+	pthread_mutex_lock(&_log->lock);
 	fflush(_log->log_fp);
+	pthread_mutex_unlock(&_log->lock);
 }
 
 void log_print(struct log * _log, const char * format, ...)
@@ -62,19 +66,23 @@ void log_print(struct log * _log, const char * format, ...)
 
 	char * date = asctime(current);
 	date[strlen(date)-1] = '\0';
-	fprintf(_log->log_fp, "%s %s: ", date, _log->log_name);
 
-	va_list ap;
-	va_start(ap, format);
-	vfprintf(_log->log_fp, format, ap);
-	fprintf(_log->log_fp, "\n");
-	_log->pending_writes++;
+	pthread_mutex_lock(&_log->lock);
+		fprintf(_log->log_fp, "%s %s: ", date, _log->log_name);
 
-	if (_log->pending_writes > MAX_PENDING_WRITES) {
-		fflush(_log->log_fp);
-		_log->pending_writes = 0;
-	}
-	va_end(ap);
+		va_list ap;
+		va_start(ap, format);
+		vfprintf(_log->log_fp, format, ap);
+		fprintf(_log->log_fp, "\n");
+		_log->pending_writes++;
+
+		if (_log->pending_writes > MAX_PENDING_WRITES) {
+			fflush(_log->log_fp);
+			_log->pending_writes = 0;
+		}
+		va_end(ap);
+
+	pthread_mutex_unlock(&_log->lock);
 }
 
 void log_printnow(struct log * _log, const char * format, ...)
@@ -89,13 +97,16 @@ void log_printnow(struct log * _log, const char * format, ...)
 
 	char * date = asctime(current);
 	date[strlen(date)-1] = '\0';
-	fprintf(_log->log_fp, "%s %s: ", date, _log->log_name);
 
-	va_list ap;
-	va_start(ap, format);
-	vfprintf(_log->log_fp, format, ap);
-	fprintf(_log->log_fp, "\n");
-	fflush(_log->log_fp);
-	_log->pending_writes = 0;
-	va_end(ap);
+	pthread_mutex_lock(&_log->lock);
+		fprintf(_log->log_fp, "%s %s: ", date, _log->log_name);
+
+		va_list ap;
+		va_start(ap, format);
+		vfprintf(_log->log_fp, format, ap);
+		fprintf(_log->log_fp, "\n");
+		fflush(_log->log_fp);
+		_log->pending_writes = 0;
+		va_end(ap);
+	pthread_mutex_unlock(&_log->lock);
 }
