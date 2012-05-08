@@ -12,10 +12,16 @@ int main()
     char log_file[256];
 	snprintf(log_file, 256, "ccnud_%u.log", IP4_to_nodeId());
 
-	struct log * _log;
+	struct log _log;
 	
-	log_init(log_name, log_file, &_log);
+	log_init(log_name, log_file, &_log, LOG_OVERWRITE | LOG_NORMAL);
 
-	log_print(_log, "print some numbers = %d, %d, and maybe a string, %s, yup.\n", 9, 82888, "tom");
-	log_close(_log);
+	log_print(&_log, "info");
+	log_important(&_log, "important");
+	log_debug(&_log, "debug");
+	log_warn(&_log, "warn");
+	log_error(&_log, "error");
+	log_critical(&_log, "critical");
+
+	log_close(&_log);
 }

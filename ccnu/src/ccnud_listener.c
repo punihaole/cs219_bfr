@@ -774,9 +774,9 @@ static int retrieve_segment(struct segment * seg)
                 bit_clear(window, i);
                 break;
             }
-            pit_to_chunk[_pit_handles[i]] = i;
+            pit_to_chunk[_pit_handles[i]->index] = i;
 
-            PIT_unlock(_pit_handles[i]);
+            pthread_mutex_unlock(_pit_handles[i]->mutex);
             chunk_window[i].intr.nonce = ccnudnb_gen_nonce();
             ccnudnb_fwd_interest(&chunk_window[i].intr);
             tx--;
@@ -794,54 +794,44 @@ static int retrieve_segment(struct segment * seg)
                 /* we timed out, we need to rtx */
                 rtt_est += rtt_est / 2.0;
                 if (rtt_est > PIT_LIFETIME_MS)
-                    rtt_est = PIT_LIFETIME_MS;
+                    rtt_est = PIT_LIFETIME_MS / 2;
             }
 
-            while (seg_q.rcv_chunks->len) {
-                PENTRY * pe_ptr = linked_list_remove(seg_q.rcv_chunks, 0);
-                if (!pe_ptr) {
-                    log_print(g_log, "NULL!");
-                }
-                PENTRY pe = *pe_ptr;
-                free(pe_ptr);
-                //log_print(g_log, "GOT PIT %d", pe);
+            while (seg_q.rcv_chunks->len > 0) {
+                PENTRY pe = linked_list_remove(seg_q.rcv_chunks, 0);
+                if (!pe) continue;
 
-                PIT_lock(pe);
+                pthread_mutex_lock(pe->mutex);
 
-                int chunk_id = pit_to_chunk[pe];
-                //log_print(g_log, "chunk id = %d", chunk_id);
+                int chunk_id = pit_to_chunk[pe->index];
                 if (chunk_id < 0) {
-                    PIT_unlock(pe);
+                    pthread_mutex_unlock(pe->mutex);
                     continue;
                 }
 
-                //log_print(g_log, "chunk = %s", chunk_window[chunk_id].intr.name->full_name);
-
-                struct content_obj * pe_data = PIT_get_data(pe);
-
                 if (chunk_window[chunk_id].seq_no == 0) {
-                    seg->obj->publisher = pe_data->publisher;
-                    seg->obj->timestamp = pe_data->timestamp;
-                    seg->chunk_size = pe_data->size;
+                    seg->obj->publisher = (*pe->obj)->publisher;
+                    seg->obj->timestamp = (*pe->obj)->timestamp;
+                    seg->chunk_size = (*pe->obj)->size;
                 }
                 int offset = chunk_window[chunk_id].seq_no * seg->chunk_size;
-                memcpy(&seg->obj->data[offset], pe_data->data, pe_data->size);
+                memcpy(&seg->obj->data[offset], (*pe->obj)->data, (*pe->obj)->size);
 
                 struct timespec now;
                 ts_fromnow(&now);
                 ts_addms(&now, PIT_LIFETIME_MS);
-                rtt_est = (int)((rtt_est + ts_mselapsed(&now, PIT_expiration(pe))) / 2.0);
+                rtt_est = (int)((rtt_est + ts_mselapsed(&now, pe->expires)) / 2.0);
                 if (rtt_est < min_rtt_est) {
                     rtt_est = min_rtt_est;
                 }
 
-                pit_to_chunk[pe] = -1;
-                //log_print(g_log, "PIT %d done, releasing", pe);
+                pit_to_chunk[pe->index] = -1;
                 PIT_release(pe);
-                content_obj_destroy(pe_data);
-                _pit_handles[chunk_id] = PIT_INVALID;
+                free(_pit_handles[chunk_id]);
+                _pit_handles[chunk_id] = NULL;
                 bit_clear(window, chunk_id);
                 bit_set(missing, chunk_window[chunk_id].seq_no);
+                log_debug(g_log, "fulfilled interest %s", chunk_window[chunk_id].intr.name->full_name);
                 content_name_delete(chunk_window[chunk_id].intr.name);
                 chunk_window[chunk_id].intr.name = NULL;
                 cwnd++;
@@ -852,21 +842,20 @@ static int retrieve_segment(struct segment * seg)
 
         for (i = 0; i < MAX_INTEREST_PIPELINE; i++) {
             if (bit_test(window, i)) {
-                if (_pit_handles[i] == PIT_INVALID) {
+                if (!_pit_handles[i]) {
                     continue;
                 }
-                PIT_lock(_pit_handles[i]);
+                pthread_mutex_lock(_pit_handles[i]->mutex);
                 if (PIT_age(_pit_handles[i]) > (2 * rtt_est)) {
                     PIT_refresh(_pit_handles[i]);
                     chunk_window[i].retries--;
-                    chunk_window[i].intr.nonce = ccnudnb_gen_nonce();
                     ccnudnb_fwd_interest(&chunk_window[i].intr);
-                    log_print(g_log, "rtx interest: %s", chunk_window[i].intr.name->full_name);
+                    log_debug(g_log, "rtx interest: %s", chunk_window[i].intr.name->full_name);
                     ssthresh = cwnd / 2 + 1;
                     cwnd = 1;
                     state = SLOW_START;
                 }
-                PIT_unlock(_pit_handles[i]);
+                pthread_mutex_unlock(_pit_handles[i]->mutex);
             }
         }
 
@@ -881,7 +870,7 @@ static int retrieve_segment(struct segment * seg)
         if (cwnd > MAX_INTEREST_PIPELINE)
             cwnd = MAX_INTEREST_PIPELINE;
 
-        /*log_print(g_log, "cwnd = %d, ssthresh = %d", cwnd, ssthresh);*/
+        /*log_debug(g_log, "cwnd = %d, ssthresh = %d", cwnd, ssthresh);*/
     }
 
     log_print(g_log, "retrieve_segment: finished for %s[%d-%d]",

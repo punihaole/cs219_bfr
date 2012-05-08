@@ -19,7 +19,7 @@
 	"bfrd.h"
 	"net_lib.h"
 
-1333605438 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_listener.c
+1333636368 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_listener.c
 	<errno.h>
 	<errno.h>
 	<pthread.h>
@@ -46,20 +46,19 @@
 	"distance_table.h"
 	"thread_pool.h"
 
-1333583860 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_net_listener.c
+1336339148 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_net_listener.c
 	<stdlib.h>
 	<errno.h>
 	<pthread.h>
 	<string.h>
-	<errno.h>
 	<unistd.h>
+	<fcntl.h>
+	<arpa/inet.h>
 	<sys/prctl.h>
 	<sys/types.h>
 	<sys/socket.h>
 	<sys/un.h>
 	<netinet/in.h>
-	<arpa/inet.h>
-	<fcntl.h>
 	"bfr.h"
 	"bfrd.h"
 	"net_lib.h"
@@ -68,7 +67,7 @@
 	"synch_queue.h"
 	"log.h"
 
-1333609467 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd.c
+1336339206 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd.c
 	<stdlib.h>
 	<string.h>
 	<errno.h>
@@ -79,6 +78,13 @@
 	<sys/socket.h>
 	<sys/un.h>
 	<netinet/in.h>
+	<sys/types.h>
+	<sys/socket.h>
+	<sys/un.h>
+	<sys/time.h>
+	<sys/ioctl.h>
+	<ifaddrs.h>
+	<net/if.h>
 	<fcntl.h>
 	"bloom_filter.h"
 	"bfr.h"
@@ -96,7 +102,7 @@
 	"ccnu.h"
 	"distance_table.h"
 
-1333504746 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd_main.c
+1335988873 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd_main.c
 	<sys/types.h>
 	<sys/stat.h>
 	<errno.h>
@@ -121,7 +127,7 @@
 	"strategy.h"
 	"synch_queue.h"
 
-1333608172 source:/home/tom/projects/cs219_bfr/bfr/src/cluster.c
+1335988873 source:/home/tom/projects/cs219_bfr/bfr/src/cluster.c
 	<math.h>
 	"cluster.h"
 	"bloom_filter.h"
@@ -151,7 +157,7 @@
 	<stdlib.h>
 	"log.h"
 
-1333607990 source:/home/tom/projects/cs219_bfr/bfr/src/strategy.c
+1335988873 source:/home/tom/projects/cs219_bfr/bfr/src/strategy.c
 	<stdlib.h>
 	<string.h>
 	<stdio.h>
@@ -180,7 +186,7 @@
 	"bloom_filter.h"
 	"ccnu.h"
 
-1332456485 source:/home/tom/projects/cs219_bfr/bfr/src/tests/bfr_test.c
+1335988873 source:/home/tom/projects/cs219_bfr/bfr/src/tests/bfr_test.c
 	<sys/types.h>
 	<sys/stat.h>
 	<errno.h>

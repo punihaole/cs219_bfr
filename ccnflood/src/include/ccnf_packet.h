@@ -45,4 +45,16 @@ struct ccnf_data_pkt {
 	void * payload;
 };
 
+static inline void interest_destroy(struct ccnf_interest_pkt * pkt)
+{
+    content_name_delete(pkt->name);
+    free(pkt);
+}
+
+static inline void data_destroy(struct ccnf_data_pkt * pkt)
+{
+    content_name_delete(pkt->name);
+    free(pkt);
+}
+
 #endif // CCNU_PACKET_H_INCLUDED

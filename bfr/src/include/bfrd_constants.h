@@ -4,7 +4,9 @@
 #include "constants.h"
 
 /* STRATEGY */
+#define MAX_INTERFACES 5
 #define DEFAULT_HANDLER_POOL 5
+#define BFR_ETHER_PROTO 0x88b6
 
 /* IPC */
 #define SOCK_QUEUE 5

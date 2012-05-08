@@ -73,12 +73,12 @@ int ccnfdl_init(int pipeline_size)
     int pool_size = INTEREST_FLOWS;
     //int pool_size = 1;
     if (tpool_create(&_listener.interest_pipeline, pool_size) < 0) {
-        log_print(g_log, "tpool_create: could not create interest thread pool!");
+        log_critical(g_log, "tpool_create: could not create interest thread pool!");
         return -1;
     }
 
     if ((_listener.sock = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
-        log_print(g_log, "socket: %s.", strerror(errno));
+        log_critical(g_log, "socket: %s.", strerror(errno));
         return -1;
     }
 
@@ -92,18 +92,18 @@ int ccnfdl_init(int pipeline_size)
 
     len = sizeof(struct sockaddr_un);
     if (bind(_listener.sock, (struct sockaddr * ) &(_listener.local), len) == -1) {
-        log_print(g_log, "bind: %s.", strerror(errno));
+        log_critical(g_log, "bind: %s.", strerror(errno));
         close(_listener.sock);
         return -1;
     }
 
     if (listen(_listener.sock, SOCK_QUEUE) == -1) {
-        log_print(g_log, "listen: %s.", strerror(errno));
+        log_critical(g_log, "listen: %s.", strerror(errno));
         return -1;
     }
 
-    log_print(g_log, "interest window: %d", _listener.interest_pipe_size);
-    log_print(g_log, "max interest window: %d", MAX_INTEREST_PIPELINE);
+    log_important(g_log, "interest window: %d", _listener.interest_pipe_size);
+    log_important(g_log, "max interest window: %d", MAX_INTEREST_PIPELINE);
 
     return 0;
 }
@@ -118,7 +118,7 @@ int ccnfdl_close()
 static int ccnfdl_accept(struct ccnfd_msg * msg)
 {
     if (!msg) {
-        log_print(g_log, "ccnfd_accept: msg ptr NULL -- IGNORING");
+        log_error(g_log, "ccnfd_accept: msg ptr NULL -- IGNORING");
         return -1;
     }
 
@@ -127,12 +127,12 @@ static int ccnfdl_accept(struct ccnfd_msg * msg)
     socklen_t t = sizeof(struct sockaddr_un);
 
     if ((sock2 = accept(_listener.sock, (struct sockaddr *) &remote, &t)) == -1) {
-        log_print(g_log, "accept: %s.", strerror(errno));
+        log_error(g_log, "accept: %s.", strerror(errno));
         return -1;
     }
 
     if ((n = recv(sock2, &msg->type, sizeof(uint8_t), 0)) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         return -1;
     }
 
@@ -167,17 +167,17 @@ static int ccnfdl_accept(struct ccnfd_msg * msg)
     }
 
     if ((n = recv(sock2, &msg->payload_size, sizeof(uint32_t), 0)) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         return -1;
     }
 
     msg->payload = (uint8_t * ) malloc(msg->payload_size);
     n = recv(sock2, msg->payload, msg->payload_size, 0);
     if (n < msg->payload_size) {
-        log_print(g_log, "recv: got %d bytes, expected %d bytes!", n, msg->payload_size);
+        log_warn(g_log, "recv: got %d bytes, expected %d bytes!", n, msg->payload_size);
         return -1;
     } else if (n < 0) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         return -1;
     }
 
@@ -191,19 +191,19 @@ void * ccnfdl_service(void * arg)
 {
     prctl(PR_SET_NAME, "ccnfd_ipc", 0, 0, 0);
     struct listener_args * ipc_args = (struct listener_args * ) arg;
-    log_print(g_log, "ccnfd_listener_service: listening...");
+    log_important(g_log, "ccnfd_listener_service: listening...");
     struct ccnfd_msg * msg;
 
 	while (1) {
 	    msg = (struct ccnfd_msg *) malloc(sizeof(struct ccnfd_msg));
 	    if (!msg) {
-            log_print(g_log, "ccnfd_listener_service: malloc: %s.", strerror(errno));
-            log_print(g_log, "ccnfd_listener_service: trying to continue...");
+            log_error(g_log, "ccnfd_listener_service: malloc: %s.", strerror(errno));
+            log_error(g_log, "ccnfd_listener_service: trying to continue...");
             sleep(1);
             continue;
 	    }
 		if (ccnfdl_accept(msg) < 0) {
-		    log_print(g_log, "ccnfd_accept failed -- trying to continue...");
+		    log_error(g_log, "ccnfd_accept failed -- trying to continue...");
 		    free(msg);
 		    continue;
 		}
@@ -244,13 +244,13 @@ static void * create_summary_response(void * arg)
     /* finish rcving the summary request packet */
     int payload_size;
     if (recv(sock, &payload_size, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_CREATE_SUMMARY_RESP;
     }
 
     int ignore;
     if (recv(sock, &ignore, sizeof(int), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_CREATE_SUMMARY_RESP;
     }
 
@@ -263,11 +263,11 @@ static void * create_summary_response(void * arg)
     int size = filter->vector->num_words;
 
     if ((n = send(sock, &size, sizeof(uint32_t), 0)) <= 0) {
-        log_print(g_log, "create_summary_response: send - %s", strerror(errno));
+        log_error(g_log, "create_summary_response: send - %s", strerror(errno));
     }
 
     if ((n = send(sock, filter->vector->map, size * sizeof(uint32_t), 0)) <= 0) {
-        log_print(g_log, "create_summary_response: send - %s", strerror(errno));
+        log_error(g_log, "create_summary_response: send - %s", strerror(errno));
     }
 
     END_CREATE_SUMMARY_RESP:
@@ -307,41 +307,41 @@ static void * publish_response(void * arg)
     uint8_t * data = NULL;
 
     if (recv(sock, &payload_size, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_PUBLISH_RESP;
     }
 
     if (recv(sock, &publisher, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_PUBLISH_RESP;
     }
 
     if (recv(sock, &name_len, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_PUBLISH_RESP;
     }
     if (name_len > MAX_NAME_LENGTH)
         name_len = MAX_NAME_LENGTH - 1;
 
     if (recv(sock, name, name_len, 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_PUBLISH_RESP;
     }
     name[name_len] = '\0';
 
     if (recv(sock, &timestamp, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_PUBLISH_RESP;
     }
 
     if (recv(sock, &size, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_PUBLISH_RESP;
     }
 
     data = (uint8_t *) malloc(size);
     if (recv(sock, data, size, 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         free(data);
         goto END_PUBLISH_RESP;
     }
@@ -398,19 +398,19 @@ static void * seq_publish(void * arg)
     int rv = 0;
 
     if (recv(sock, &payload_size, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         rv = -1;
         goto END_PUBLISH_RESP;
     }
 
     if (recv(sock, &publisher, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         rv = -1;
         goto END_PUBLISH_RESP;
     }
 
     if (recv(sock, &name_len, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         rv = -1;
         goto END_PUBLISH_RESP;
     }
@@ -418,27 +418,27 @@ static void * seq_publish(void * arg)
         name_len = MAX_NAME_LENGTH - 1;
 
     if (recv(sock, name, name_len, 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         rv = -1;
         goto END_PUBLISH_RESP;
     }
     name[name_len] = '\0';
 
     if (recv(sock, &timestamp, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         rv = -1;
         goto END_PUBLISH_RESP;
     }
 
     if (recv(sock, &size, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         rv = -1;
         goto END_PUBLISH_RESP;
     }
 
     data = (uint8_t *) malloc(size);
     if (recv(sock, data, size, 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         free(data);
         rv = -1;
         goto END_PUBLISH_RESP;
@@ -452,7 +452,7 @@ static void * seq_publish(void * arg)
 
     int num_chunks = 0;
     if (recv(sock, &num_chunks, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         free(data);
         rv = -1;
         goto END_PUBLISH_RESP;
@@ -462,19 +462,19 @@ static void * seq_publish(void * arg)
     int i;
     for (i = 0; i < num_chunks; i++) {
         if (recv(sock, &payload_size, sizeof(uint32_t), 0) == -1) {
-            log_print(g_log, "recv: %s.", strerror(errno));
+            log_error(g_log, "recv: %s.", strerror(errno));
             rv = -1;
             goto END_PUBLISH_RESP;
         }
 
         if (recv(sock, &publisher, sizeof(uint32_t), 0) == -1) {
-            log_print(g_log, "recv: %s.", strerror(errno));
+            log_error(g_log, "recv: %s.", strerror(errno));
             rv = -1;
             goto END_PUBLISH_RESP;
         }
 
         if (recv(sock, &name_len, sizeof(uint32_t), 0) == -1) {
-            log_print(g_log, "recv: %s.", strerror(errno));
+            log_error(g_log, "recv: %s.", strerror(errno));
             rv = -1;
             goto END_PUBLISH_RESP;
         }
@@ -482,27 +482,27 @@ static void * seq_publish(void * arg)
             name_len = MAX_NAME_LENGTH - 1;
 
         if (recv(sock, name, name_len, 0) == -1) {
-            log_print(g_log, "recv: %s.", strerror(errno));
+            log_error(g_log, "recv: %s.", strerror(errno));
             rv = -1;
             goto END_PUBLISH_RESP;
         }
         name[name_len] = '\0';
 
         if (recv(sock, &timestamp, sizeof(uint32_t), 0) == -1) {
-            log_print(g_log, "recv: %s.", strerror(errno));
+            log_error(g_log, "recv: %s.", strerror(errno));
             rv = -1;
             goto END_PUBLISH_RESP;
         }
 
         if (recv(sock, &size, sizeof(uint32_t), 0) == -1) {
-            log_print(g_log, "recv: %s.", strerror(errno));
+            log_error(g_log, "recv: %s.", strerror(errno));
             rv = -1;
             goto END_PUBLISH_RESP;
         }
 
         data = (uint8_t *) malloc(size);
         if (recv(sock, data, size, 0) == -1) {
-            log_print(g_log, "recv: %s.", strerror(errno));
+            log_error(g_log, "recv: %s.", strerror(errno));
             rv = -1;
             free(data);
             goto END_PUBLISH_RESP;
@@ -521,7 +521,7 @@ static void * seq_publish(void * arg)
     linked_list_delete(chunks);
 
     if (send(sock, &rv, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_PUBLISH_RESP;
     }
 
@@ -550,12 +550,12 @@ static void * retrieve_response(void * arg)
     struct content_obj * content = NULL;
 
     if (recv(sock, &payload_size, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_RETRIEVE_RESP;
     }
 
     if (recv(sock, &name_len, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_RETRIEVE_RESP;
     }
 
@@ -563,7 +563,7 @@ static void * retrieve_response(void * arg)
         name_len = MAX_NAME_LENGTH - 1;
 
     if (recv(sock, str, name_len, 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         goto END_RETRIEVE_RESP;
     }
     str[name_len] = '\0';
@@ -583,7 +583,7 @@ static void * retrieve_response(void * arg)
     }
 
     if (send(sock, &rv, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_RETRIEVE_RESP;
     }
 
@@ -597,32 +597,32 @@ static void * retrieve_response(void * arg)
     uint8_t * data = content->data;
 
     if (send(sock, &publisher, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_RETRIEVE_RESP;
     }
 
     if (send(sock, &name_len, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_RETRIEVE_RESP;
     }
 
     if (send(sock, content->name->full_name, name_len, 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_RETRIEVE_RESP;
     }
 
     if (send(sock, &timestamp, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_RETRIEVE_RESP;
     }
 
     if (send(sock, &size, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_RETRIEVE_RESP;
     }
 
     if (send(sock, data, size, 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_RETRIEVE_RESP;
     }
 
@@ -743,7 +743,7 @@ static int retrieve_segment(struct segment * seg)
         tx = cwnd;
         window->num_bits = cwnd;
 
-        log_print(g_log, "state = %d, cwnd = %d, ssthresh = %d rtt_est = %d", state, cwnd, ssthresh, rtt_est);
+        log_debug(g_log, "state = %d, cwnd = %d, ssthresh = %d rtt_est = %d", state, cwnd, ssthresh, rtt_est);
 
         while (tx && (current_chunk < seg->num_chunks)) {
             snprintf(comp, MAX_NAME_LENGTH - seg->name->len, "/%d", current_chunk);
@@ -764,15 +764,35 @@ static int retrieve_segment(struct segment * seg)
                 break;
             }
             pit_to_chunk[_pit_handles[i]->index] = i;
-
             pthread_mutex_unlock(_pit_handles[i]->mutex);
-            ccnfdnb_fwd_interest(&chunk_window[i].intr);
-            tx--;
+
+            struct content_obj * co = CS_get(chunk_window[i].intr.name);
+            if (!co) {
+                log_debug(g_log, "expressing new interest: %s", chunk_window[i].intr.name->full_name);
+                ccnfdnb_fwd_interest(&chunk_window[i].intr);
+                tx--;
+            } else {
+                log_debug(g_log, "retrieved %s from CS", co->name->full_name);
+
+                PENTRY pe = PIT_exact_match(chunk_window[i].intr.name);
+                *pe->obj = co;
+                pthread_mutex_unlock(pe->mutex);
+
+                pthread_mutex_lock(&seg_q.mutex);
+
+                linked_list_append(seg_q.rcv_chunks, pe);
+                seg_q.rcv_window++;
+
+                pthread_mutex_unlock(&seg_q.mutex);
+            }
+
             current_chunk++;
-            log_print(g_log, "expressing new interest: %s", chunk_window[i].intr.name->full_name);
         }
+        log_debug(g_log, "tx window full");
 
         pthread_mutex_lock(&seg_q.mutex);
+
+        if (seg_q.rcv_chunks->len == 0) {
             struct timespec wait;
             ts_fromnow(&wait);
             ts_addms(&wait, 2 * rtt_est);
@@ -784,48 +804,48 @@ static int retrieve_segment(struct segment * seg)
                 if (rtt_est > PIT_LIFETIME_MS)
                     rtt_est = PIT_LIFETIME_MS / 2;
             }
+        }
 
-            while (seg_q.rcv_chunks->len > 0) {
-                PENTRY pe = linked_list_remove(seg_q.rcv_chunks, 0);
-                if (!pe) continue;
+        while (seg_q.rcv_chunks->len > 0) {
+            PENTRY pe = linked_list_remove(seg_q.rcv_chunks, 0);
+            log_assert(g_log, pe != NULL, "invalid pit entry");
 
-                pthread_mutex_lock(pe->mutex);
+            pthread_mutex_lock(pe->mutex);
+            log_debug(g_log, "pit entry %s fulfilled", (*pe->obj)->name->full_name);
 
-                int chunk_id = pit_to_chunk[pe->index];
-                if (chunk_id < 0) {
-                    pthread_mutex_unlock(pe->mutex);
-                    continue;
-                }
+            int chunk_id = pit_to_chunk[pe->index];
+            log_assert(g_log, chunk_id >= 0, "invalid chunk id");
 
-                if (chunk_window[chunk_id].seq_no == 0) {
-                    seg->obj->publisher = (*pe->obj)->publisher;
-                    seg->obj->timestamp = (*pe->obj)->timestamp;
-                    seg->chunk_size = (*pe->obj)->size;
-                }
-                int offset = chunk_window[chunk_id].seq_no * seg->chunk_size;
-                memcpy(&seg->obj->data[offset], (*pe->obj)->data, (*pe->obj)->size);
-
-                struct timespec now;
-                ts_fromnow(&now);
-                ts_addms(&now, PIT_LIFETIME_MS);
-                rtt_est = (int)((rtt_est + ts_mselapsed(&now, pe->expires)) / 2.0);
-                if (rtt_est < min_rtt_est) {
-                    rtt_est = min_rtt_est;
-                }
-
-                pit_to_chunk[pe->index] = -1;
-                PIT_release(pe);
-                free(_pit_handles[chunk_id]);
-                _pit_handles[chunk_id] = NULL;
-                bit_clear(window, chunk_id);
-                bit_set(missing, chunk_window[chunk_id].seq_no);
-                log_print(g_log, "fulfilled interest %s", chunk_window[chunk_id].intr.name->full_name);
-                content_name_delete(chunk_window[chunk_id].intr.name);
-                chunk_window[chunk_id].intr.name = NULL;
-                cwnd++;
-                if (state == CONG_AVOID)
-                    fullfilled++;
+            if (chunk_window[chunk_id].seq_no == 0) {
+                seg->obj->publisher = (*pe->obj)->publisher;
+                seg->obj->timestamp = (*pe->obj)->timestamp;
+                seg->chunk_size = (*pe->obj)->size;
             }
+            int offset = chunk_window[chunk_id].seq_no * seg->chunk_size;
+            memcpy(&seg->obj->data[offset], (*pe->obj)->data, (*pe->obj)->size);
+
+            struct timespec now;
+            ts_fromnow(&now);
+            ts_addms(&now, PIT_LIFETIME_MS);
+            rtt_est = (int)((rtt_est + ts_mselapsed(&now, pe->expires)) / 2.0);
+            if (rtt_est < min_rtt_est) {
+                rtt_est = min_rtt_est;
+            }
+
+            pit_to_chunk[pe->index] = -1;
+            PIT_release(pe);
+            free(_pit_handles[chunk_id]);
+            _pit_handles[chunk_id] = NULL;
+            bit_clear(window, chunk_id);
+            bit_set(missing, chunk_window[chunk_id].seq_no);
+            log_debug(g_log, "retrieved chunk %s", chunk_window[chunk_id].intr.name->full_name);
+            content_name_delete(chunk_window[chunk_id].intr.name);
+            chunk_window[chunk_id].intr.name = NULL;
+            cwnd++;
+            if (state == CONG_AVOID)
+                fullfilled++;
+        }
+
         pthread_mutex_unlock(&seg_q.mutex);
 
         for (i = 0; i < MAX_INTEREST_PIPELINE; i++) {
@@ -838,7 +858,7 @@ static int retrieve_segment(struct segment * seg)
                     PIT_refresh(_pit_handles[i]);
                     chunk_window[i].retries--;
                     ccnfdnb_fwd_interest(&chunk_window[i].intr);
-                    log_print(g_log, "rtx interest: %s", chunk_window[i].intr.name->full_name);
+                    log_debug(g_log, "rtx interest: %s", chunk_window[i].intr.name->full_name);
                     ssthresh = cwnd / 2 + 1;
                     cwnd = 1;
                     state = SLOW_START;
@@ -858,10 +878,10 @@ static int retrieve_segment(struct segment * seg)
         if (cwnd > MAX_INTEREST_PIPELINE)
             cwnd = MAX_INTEREST_PIPELINE;
 
-        /*log_print(g_log, "cwnd = %d, ssthresh = %d", cwnd, ssthresh);*/
+        /*log_debug(g_log, "cwnd = %d, ssthresh = %d", cwnd, ssthresh);*/
     }
 
-    log_print(g_log, "retrieve_segment: finished for %s[%d-%d]",
+    log_debug(g_log, "retrieve_segment: finished for %s[%d-%d]",
               seg->name->full_name, 0, seg->num_chunks-1);
 
     rv = 0;
@@ -899,13 +919,13 @@ static void * seq_response(void * arg)
     struct segment seg;
 
     if (recv(sock, &payload_size, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         send(sock, &rv, sizeof(uint32_t), 0);
         goto END_SEQ_RESP;
     }
 
     if (recv(sock, &name_len, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         send(sock, &rv, sizeof(uint32_t), 0);
         goto END_SEQ_RESP;
     }
@@ -914,31 +934,33 @@ static void * seq_response(void * arg)
         name_len = MAX_NAME_LENGTH - 1;
 
     if (recv(sock, str, name_len, 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         send(sock, &rv, sizeof(uint32_t), 0);
         goto END_SEQ_RESP;
     }
     str[name_len] = '\0';
 
     if (recv(sock, &chunks, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         send(sock, &rv, sizeof(uint32_t), 0);
         goto END_SEQ_RESP;
     }
 
     if (recv(sock, &file_len, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "recv: %s.", strerror(errno));
+        log_error(g_log, "recv: %s.", strerror(errno));
         send(sock, &rv, sizeof(uint32_t), 0);
         goto END_SEQ_RESP;
     }
 
     name = content_name_create(str);
 
+    /*
     if ((seg.obj = CS_getSegment(name)) != NULL) {
-        log_print(g_log, "seq_response: found segment %s in CS", name->full_name);
+        log_error(g_log, "seq_response: found segment %s in CS", name->full_name);
         rv = 0;
         goto RETURN_CONTENT;
     }
+    */
 
     log_print(g_log, "seq_response: retrieving %d chunks with base: %s",
               chunks, name->full_name);
@@ -952,7 +974,7 @@ static void * seq_response(void * arg)
      */
     snprintf(str, MAX_NAME_LENGTH - name->len - 1, "%d", chunks);
     if (content_name_appendComponent(name, str) != 0) {
-        log_print(g_log, "could not append component to name (too long?)");
+        log_error(g_log, "could not append component to name (too long?)");
         send(sock, &rv, sizeof(uint32_t), 0);
         goto END_SEQ_RESP;
     }
@@ -972,47 +994,46 @@ static void * seq_response(void * arg)
     seg.obj->name = name;
     seg.obj->data = malloc(file_len);
     if (!seg.obj->data) {
-        log_print(g_log, "retrieve_segment: failed to allocated %d bytes!", file_len);
+        log_error(g_log, "retrieve_segment: failed to allocated %d bytes!", file_len);
         send(sock, &rv, sizeof(uint32_t), 0);
         goto END_SEQ_RESP;
     }
     seg.obj->size = file_len;
 
     if ((rv = retrieve_segment(&seg)) < 0) {
-        log_print(g_log, "retrieve_segment: failed to get %s!", name->full_name);
+        log_error(g_log, "retrieve_segment: failed to get %s!", name->full_name);
         send(sock, &rv, sizeof(uint32_t), 0);
         goto END_SEQ_RESP;
     }
 
     /* return the content */
-    RETURN_CONTENT:
     if (send(sock, &rv, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_SEQ_RESP;
     }
 
     if (send(sock, &seg.obj->publisher, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_SEQ_RESP;
     }
 
     if (send(sock, &name->len, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_SEQ_RESP;
     }
 
     if (send(sock, name->full_name, name_len, 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_SEQ_RESP;
     }
 
     if (send(sock, &seg.obj->timestamp, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_SEQ_RESP;
     }
 
     if (send(sock, &seg.obj->size, sizeof(uint32_t), 0) == -1) {
-        log_print(g_log, "send: %s.", strerror(errno));
+        log_error(g_log, "send: %s.", strerror(errno));
         goto END_SEQ_RESP;
     }
 
@@ -1021,18 +1042,18 @@ static void * seq_response(void * arg)
     int n = -1;
 
     while (total < seg.obj->size) {
-        log_print(g_log, "total = %d", total);
+        log_debug(g_log, "total = %d", total);
         n = send(sock, seg.obj->data+total, left, 0);
         if (n == -1) break;
         total += n;
         left -= n;
-        log_print(g_log, "seq_response: sent %d bytes, %d bytes to go", n, left);
+        log_debug(g_log, "seq_response: sent %d bytes, %d bytes to go", n, left);
     }
 
     if (n == -1 || left != 0 || total != seg.obj->size) {
-        log_print(g_log, "encountered error, sending segment, sent %d bytes!", total);
+        log_error(g_log, "encountered error, sending segment, sent %d bytes!", total);
     } else {
-        log_print(g_log, "seq_response: returned %d bytes", total);
+        log_debug(g_log, "seq_response: returned %d bytes", total);
     }
 
     content_obj_destroy(seg.obj);

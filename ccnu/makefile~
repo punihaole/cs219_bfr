@@ -34,10 +34,10 @@ $(OBJ)/ccnud.o: $(SRC)/ccnud.c $(OBJ)/ccnud_listener.o $(OBJ)/ccnud_net_broadcas
 $(OBJ)/ccnud_listener.o: $(SRC)/ccnud_listener.c $(OBJ)/ccnud_cs.o $(OBJ)/ccnud_net_broadcaster.o
 	$(CC) $(CFLAGS) -c $(SRC)/ccnud_listener.c -o $(OBJ)/ccnud_listener.o
 
-$(OBJ)/ccnud_net_broadcaster.o: $(SRC)/ccnud_net_broadcaster.c $(OBJ)/ccnud_pit.o
+$(OBJ)/ccnud_net_broadcaster.o: $(SRC)/ccnud_net_broadcaster.c $(OBJ)/ccnud_pit.o $(OBJ)/ccnud_stats.o
 	$(CC) $(CFLAGS) -c $(SRC)/ccnud_net_broadcaster.c -o $(OBJ)/ccnud_net_broadcaster.o
 
-$(OBJ)/ccnud_net_listener.o: $(SRC)/ccnud_net_listener.c $(OBJ)/ccnud_pit.o $(OBJ)/ccnu.o $(OBJ)/ccnud_net_broadcaster.o $(OBJ)/ccnud_cs.o $(OBJ)/ccnud_pit.o
+$(OBJ)/ccnud_net_listener.o: $(SRC)/ccnud_net_listener.c $(OBJ)/ccnud_pit.o $(OBJ)/ccnu.o $(OBJ)/ccnud_net_broadcaster.o $(OBJ)/ccnud_cs.o $(OBJ)/ccnud_pit.o $(OBJ)/ccnud_stats.o
 	$(CC) $(CFLAGS) -c $(SRC)/ccnud_net_listener.c -o $(OBJ)/ccnud_net_listener.o
 
 $(OBJ)/ccnud_cs.o: $(SRC)/ccnud_cs.c

@@ -36,10 +36,6 @@ struct ccnfd_net_s {
     struct linked_list * segments;
 };
 
-extern int sockfd[MAX_INTERFACES];
-extern struct sockaddr_ll eth_addr[MAX_INTERFACES];
-extern int faces;
-
 struct ccnfd_net_s _net;
 
 static void * handle_interest(struct ccnf_interest_pkt * interest);
@@ -123,7 +119,7 @@ int ccnfdnl_init(int pipeline_size)
     */
 
     if (tpool_create(&_net.packet_pipeline, pipeline_size) < 0) {
-        log_print(g_log, "tpool_create: could not create interest thread pool!");
+        log_critical(g_log, "tpool_create: could not create interest thread pool!");
         return -1;
     }
 
@@ -162,13 +158,13 @@ void * ccnfdnl_service(void * arg)
         struct ether_header eh;
         net_buffer_copyFrom(&buf, &eh, sizeof(eh));
 
-        /*log_print(g_log, "ccnfdnl_service: rcvd %d bytes from %02x:%02x:%02x:%02x:%02x:%02x",
+        log_debug(g_log, "ccnfdnl_service: rcvd %d bytes from %02x:%02x:%02x:%02x:%02x:%02x",
                   rcvd,
                   eh.ether_shost[0], eh.ether_shost[1], eh.ether_shost[2],
                   eh.ether_shost[3], eh.ether_shost[4], eh.ether_shost[5]);
-        */
+
         if (rcvd <= 0) {
-            log_print(g_log, "ccnfdnl_service: recv failed -- trying to stay alive!");
+            log_error(g_log, "ccnfdnl_service: recv failed -- trying to stay alive!");
             sleep(1);
             continue;
         }
@@ -186,7 +182,7 @@ void * ccnfdnl_service(void * arg)
             str[name_len] = '\0';
             interest->name = content_name_create(str);
             tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_interest,
-                          interest, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
+                          interest, TPOOL_FREE_ARG | TPOOL_NO_RV, (delete_t)interest_destroy, NULL);
         } else if (type == PACKET_TYPE_DATA) {
             struct ccnf_data_pkt * data = malloc(sizeof(struct ccnf_data_pkt));
             data->hops = net_buffer_getByte(&buf);
@@ -208,7 +204,7 @@ void * ccnfdnl_service(void * arg)
                               data, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
             }
         } else {
-            log_print(g_log, "ccnfdnl_service: recvd unknown msg type - %u", type);
+            log_warn(g_log, "ccnfdnl_service: recvd unknown msg type - %u", type);
             sleep(1);
         }
 	}
@@ -247,10 +243,8 @@ static void * handle_interest(struct ccnf_interest_pkt * interest)
     prctl(PR_SET_NAME, proc, 0, 0, 0);
 
 	ccnfstat_rcvd_interest(interest);
-    /*log_print(g_log, "handle_interest: %s, ttl = %d",
+    log_debug(g_log, "handle_interest: %s, ttl = %d",
               interest->name->full_name, interest->ttl);
-    */
-    /* check the CS for data to match interest */
 
     PENTRY pe = PIT_exact_match(interest->name);
     if (pe) {
@@ -259,9 +253,9 @@ static void * handle_interest(struct ccnf_interest_pkt * interest)
         pthread_mutex_lock(&g_lock);
         int timeout = g_timeout_ms;
         pthread_mutex_unlock(&g_lock);
+
         if (PIT_age(pe) >= timeout) {
-            log_print(g_log, "handle_interest: %s refreshing.",
-                      interest->name->full_name);
+            log_debug(g_log, "handle_interest: %s refreshing.", interest->name->full_name);
             ccnfdnb_fwd_interest(interest);
         }
         PIT_refresh(pe);
@@ -275,23 +269,22 @@ static void * handle_interest(struct ccnf_interest_pkt * interest)
 
         if (content) {
 
-            log_print(g_log, "handle_interest: %s (responded)", interest->name->full_name);
+            log_debug(g_log, "handle_interest: %s (responded)", interest->name->full_name);
             ccnfdnb_fwd_data(content, 1);
+            content_obj_destroy(content);
 
         } else {
 
             ccnfdnb_fwd_interest(interest);
-            log_print(g_log, "handle_interest: %s forwarding.",
-                      interest->name->full_name);
+            log_debug(g_log, "handle_interest: %s (forwarding)", interest->name->full_name);
 
             /* we fwded the interest, add it to the pit */
             PIT_add_entry(interest->name);
 
         }
-
     }
 
-    //log_print(g_log, "handle_interest: done");
+    log_debug(g_log, "handle_interest: done");
 
     return NULL;
 }
@@ -302,29 +295,28 @@ static void * handle_data(struct ccnf_data_pkt * data)
     snprintf(proc, 256, "hd%u", g_nodeId);
     prctl(PR_SET_NAME, proc, 0, 0, 0);
 
-    /*log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
+    log_debug(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
               data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);
-    */
-    struct content_obj * obj;
-    obj = (struct content_obj *) malloc(sizeof(struct content_obj));
-
-    obj->publisher = data->publisher_id;
-    obj->name = data->name;
-    obj->timestamp = data->timestamp;
-    obj->size = data->payload_len;
-    obj->data = data->payload;
 
     /* check if it fulfills a registered interest */
-    PENTRY pe = PIT_exact_match(obj->name);
+    PENTRY pe = PIT_exact_match(data->name);
     if (!pe) {
-        log_print(g_log, "%s unsolicited data", obj->name->full_name);
+        log_debug(g_log, "%s unsolicited data", data->name->full_name);
         /* unsolicited data */
 		ccnfstat_rcvd_data_unsolicited(data);
+		free(data->payload);
     } else {
+        struct content_obj * obj;
+        obj = (struct content_obj *) malloc(sizeof(struct content_obj));
+
+        obj->publisher = data->publisher_id;
+        obj->name = data->name;
+        obj->timestamp = data->timestamp;
+        obj->size = data->payload_len;
+        obj->data = data->payload;
+
 		ccnfstat_rcvd_data(data);
-		log_print(g_log, "PUTTING");
         CS_put(obj);
-        log_print(g_log, "PUT");
         if (!*pe->obj) {
             *pe->obj = obj; /* hand them the data and wake them up*/
         }
@@ -340,27 +332,28 @@ static void * handle_data(struct ccnf_data_pkt * data)
                 linked_list_append(seg->rcv_chunks, pe);
                 seg->rcv_window++;
                 if (seg->rcv_window >= *seg->max_window) {
-                    log_print(g_log, "%s filled the window, notifiying expresser thread", obj->name->full_name);
+                    log_debug(g_log, "%s filled the window, notifiying expresser thread", obj->name->full_name);
                     seg->rcv_window = 0;
                     pthread_cond_signal(&seg->cond);
                 }
                 pthread_mutex_unlock(&seg->mutex);
             } else {
-                log_print(g_log, "%s is a chunk, notifiying expresser thread", obj->name->full_name);
+                log_debug(g_log, "%s is a chunk, notifiying expresser thread", obj->name->full_name);
                 pthread_cond_signal(pe->cond);
                 pthread_mutex_unlock(pe->mutex);
                 free(pe);
             }
 
         } else {
-            log_print(g_log, "%s fulfilling PIT, fwding data", obj->name->full_name);
+            log_debug(g_log, "%s fulfilling PIT, fwding data", obj->name->full_name);
             /* we matched an interest rcvd over the net */
             ccnfdnb_fwd_data(obj, data->hops + 1);
             PIT_release(pe); /* release will unlock the lock */
+			content_obj_destroy(obj);
         }
     }
 
-    //log_print(g_log, "handle_data: done");
+    log_debug(g_log, "handle_data: done");
 
     return NULL;
 }

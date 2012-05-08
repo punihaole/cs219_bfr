@@ -2,15 +2,25 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <sys/prctl.h>
-#include <sys/time.h>
+#include <pthread.h>
+#include <fcntl.h>
+#include <math.h>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <netinet/in.h>
-#include <math.h>
+#include <sys/time.h>
+#include <sys/ioctl.h>
+#include <sys/prctl.h>
+
+#include <arpa/inet.h>
+#include <net/if.h>
+#include <netinet/ip.h>
+#include <netinet/udp.h>
+#include <netinet/ether.h>
+#include <linux/if_packet.h>
+#include <ifaddrs.h>
 
 #include "cluster.h"
 #include "bfr.h"
@@ -86,6 +96,8 @@ struct linked_list * pending_joins;
 pthread_mutex_t matching_responses_lock;
 struct linked_list * matching_responses;
 
+static struct ether_header eh[MAX_INTERFACES];
+
 static struct strategy _strategy;
 
 static int cluster(unsigned level);
@@ -149,6 +161,59 @@ int strategy_init(unsigned num_levels, int bloom_interval_ms, int cluster_interv
 
     pthread_mutex_init(&_strategy.nonce_lock, NULL);
     _strategy.seen_nonces = bit_create(65535);
+
+    g_faces = 0;
+    struct ifaddrs * ifa, * p;
+
+    if (getifaddrs(&ifa) != 0) {
+        log_critical(g_log, "net_init: getifaddrs: %s", strerror(errno));
+        return -1;
+    }
+
+    int family;
+    for (p = ifa; p != NULL; p = p->ifa_next) {
+        family = p->ifa_addr->sa_family;
+        if ((p == NULL) || (p->ifa_addr == NULL)) continue;
+        if (family != AF_PACKET) continue;
+        if (strcmp(p->ifa_name, "lo") == 0) continue;
+
+        struct ifreq if_mac;
+        memset(&if_mac, 0, sizeof(struct ifreq));
+        strncpy(if_mac.ifr_name, p->ifa_name, IFNAMSIZ-1);
+        if (ioctl(g_sockfd, SIOCGIFHWADDR, &if_mac) < 0) {
+            log_critical(g_log, "net_init: ioctl: %s", strerror(errno));
+            return -1;
+        }
+
+        /* dest: broadcast MAC addr
+         * src: my NIC
+         */
+        memset(&eh[g_faces], 0, sizeof(struct ether_header));
+        eh[g_faces].ether_shost[0] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[0];
+        eh[g_faces].ether_shost[1] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[1];
+        eh[g_faces].ether_shost[2] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[2];
+        eh[g_faces].ether_shost[3] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[3];
+        eh[g_faces].ether_shost[4] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[4];
+        eh[g_faces].ether_shost[5] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[5];
+        eh[g_faces].ether_dhost[0] = 0xff;
+        eh[g_faces].ether_dhost[1] = 0xff;
+        eh[g_faces].ether_dhost[2] = 0xff;
+        eh[g_faces].ether_dhost[3] = 0xff;
+        eh[g_faces].ether_dhost[4] = 0xff;
+        eh[g_faces].ether_dhost[5] = 0xff;
+        eh[g_faces].ether_type = htons(BFR_ETHER_PROTO);
+
+        memset(&g_eth_addr[g_faces], 0, sizeof(struct sockaddr_ll));
+        g_eth_addr[g_faces].sll_ifindex = if_nametoindex(p->ifa_name);
+        g_eth_addr[g_faces].sll_halen = ETH_ALEN;
+        g_eth_addr[g_faces].sll_addr[0] = 0xff;
+        g_eth_addr[g_faces].sll_addr[1] = 0xff;
+        g_eth_addr[g_faces].sll_addr[2] = 0xff;
+        g_eth_addr[g_faces].sll_addr[3] = 0xff;
+        g_eth_addr[g_faces].sll_addr[4] = 0xff;
+        g_eth_addr[g_faces].sll_addr[5] = 0xff;
+        g_faces++;
+    }
 
     return 0;
 }
@@ -781,23 +846,36 @@ static int broadcast_bloom_msg(struct bloom_msg * msg)
 
     struct net_buffer buf;
     net_buffer_init(BFR_MAX_PACKET_SIZE, &buf);
-    /* pack the header */
-    int rv = 0;
-    net_buffer_putByte(&buf, MSG_NET_BLOOMFILTER_UPDATE);
-    net_buffer_putInt(&buf, g_bfr.nodeId);
-    net_buffer_putInt(&buf, size);
-    /*pack the payload (bloom filter msg) */
-    net_buffer_putShort(&buf, msg->nonce);
-    net_buffer_putByte(&buf, msg->origin_level);
-    net_buffer_putShort(&buf, msg->origin_clusterId);
-    net_buffer_putByte(&buf, msg->dest_level);
-    net_buffer_putShort(&buf, msg->dest_clusterId);
-    net_buffer_putLong(&buf, msg->lastHopDistance);
-    net_buffer_putShort(&buf, msg->vector_bits);
-    net_buffer_copyTo(&buf, msg->vector, vec_size);
 
-    if ((rv = net_buffer_send(&buf, g_bfr.sock, &g_bfr.bcast_addr)) < 0) {
-        //log_print(g_log, "broadcast_bloom_msg: net_buffer_send failed!");
+    int i;
+    int rv = 0;
+    for (i = 0; i < g_faces; i++) {
+        net_buffer_reset(&buf);
+        /* ether header */
+        net_buffer_copyTo(&buf, &eh[i], sizeof(struct ether_header));
+
+        /* pack the header */
+        net_buffer_putByte(&buf, MSG_NET_BLOOMFILTER_UPDATE);
+        net_buffer_putInt(&buf, g_bfr.nodeId);
+        net_buffer_putInt(&buf, size);
+        /*pack the payload (bloom filter msg) */
+        net_buffer_putShort(&buf, msg->nonce);
+        net_buffer_putByte(&buf, msg->origin_level);
+        net_buffer_putShort(&buf, msg->origin_clusterId);
+        net_buffer_putByte(&buf, msg->dest_level);
+        net_buffer_putShort(&buf, msg->dest_clusterId);
+        net_buffer_putLong(&buf, msg->lastHopDistance);
+        net_buffer_putShort(&buf, msg->vector_bits);
+        net_buffer_copyTo(&buf, msg->vector, vec_size);
+
+        int n = buf.buf_ptr - buf.buf;
+        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
+        if (sent == -1) {
+            log_error(g_log, "broadcast_bloom_msg: sendto(%d): %s", i, strerror(errno));
+            rv = -1;
+        } else if (sent != n) {
+            log_warn(g_log, "broadcast_bloom_msg: warning sent %d bytes, expected %d!", sent, n);
+        }
     }
 
     free(buf.buf);
@@ -815,21 +893,34 @@ static int broadcast_join_msg(struct cluster_join_msg * msg)
     bfrstat_sent_join(msg);
 
     int size = CLUSTER_JOIN_MSG_SIZE;
+
     struct net_buffer buf;
     net_buffer_init(size + HDR_SIZE, &buf);
 
-    /* header */
-    net_buffer_putByte(&buf, MSG_NET_CLUSTER_JOIN);
-    net_buffer_putInt(&buf, g_bfr.nodeId);
-    net_buffer_putInt(&buf, size);
+    int i;
+    int rv = 0;
+    for (i = 0; i < g_faces; i++) {
+        net_buffer_reset(&buf);
+        /* ether header */
+        net_buffer_copyTo(&buf, &eh[i], sizeof(struct ether_header));
 
-    /* payload */
-    net_buffer_putByte(&buf, msg->cluster_level);
-    net_buffer_putShort(&buf, msg->cluster_id);
+        /* header */
+        net_buffer_putByte(&buf, MSG_NET_CLUSTER_JOIN);
+        net_buffer_putInt(&buf, g_bfr.nodeId);
+        net_buffer_putInt(&buf, size);
 
-    int rv;
-    if ((rv = net_buffer_send(&buf, g_bfr.sock, &g_bfr.bcast_addr)) < 0) {
-        //log_print(g_log, "broadcast_join_msg: net_buffer_send failed!");
+        /* payload */
+        net_buffer_putByte(&buf, msg->cluster_level);
+        net_buffer_putShort(&buf, msg->cluster_id);
+
+        int n = buf.buf_ptr - buf.buf;
+        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
+        if (sent == -1) {
+            log_error(g_log, "ccnudnb_fwd_data: sendto(%d): %s", i, strerror(errno));
+            rv = -1;
+        } else if (sent != n) {
+            log_warn(g_log, "ccnudnb_fwd_data: warning sent %d bytes, expected %d!", sent, n);
+        }
     }
 
     free(buf.buf);
@@ -850,19 +941,31 @@ static int broadcast_cluster_msg(struct cluster_msg * msg)
     struct net_buffer buf;
     net_buffer_init(size + HDR_SIZE, &buf);
 
-    /* header */
-    net_buffer_putByte(&buf, MSG_NET_CLUSTER_RESPONSE);
-    net_buffer_putInt(&buf, g_bfr.nodeId);
-    net_buffer_putInt(&buf, size);
-    /* payload */
-    net_buffer_putByte(&buf, msg->cluster_level);
-    net_buffer_putShort(&buf, msg->cluster_id);
-    net_buffer_putInt(&buf, msg->cluster_head);
-    net_buffer_putByte(&buf, msg->hops);
+    int i;
+    int rv = 0;
+    for (i = 0; i < g_faces; i++) {
+        net_buffer_reset(&buf);
+        /* ether header */
+        net_buffer_copyTo(&buf, &eh[i], sizeof(struct ether_header));
 
-    int rv;
-    if ((rv = net_buffer_send(&buf, g_bfr.sock, &g_bfr.bcast_addr)) < 0) {
-        //log_print(g_log, "broadcast_cluster_msg: net_buffer_send failed!");
+        /* header */
+        net_buffer_putByte(&buf, MSG_NET_CLUSTER_RESPONSE);
+        net_buffer_putInt(&buf, g_bfr.nodeId);
+        net_buffer_putInt(&buf, size);
+        /* payload */
+        net_buffer_putByte(&buf, msg->cluster_level);
+        net_buffer_putShort(&buf, msg->cluster_id);
+        net_buffer_putInt(&buf, msg->cluster_head);
+        net_buffer_putByte(&buf, msg->hops);
+
+        int n = buf.buf_ptr - buf.buf;
+        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
+        if (sent == -1) {
+            log_error(g_log, "ccnudnb_fwd_data: sendto(%d): %s", i, strerror(errno));
+            rv = -1;
+        } else if (sent != n) {
+            log_warn(g_log, "ccnudnb_fwd_data: warning sent %d bytes, expected %d!", sent, n);
+        }
     }
 
     free(buf.buf);
@@ -881,20 +984,32 @@ static int broadcast_pill_msg(struct sleeping_pill_msg * msg)
     struct net_buffer buf;
     net_buffer_init(size + HDR_SIZE, &buf);
 
-    /* header */
-    net_buffer_putByte(&buf, SLEEPING_PILL_MSG_SIZE);
-    net_buffer_putInt(&buf, g_bfr.nodeId);
-    net_buffer_putInt(&buf, size);
+    int i;
+    int rv = 0;
+    for (i = 0; i < g_faces; i++) {
+        net_buffer_reset(&buf);
+        /* ether header */
+        net_buffer_copyTo(&buf, &eh[i], sizeof(struct ether_header));
 
-    /* payload */
-    net_buffer_putByte(&buf, msg->level);
-    net_buffer_putShort(&buf, msg->clusterId);
-    net_buffer_putInt(&buf, msg->clusterHead);
-    net_buffer_putByte(&buf, msg->hopCount);
+        /* header */
+        net_buffer_putByte(&buf, SLEEPING_PILL_MSG_SIZE);
+        net_buffer_putInt(&buf, g_bfr.nodeId);
+        net_buffer_putInt(&buf, size);
 
-    int rv;
-    if ((rv = net_buffer_send(&buf, g_bfr.sock, &g_bfr.bcast_addr)) < 0) {
-        //log_print(g_log, "broadcast_cluster_msg: net_buffer_send failed!");
+        /* payload */
+        net_buffer_putByte(&buf, msg->level);
+        net_buffer_putShort(&buf, msg->clusterId);
+        net_buffer_putInt(&buf, msg->clusterHead);
+        net_buffer_putByte(&buf, msg->hopCount);
+
+        int n = buf.buf_ptr - buf.buf;
+        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
+        if (sent == -1) {
+            log_error(g_log, "ccnudnb_fwd_data: sendto(%d): %s", i, strerror(errno));
+            rv = 0;
+        } else if (sent != n) {
+            log_warn(g_log, "ccnudnb_fwd_data: warning sent %d bytes, expected %d!", sent, n);
+        }
     }
 
     free(buf.buf);

@@ -4,12 +4,21 @@
 #include <errno.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <fcntl.h>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/time.h>
-#include <netinet/in.h>
-#include <fcntl.h>
+#include <sys/ioctl.h>
+
+#include <arpa/inet.h>
+#include <net/if.h>
+#include <netinet/ip.h>
+#include <netinet/udp.h>
+#include <netinet/ether.h>
+#include <linux/if_packet.h>
+#include <ifaddrs.h>
 
 #include "ccnud_net_broadcaster.h"
 
@@ -28,13 +37,63 @@
 #include "ts.h"
 
 extern struct log * g_log;
-static int _bcast_sock;
-static struct sockaddr_in _addr;
+static struct ether_header eh[MAX_INTERFACES];
 
 int ccnudnb_init()
 {
-    _bcast_sock = broadcast_socket();
-    broadcast_addr(&_addr, LISTEN_PORT);
+    g_faces = 0;
+    struct ifaddrs * ifa, * p;
+
+    if (getifaddrs(&ifa) != 0) {
+        log_critical(g_log, "net_init: getifaddrs: %s", strerror(errno));
+        return -1;
+    }
+
+    int family;
+    for (p = ifa; p != NULL; p = p->ifa_next) {
+        family = p->ifa_addr->sa_family;
+        if ((p == NULL) || (p->ifa_addr == NULL)) continue;
+        if (family != AF_PACKET) continue;
+        if (strcmp(p->ifa_name, "lo") == 0) continue;
+
+        struct ifreq if_mac;
+        memset(&if_mac, 0, sizeof(struct ifreq));
+        strncpy(if_mac.ifr_name, p->ifa_name, IFNAMSIZ-1);
+        if (ioctl(g_sockfd, SIOCGIFHWADDR, &if_mac) < 0) {
+            log_critical(g_log, "net_init: ioctl: %s", strerror(errno));
+            return -1;
+        }
+
+        /* dest: broadcast MAC addr
+         * src: my NIC
+         */
+        memset(&eh[g_faces], 0, sizeof(struct ether_header));
+        eh[g_faces].ether_shost[0] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[0];
+        eh[g_faces].ether_shost[1] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[1];
+        eh[g_faces].ether_shost[2] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[2];
+        eh[g_faces].ether_shost[3] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[3];
+        eh[g_faces].ether_shost[4] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[4];
+        eh[g_faces].ether_shost[5] = ((uint8_t *)&if_mac.ifr_hwaddr.sa_data)[5];
+        eh[g_faces].ether_dhost[0] = 0xff;
+        eh[g_faces].ether_dhost[1] = 0xff;
+        eh[g_faces].ether_dhost[2] = 0xff;
+        eh[g_faces].ether_dhost[3] = 0xff;
+        eh[g_faces].ether_dhost[4] = 0xff;
+        eh[g_faces].ether_dhost[5] = 0xff;
+        eh[g_faces].ether_type = htons(CCNU_ETHER_PROTO);
+
+        memset(&g_eth_addr[g_faces], 0, sizeof(struct sockaddr_ll));
+        g_eth_addr[g_faces].sll_ifindex = if_nametoindex(p->ifa_name);
+        g_eth_addr[g_faces].sll_halen = ETH_ALEN;
+        g_eth_addr[g_faces].sll_addr[0] = 0xff;
+        g_eth_addr[g_faces].sll_addr[1] = 0xff;
+        g_eth_addr[g_faces].sll_addr[2] = 0xff;
+        g_eth_addr[g_faces].sll_addr[3] = 0xff;
+        g_eth_addr[g_faces].sll_addr[4] = 0xff;
+        g_eth_addr[g_faces].sll_addr[5] = 0xff;
+        g_faces++;
+    }
+
     return 0;
 }
 
@@ -58,7 +117,7 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
     pthread_mutex_unlock(&g_lock);
     int ttl = MAX_TTL;
     int qry = 1;
-    PENTRY pe = PIT_INVALID;
+    PENTRY pe = NULL;
 
     if (use_opt) {
         if ((opt->mode & CCNUDNB_USE_ROUTE) == CCNUDNB_USE_ROUTE) {
@@ -106,14 +165,8 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
      * arrives.
      */
     pe = PIT_get_handle(name);
-    if (pe < 0) {
+    if (!pe) {
         log_print(g_log, "ccnudnb_express_interest: failed to create pit entry");
-        goto CLEANUP;
-    }
-    struct content_obj ** data = NULL;
-    if (PIT_point_data(pe, &data) < 0) {
-        PIT_close(pe);
-        log_print(g_log, "ccnudnb_express_interest: failed to get data ptr");
         goto CLEANUP;
     }
 
@@ -131,34 +184,32 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
         interest.nonce = ccnudnb_gen_nonce();
         ccnudnb_fwd_interest(&interest);
         /* now that we registered and sent the interest we wait */
-        while (!*data) {
+        while (!*pe->obj) {
             ts_fromnow(&ts);
             ts_addms(&ts, timeout_ms);
-            rv = PIT_wait(pe, &ts);
+            rv = pthread_cond_timedwait(pe->cond, pe->mutex, &ts);
 
-            if (rv == ETIMEDOUT) {
+            if (rv == ETIMEDOUT || *pe->obj) {
                 break;
             }
-            if (*data) {
-                /* exit the invariant check loop, timed out or rcvd data */
-                goto END;
-            }
         }
+
+        if (*pe->obj) break;
+
     }
 
-    END:
     rv = 0;
-    if (!*data) {
+    if (!*pe->obj) {
         log_print(g_log, "ccnudnb_express_interest: rtx interest %d times with no data.",i);
         rv = -1;
         goto CLEANUP;
     } else {
         log_print(g_log, "ccnudnb_express_interest: rcvd data %s", name->full_name);
-        *content_ptr = *data;
+        *content_ptr = *pe->obj;
     }
 
     CLEANUP:
-    if (pe >= 0) {
+    if (pe) {
         PIT_release(pe); /* will unlock our mutex */
     }
 
@@ -193,23 +244,37 @@ int ccnudnb_fwd_interest(struct ccnu_interest_pkt * interest)
 
     struct net_buffer buf;
     net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
-    net_buffer_putByte(&buf, PACKET_TYPE_INTEREST);
-    net_buffer_putShort(&buf, interest->nonce);
-    net_buffer_putByte(&buf, interest->ttl);
-    net_buffer_putByte(&buf, interest->orig_level);
-    net_buffer_putShort(&buf, interest->orig_clusterId);
-    net_buffer_putByte(&buf, interest->dest_level);
-    net_buffer_putShort(&buf, interest->dest_clusterId);
-    net_buffer_putLong(&buf, interest->distance);
-    net_buffer_putInt(&buf, interest->name->len);
-    net_buffer_copyTo(&buf, interest->name->full_name, interest->name->len);
-
     ccnustat_sent_interest(interest);
-    int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
+
+    int i;
+    for (i = 0; i < g_faces; i++) {
+        net_buffer_reset(&buf);
+        /* ether header */
+        net_buffer_copyTo(&buf, &eh[i], sizeof(struct ether_header));
+
+        net_buffer_putByte(&buf, PACKET_TYPE_INTEREST);
+        net_buffer_putShort(&buf, interest->nonce);
+        net_buffer_putByte(&buf, interest->ttl);
+        net_buffer_putByte(&buf, interest->orig_level);
+        net_buffer_putShort(&buf, interest->orig_clusterId);
+        net_buffer_putByte(&buf, interest->dest_level);
+        net_buffer_putShort(&buf, interest->dest_clusterId);
+        net_buffer_putLong(&buf, interest->distance);
+        net_buffer_putInt(&buf, interest->name->len);
+        net_buffer_copyTo(&buf, interest->name->full_name, interest->name->len);
+
+        int n = buf.buf_ptr - buf.buf;
+        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *) &g_eth_addr[i], sizeof(g_eth_addr[i]));
+        if (sent == -1) {
+            log_error(g_log, "ccnudnb_fwd_interest: sendto(%d): %s", i, strerror(errno));
+        } else if (sent != n) {
+            log_warn(g_log, "ccnudnb_fwd_interest: warning sent %d bytes, expected %d!", sent, n);
+        }
+    }
 
     free(buf.buf);
 
-    return rv;
+    return 0;
 }
 
 int ccnudnb_fwd_data(struct content_obj * content, int hops_taken)
@@ -220,19 +285,33 @@ int ccnudnb_fwd_data(struct content_obj * content, int hops_taken)
     struct net_buffer buf;
     net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
 
-    net_buffer_putByte(&buf, PACKET_TYPE_DATA);
-    net_buffer_putByte(&buf, hops_taken);
-    net_buffer_putInt(&buf, content->publisher);
-    net_buffer_putInt(&buf, content->name->len);
-    net_buffer_copyTo(&buf, content->name->full_name, content->name->len);
-    net_buffer_putInt(&buf, content->timestamp);
-    net_buffer_putInt(&buf, content->size);
-    net_buffer_copyTo(&buf, content->data, content->size);
+    ccnustat_sent_data(content);
 
-	ccnustat_sent_data(content);
-    int rv = net_buffer_send(&buf, _bcast_sock, &_addr);
+    int i;
+    for (i = 0; i < g_faces; i++) {
+        net_buffer_reset(&buf);
+        /* ether header */
+        net_buffer_copyTo(&buf, &eh[i], sizeof(struct ether_header));
+
+        net_buffer_putByte(&buf, PACKET_TYPE_DATA);
+        net_buffer_putByte(&buf, hops_taken);
+        net_buffer_putInt(&buf, content->publisher);
+        net_buffer_putInt(&buf, content->name->len);
+        net_buffer_copyTo(&buf, content->name->full_name, content->name->len);
+        net_buffer_putInt(&buf, content->timestamp);
+        net_buffer_putInt(&buf, content->size);
+        net_buffer_copyTo(&buf, content->data, content->size);
+
+        int n = buf.buf_ptr - buf.buf;
+        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
+        if (sent == -1) {
+            log_error(g_log, "ccnudnb_fwd_data: sendto(%d): %s", i, strerror(errno));
+        } else if (sent != n) {
+            log_warn(g_log, "ccnudnb_fwd_data: warning sent %d bytes, expected %d!", sent, n);
+        }
+    }
 
     free(buf.buf);
 
-    return rv;
+    return 0;
 }

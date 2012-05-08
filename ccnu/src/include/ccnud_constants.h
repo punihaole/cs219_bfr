@@ -11,10 +11,14 @@
 
 /* NET */
 #define DEFAULT_NODE_ID IP4_to_nodeId()
-#define CCNU_MAX_PACKET_SIZE (1500 - 8 - 12) /* UDP+IP overhead of 20 bytes */
+#define CCNU_MAX_PACKET_SIZE 1500 /* UDP+IP overhead of 20 bytes */
 #define MAX_TTL 6
 #define LISTEN_PORT 8282
 #define SOCK_QUEUE 5
+#define MAX_INTERFACES 5
+#define CCNF_ETHER_PROTO 0x88b5
+#define CCNU_ETHER_PROTO 0x88b5
+#define BFR_ETHER_PROTO 0x88b6
 
 typedef enum {
     SLOW_START,

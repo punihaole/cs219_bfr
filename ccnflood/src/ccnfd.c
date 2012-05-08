@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 #include <math.h>
 
@@ -79,15 +78,15 @@ void signal_handler(int signal)
 {
     switch(signal) {
         case SIGHUP:
-            log_print(g_log, "Received SIGHUP signal.");
+            log_important(g_log, "Received SIGHUP signal.");
             break;
         case SIGTERM:
-            log_print(g_log, "Received SIGTERM signal.");
+            log_important(g_log, "Received SIGTERM signal.");
             /* do cleanup */
             exit(EXIT_SUCCESS);
             break;
         default:
-            log_print(g_log, "Unhandled signal (%d) %s", signal, strsignal(signal));
+            log_warn(g_log, "Unhandled signal (%d) %s", signal, strsignal(signal));
             break;
     }
 }
@@ -99,7 +98,7 @@ static int net_init()
     struct ifaddrs * ifa, * p;
 
     if (getifaddrs(&ifa) != 0) {
-        log_print(g_log, "net_init: getifaddrs: %s", strerror(errno));
+        log_critical(g_log, "net_init: getifaddrs: %s", strerror(errno));
         return -1;
     }
 
@@ -117,7 +116,7 @@ static int net_init()
         if (family != AF_PACKET) continue;
 
         if (strcmp(p->ifa_name, "lo") == 0) {
-            log_print(g_log, "net_init: skipping lo");
+            log_debug(g_log, "net_init: skipping lo");
             continue;
         }
 
@@ -162,7 +161,7 @@ static int net_init()
 
         g_sockfd = socket(AF_PACKET, SOCK_RAW, htons(CCNF_ETHER_PROTO));
         if (g_sockfd < 0) {
-            log_print(g_log, "net_init: socket: %s", strerror(errno));
+            log_critical(g_log, "net_init: socket: %s", strerror(errno));
             return -1;
         }
     }
@@ -197,8 +196,10 @@ int main(int argc, char *argv[])
     signal(SIGINT, signal_handler);
     signal(SIGQUIT, signal_handler);
 
+    int logging_level = LOG_NORMAL;
+
     int c;
-    while ((c = getopt(argc, argv, "-h?tl:n:p:i:")) != -1) {
+    while ((c = getopt(argc, argv, "-h?tl:n:p:i:qv")) != -1) {
         switch (c) {
             case 'h':
                 print_usage(argv[0]);
@@ -247,6 +248,12 @@ int main(int argc, char *argv[])
                 interest_pipeline = atoi(optarg);
                 fprintf(stderr, "set interest pipeline size to %d.\n", interest_pipeline);
                 break;
+            case 'q':
+                logging_level = LOG_ERROR | LOG_CRITICAL;
+                break;
+            case 'v':
+                logging_level = LOG_DEVEL;
+                break;
             default:
                 print_usage(argv[0]);
                 exit(EXIT_SUCCESS);
@@ -257,7 +264,7 @@ int main(int argc, char *argv[])
     char * home_env = getenv("HOME");
     char home[256];
     if (!home_env) {
-        fprintf(stderr, "bfrd: could not parse HOME environment, exiting!");
+        fprintf(stderr, "ccnfd: could not parse HOME environment, exiting!");
         exit(EXIT_FAILURE);
     }
     strncpy(home, home_env, 256);
@@ -272,8 +279,8 @@ int main(int argc, char *argv[])
     snprintf(proc, 256, "ccnfd%u", g_nodeId);
     prctl(PR_SET_NAME, proc, 0, 0, 0);
 
-    if (log_init(log_name, log_file, g_log, LOG_OVERWRITE) < 0) {
-        fprintf(stderr, "ccnfd log: %s failed to initalize!", log_file);
+    if (log_init(log_name, log_file, g_log, LOG_OVERWRITE | logging_level) < 0) {
+        fprintf(stderr, "ccnfd log: %s failed to initalize!\n", log_file);
         exit(EXIT_FAILURE);
     }
 
@@ -281,11 +288,11 @@ int main(int argc, char *argv[])
         snprintf(stat_file, 256, "%s/stat/ccnfd_%u.stat", home, g_nodeId);
 	stat_file[255] = '\0';
     if (ccnfstat_init(stat_file) < 0) {
-        fprintf(stderr, "ccnfd stat: %s failed to initalize!", stat_file);
+        fprintf(stderr, "ccnfd stat: %s failed to initalize!\n", stat_file);
         exit(EXIT_FAILURE);
     }
 
-    fprintf(stderr, "Starting ccnfd...");
+    fprintf(stderr, "Starting ccnfd...\n");
 
     pid = fork();
     if (pid < 0) {
@@ -302,7 +309,7 @@ int main(int argc, char *argv[])
 
     sid = setsid();
     if (sid < 0) {
-        fprintf(stderr, "setsid: %s.", strerror(errno));
+        fprintf(stderr, "setsid: %s.\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
 
@@ -313,38 +320,38 @@ int main(int argc, char *argv[])
 
     /* change the current working directory (after log is inited) */
     if ((chdir("/")) < 0) {
-        log_print(g_log, "chdir: %s.", strerror(errno));
+        log_critical(g_log, "chdir: %s.\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     /* initalize CS, PIT, FIB */
     if (CS_init(OLDEST, p) != 0) {
-        log_print(g_log, "failed to create CS! - EXITING");
+        log_critical(g_log, "failed to create CS! - EXITING");
         exit(EXIT_FAILURE);
     }
 
     if (PIT_init() != 0) {
-        log_print(g_log, "failed to create PIT! - EXITING");
+        log_critical(g_log, "failed to create PIT! - EXITING");
         exit(EXIT_FAILURE);
     }
 
     if (ccnfdl_init(interest_pipeline) < 0) {
-        log_print(g_log, "ccnfd listener failed to initalize.");
+        log_critical(g_log, "ccnfd listener failed to initalize.");
         exit(EXIT_FAILURE);
     }
 
     if (net_init() < 0) {
-        log_print(g_log, "ccnfd net init failed.");
+        log_critical(g_log, "ccnfd net init failed.");
         exit(EXIT_FAILURE);
     }
 
     if (ccnfdnl_init(interest_pipeline) < 0) {
-        log_print(g_log, "ccnfd net listener failed to initalize.");
+        log_critical(g_log, "ccnfd net listener failed to initalize.");
         exit(EXIT_FAILURE);
     }
 
     if (ccnfdnb_init() < 0) {
-        log_print(g_log, "ccnfd net broadcaster failed to initalize.");
+        log_critical(g_log, "ccnfd net broadcaster failed to initalize.");
         exit(EXIT_FAILURE);
     }
 
@@ -382,24 +389,24 @@ int main(int argc, char *argv[])
             switch (msg->type) {
                 case MSG_IPC_TIMEOUT:
                     if (msg->payload_size != sizeof(uint32_t)) {
-                        log_print(g_log, "ccnfd: malformed MSG_IPC_TIMEOUT");
+                        log_error(g_log, "ccnfd: malformed MSG_IPC_TIMEOUT");
                     }
                     pthread_mutex_lock(&g_lock);
                     memcpy(&g_timeout_ms, msg->payload, sizeof(uint32_t));
                     pthread_mutex_unlock(&g_lock);
-                    log_print(g_log, "ccnfd: updating interest timeout = %d", g_timeout_ms);
+                    log_important(g_log, "ccnfd: updating interest timeout = %d", g_timeout_ms);
                     break;
                 case MSG_IPC_RETRIES:
                     if (msg->payload_size != sizeof(uint32_t)) {
-                        log_print(g_log, "ccnfd: malformed MSG_IPC_TIMEOUT");
+                        log_error(g_log, "ccnfd: malformed MSG_IPC_TIMEOUT");
                     }
                     pthread_mutex_lock(&g_lock);
                     memcpy(&g_interest_attempts, msg->payload, sizeof(uint32_t));
                     pthread_mutex_unlock(&g_lock);
-                    log_print(g_log, "ccnfd: updating interest retries = %d", g_interest_attempts);
+                    log_important(g_log, "ccnfd: updating interest retries = %d", g_interest_attempts);
                     break;
                 default:
-                    log_print(g_log, "ccnud: unknown IPC message: %d", msg->type);
+                    log_error(g_log, "ccnud: unknown IPC message: %d", msg->type);
                     break;
             }
 

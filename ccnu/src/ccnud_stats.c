@@ -15,7 +15,7 @@ int ccnustat_init(char * filename)
     stat_log = malloc(sizeof(struct log));
     char log_name[256];
     snprintf(log_name, 256, "ccnu_stats_%u", g_nodeId);
-    if (log_init(log_name, filename, stat_log, LOG_OVERWRITE)) return -1;
+    if (log_init(log_name, filename, stat_log, LOG_OVERWRITE | LOG_NORMAL)) return -1;
 
     return 0;
 }

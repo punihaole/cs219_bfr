@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stddef.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
@@ -53,7 +54,7 @@ int ccnfdnb_init()
     struct ifaddrs * ifa, * p;
 
     if (getifaddrs(&ifa) != 0) {
-        log_print(g_log, "net_init: getifaddrs: %s", strerror(errno));
+        log_critical(g_log, "net_init: getifaddrs: %s", strerror(errno));
         return -1;
     }
 
@@ -68,7 +69,7 @@ int ccnfdnb_init()
         memset(&if_mac, 0, sizeof(struct ifreq));
         strncpy(if_mac.ifr_name, p->ifa_name, IFNAMSIZ-1);
         if (ioctl(g_sockfd, SIOCGIFHWADDR, &if_mac) < 0) {
-            log_print(g_log, "net_init: ioctl: %s", strerror(errno));
+            log_critical(g_log, "net_init: ioctl: %s", strerror(errno));
             return -1;
         }
 
@@ -145,7 +146,7 @@ int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** c
      */
     pe = PIT_get_handle(name);
     if (!pe) {
-        log_print(g_log, "ccnfdnb_express_interest: failed to create pit entry");
+        log_error(g_log, "ccnfdnb_express_interest: failed to create pit entry");
         goto CLEANUP;
     }
 
@@ -156,7 +157,7 @@ int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** c
     struct timespec ts;
     for (i = 1; i <= retries; i++) {
         if (i > 1) {
-            log_print(g_log, "ccnfdnb_express_interest: retransmitting interest (%s),...",
+            log_debug(g_log, "ccnfdnb_express_interest: retransmitting interest (%s),...",
                       name->full_name);
         }
 		PIT_refresh(pe);
@@ -166,7 +167,7 @@ int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** c
         while (!*pe->obj) {
             ts_fromnow(&ts);
             ts_addms(&ts, timeout_ms);
-            log_print(g_log, "ccnfdnb_express_interest: waiting for response (%s)...",
+            log_debug(g_log, "ccnfdnb_express_interest: waiting for response (%s)...",
                       name->full_name);
             rv = pthread_cond_timedwait(pe->cond, pe->mutex, &ts);
             if (rv == ETIMEDOUT || *pe->obj) {
@@ -180,16 +181,16 @@ int ccnfdnb_express_interest(struct content_name * name, struct content_obj ** c
 
     rv = 0;
     if (!*pe->obj) {
-        log_print(g_log, "ccnfdnb_express_interest: rtx interest %d times with no data.", i-1);
+        log_debug(g_log, "ccnfdnb_express_interest: rtx interest %d times with no data.", i-1);
         rv = -1;
         goto CLEANUP;
     } else {
-        log_print(g_log, "ccnfdnb_express_interest:rcvd data after %d tries.", i);
+        log_debug(g_log, "ccnfdnb_express_interest:rcvd data after %d tries.", i);
+		*content_ptr = *pe->obj;
     }
 
     CLEANUP:
     if (pe) {
-        *content_ptr = *pe->obj;
         PIT_release(pe); /* will unlock our mutex */
     }
 
@@ -201,31 +202,36 @@ int ccnfdnb_fwd_interest(struct ccnf_interest_pkt * interest)
     /* we just forward the thing. Whoever calls this upstream set the params */
     if (!interest || !interest->name) return -1;
 
-    struct net_buffer buf;
-    net_buffer_init(CCNF_MAX_PACKET_SIZE, &buf);
+    char buf[CCNF_MAX_PACKET_SIZE + sizeof(struct ether_header)];
     ccnfstat_sent_interest(interest);
+
+    uint32_t name_len = htonl(interest->name->len);
+
+    int n = sizeof(struct ether_header);
+    buf[n++] = PACKET_TYPE_INTEREST;
+    buf[n++] = interest->ttl;
+    memcpy(buf+n, &name_len, sizeof(uint32_t));
+    n += sizeof(uint32_t);
+    memcpy(buf+n, interest->name->full_name, interest->name->len);
+    n += interest->name->len;
 
     int i;
     for (i = 0; i < g_faces; i++) {
-        net_buffer_reset(&buf);
         /* ether header */
-        net_buffer_copyTo(&buf, &eh[i], sizeof(struct ether_header));
+        memcpy(buf, &eh[i], sizeof(struct ether_header));
 
-        net_buffer_putByte(&buf, PACKET_TYPE_INTEREST);
-        net_buffer_putByte(&buf, interest->ttl);
-        net_buffer_putInt(&buf, interest->name->len);
-        net_buffer_copyTo(&buf, interest->name->full_name, interest->name->len);
+        int expected = MIN_INTEREST_PKT_SIZE + interest->name->len + sizeof(struct ether_header);
+        log_assert(g_log, n == expected, "n(%d) != expected(%d)!", n, expected);
 
-        int n = buf.buf_ptr - buf.buf;
-        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *) &g_eth_addr[i], sizeof(g_eth_addr[i]));
+        int sent = sendto(g_sockfd, buf, n, 0, (struct sockaddr *) &g_eth_addr[i], sizeof(g_eth_addr[i]));
         if (sent == -1) {
-            log_print(g_log, "ccnfdnb_fwd_interest: sendto(%d): %s", i, strerror(errno));
+            log_error(g_log, "ccnfdnb_fwd_interest: sendto(%d): %s", i, strerror(errno));
         } else if (sent != n) {
-            log_print(g_log, "ccnfdnb_fwd_interest: warning sent %d bytes, expected %d!", sent, n);
+            log_warn(g_log, "ccnfdnb_fwd_interest: warning sent %d bytes, expected %d!", sent, n);
         }
-    }
 
-    free(buf.buf);
+        log_debug(g_log, "ccnfdnb_fwd_interest: sent %d bytes", sent);
+    }
 
     return 0;
 }
@@ -235,36 +241,47 @@ int ccnfdnb_fwd_data(struct content_obj * content, int hops_taken)
     /* we just forward the thing. Whoever calls this upstream set the params */
     if (!content || !content->name || !content->data) return -1;
 
-    struct net_buffer buf;
-    net_buffer_init(CCNF_MAX_PACKET_SIZE, &buf);
+    uint32_t publisher = htonl(content->publisher);
+    uint32_t name_len = htonl(content->name->len);
+    uint32_t timestamp = htonl(content->timestamp);
+    uint32_t size = htonl(content->size);
+
+    char buf[CCNF_MAX_PACKET_SIZE + sizeof(struct ether_header)];
+    int n = sizeof(struct ether_header);
+    buf[n++] = PACKET_TYPE_DATA;
+    buf[n++] = hops_taken;
+    memcpy(buf+n, &publisher, sizeof(uint32_t));
+    n += sizeof(uint32_t);
+    memcpy(buf+n, &name_len, sizeof(uint32_t));
+    n += sizeof(uint32_t);
+    memcpy(buf+n, content->name->full_name, content->name->len);
+    n += content->name->len;
+    memcpy(buf+n, &timestamp, sizeof(uint32_t));
+    n += sizeof(uint32_t);
+    memcpy(buf+n, &size, sizeof(uint32_t));
+    n += sizeof(uint32_t);
+    memcpy(buf+n, content->data, content->size);
+    n += content->size;
 
     ccnfstat_sent_data(content);
 
+    log_debug(g_log, "ccnfdnb_fwd_data: sending %s with %d bytes of data",
+              content->name->full_name, content->size);
     int i;
     for (i = 0; i < g_faces; i++) {
-        net_buffer_reset(&buf);
         /* ether header */
-        net_buffer_copyTo(&buf, &eh[i], sizeof(struct ether_header));
+        memcpy(buf, &eh[i], sizeof(struct ether_header));
 
-        net_buffer_putByte(&buf, PACKET_TYPE_DATA);
-        net_buffer_putByte(&buf, hops_taken);
-        net_buffer_putInt(&buf, content->publisher);
-        net_buffer_putInt(&buf, content->name->len);
-        net_buffer_copyTo(&buf, content->name->full_name, content->name->len);
-        net_buffer_putInt(&buf, content->timestamp);
-        net_buffer_putInt(&buf, content->size);
-        net_buffer_copyTo(&buf, content->data, content->size);
+        int expected = MIN_DATA_PKT_SIZE + content->name->len + content->size + sizeof(struct ether_header);
+        log_assert(g_log, n == expected, "n(%d) != expected(%d)!", n, expected);
 
-        int n = buf.buf_ptr - buf.buf;
-        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
+        int sent = sendto(g_sockfd, buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
         if (sent == -1) {
-            log_print(g_log, "ccnfdnb_fwd_data: sendto(%d): %s", i, strerror(errno));
+            log_error(g_log, "ccnfdnb_fwd_data: sendto(%d): %s", i, strerror(errno));
         } else if (sent != n) {
-            log_print(g_log, "ccnfdnb_fwd_data: warning sent %d bytes, expected %d!", sent, n);
+            log_warn(g_log, "ccnfdnb_fwd_data: warning sent %d bytes, expected %d!", sent, n);
         }
     }
-
-    free(buf.buf);
 
     return 0;
 }

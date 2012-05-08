@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <syslog.h>
 #include <errno.h>
 #include <math.h>
 #include <pthread.h>
@@ -704,7 +703,7 @@ int ccnf_retrieveSeq(struct content_name * baseName, int chunks, int file_len, s
 int ccnf_cs_summary(struct bloom ** bloom_ptr)
 {
     if (!bloom_ptr) {
-        syslog(LOG_WARNING, "ccnf_cs_summary: invalid bloom_ptr! -- IGNORING");
+        fprintf(stderr, "ccnf_cs_summary: invalid bloom_ptr! -- IGNORING");
         return -1;
     }
 

@@ -137,7 +137,7 @@ int net_buffer_copyFrom(struct net_buffer * src, void * dst, int size)
     if (!src->buf) return -1;
 
     memcpy(dst, src->buf_ptr, size);
-    src->buf_ptr += sizeof(uint8_t) * size;
+    src->buf_ptr += size;
     return 0;
 }
 
@@ -148,7 +148,7 @@ int net_buffer_copyTo(struct net_buffer * dst, void * src, int size)
 	if ((dst->buf_ptr + size) > (dst->buf + dst->size)) return -1;
 
     memcpy(dst->buf_ptr, src, size);
-    dst->buf_ptr += sizeof(uint8_t) * size;
+    dst->buf_ptr += size;
     return 0;
 }
 

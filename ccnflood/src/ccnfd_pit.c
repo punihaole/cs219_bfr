@@ -198,17 +198,13 @@ PENTRY PIT_exact_match(struct content_name * name)
     int valid = 1;
     if (match) {
         pthread_mutex_lock(&g_pit.pit_table[i].mutex);
-        pthread_mutex_unlock(&g_pit.pit_lock);
 
-        if (ts_compare(&g_pit.pit_table[i].expires, &now) < 0) {
-            log_print(g_log, "EXPIRED: %s", name->full_name);
+        if (ts_compare(&g_pit.pit_table[i].expires, &now) >= 0) {
             valid = 1;
         } else if (g_pit.pit_table[i].available == 0) {
-            log_print(g_log, "BEING SERVICED: %s", name->full_name);
             valid = 1;
         }
 
-        log_print(g_log, "FOUND: %s", name->full_name);
         PENTRY pe = (PENTRY) malloc(sizeof(_pit_entry_s));
         pe->mutex = &g_pit.pit_table[i].mutex;
         pe->cond = &g_pit.pit_table[i].cond;
@@ -217,6 +213,8 @@ PENTRY PIT_exact_match(struct content_name * name)
         pe->registered = g_pit.pit_table[i].registered;
         pe->expires = &g_pit.pit_table[i].expires;
         g_pit.pit_table[i].available = 0;
+
+        pthread_mutex_unlock(&g_pit.pit_lock);
 
         if (valid) {
             return pe;
@@ -279,6 +277,10 @@ PENTRY PIT_exact_match(struct content_name * name)
 
 void PIT_release(PENTRY _pe)
 {
+    /* the only danger is searching the pit and finding this entry matches.
+     * that's why we make sure its very expired by the time its searchable...
+     */
+    memset(&g_pit.pit_table[_pe->index].expires, 0, sizeof(struct timespec));
     pthread_mutex_unlock(_pe->mutex);
 
     pthread_mutex_lock(&g_pit.pit_lock);
@@ -304,6 +306,7 @@ void PIT_refresh(PENTRY _pe)
 
 void PIT_close(PENTRY _pe)
 {
+    memset(&g_pit.pit_table[_pe->index].expires, 0, sizeof(struct timespec));
     pthread_mutex_unlock(_pe->mutex);
     pthread_mutex_lock(&g_pit.pit_lock);
         g_pit.pit_table[_pe->index].available = 1;
@@ -338,8 +341,8 @@ void PIT_print()
         int i;
         for (i = 0; i < PIT_SIZE; i++) {
             if (bit_test(g_pit.pit_table_valid, i) == 1) {
-                log_print(g_log, "PIT[%d] = %s", i, g_pit.pit_table[i].name->full_name);
-                log_print(g_log, "\tExpires: %d", g_pit.pit_table[i].expires.tv_sec);
+                log_debug(g_log, "PIT[%d] = %s", i, g_pit.pit_table[i].name->full_name);
+                log_debug(g_log, "\tExpires: %d", g_pit.pit_table[i].expires.tv_sec);
             }
         }
     pthread_mutex_unlock(&g_pit.pit_lock);

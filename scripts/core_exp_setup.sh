@@ -15,7 +15,7 @@
 #done
 
 _dir="/home/tom/projects/cs219_bfr"
-$_dir/bin/ccnfd -p 0.01
+$_dir/bin/ccnfd -p 0.01 -v
 
 sleep 0.5
 $_dir/apps/scripts/experiment_flood.sh

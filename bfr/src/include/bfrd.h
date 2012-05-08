@@ -13,6 +13,12 @@
 #include <sys/un.h>
 #include <netinet/in.h>
 
+#include <linux/if_packet.h>
+#include <linux/if_ether.h>
+#include <net/if.h>
+#include <netinet/ether.h>
+
+
 #include "linked_list.h"
 #include "content_name.h"
 #include "bfrd_constants.h"
@@ -53,10 +59,6 @@ struct bfr {
     struct cluster leaf_cluster;
     struct bfr_level * levels; /* the top level of our cluster tree */
 
-    /* for broadcasting our routing packets to MANET */
-    struct sockaddr_in bcast_addr;
-    int sock;
-
     double x;
     double y;
 
@@ -73,6 +75,11 @@ struct listener_args {
 
 extern struct bfr g_bfr;
 extern struct log * g_log;
+
+extern int g_sockfd;
+extern struct sockaddr_ll g_eth_addr[MAX_INTERFACES];
+extern char g_face_name[IFNAMSIZ][MAX_INTERFACES];
+extern int g_faces;
 
 /*
  * Reads a long from a random stream. Pass in /dev/urandom or /dev/random

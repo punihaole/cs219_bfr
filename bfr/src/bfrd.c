@@ -10,6 +10,20 @@
 #include <sys/un.h>
 #include <netinet/in.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/time.h>
+#include <sys/ioctl.h>
+
+//#include <netinet/in.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+
+//#include <linux/if_packet.h>
+//#include <linux/if_ether.h>
+//#include <linux/if_arp.h>
+
 #include <fcntl.h>
 
 #include "bloom_filter.h"
@@ -35,6 +49,11 @@
 
 struct bfr g_bfr;
 struct log * g_log;
+
+int g_sockfd;
+struct sockaddr_ll g_eth_addr[MAX_INTERFACES];
+char g_face_name[IFNAMSIZ][MAX_INTERFACES];
+int g_faces;
 
 int read_rand(const char * dev, long * rand)
 {
@@ -103,15 +122,41 @@ int bfr_init(int nodeId, unsigned levels, unsigned width, unsigned height,
     }
     log_print(g_log, "bfr_init: successfully retrieved cs summary from ccnud.");
 
-    if ((g_bfr.sock = broadcast_socket()) == -1) {
-        log_print(g_log, "bfr_init: failed to get broadcast socket!");
-        return -1;
-	}
+        memset(g_face_name, 0, sizeof(g_face_name));
 
-    if (broadcast_addr(&g_bfr.bcast_addr, LISTEN_PORT) == -1) {
-        log_print(g_log, "bfr_init: failed to get broadcast addr!");
+    struct ifaddrs * ifa, * p;
+
+    if (getifaddrs(&ifa) != 0) {
+        log_critical(g_log, "bfr_init: getifaddrs: %s", strerror(errno));
         return -1;
-	}
+    }
+
+    g_faces = 0;
+    int family;
+    for (p = ifa; p != NULL; p = p->ifa_next) {
+        family = p->ifa_addr->sa_family;
+        if ((p == NULL) || (p->ifa_addr == NULL)) continue;
+        log_print(g_log, "bfr_init: found face: %s, address family: %d%s",
+                  p->ifa_name, family,
+                  (family == AF_PACKET) ? " (AF_PACKET)" :
+                  (family == AF_INET) ?   " (AF_INET)" :
+                  (family == AF_INET6) ?  " (AF_INET6)" : "");
+
+        if (family != AF_PACKET) continue;
+
+        if (strcmp(p->ifa_name, "lo") == 0) {
+            log_debug(g_log, "bfr_init: skipping lo");
+            continue;
+        }
+
+        g_sockfd = socket(AF_PACKET, SOCK_RAW, htons(BFR_ETHER_PROTO));
+        if (g_sockfd < 0) {
+            log_critical(g_log, "bfr_init: socket: %s", strerror(errno));
+            return -1;
+        }
+    }
+
+    freeifaddrs(ifa);
 
     log_print(g_log, "bfr_init: successful.");
 
@@ -198,8 +243,8 @@ void bfr_handle_ipc(struct listener_args * ipc_args)
                 for (i = 0; i < g_bfr.num_levels; i++) {
                     old = g_bfr.clusterIds[i];
                     g_bfr.clusterIds[i] = grid_cluster(i + 1, x, y);
-                    /*log_print(g_log, "handle_ipc: level %u, old cluster = %u, new cluster = %u",
-                              i+1, old, g_bfr.clusterIds[i]);*/
+                    log_debug(g_log, "handle_ipc: level %u, old cluster = %u, new cluster = %u",
+                              i+1, old, g_bfr.clusterIds[i]);
                 }
                 g_bfr.x = x;
                 g_bfr.y = y;

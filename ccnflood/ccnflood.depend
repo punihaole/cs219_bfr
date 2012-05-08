@@ -1,9 +1,8 @@
 # depslib dependency file v1.0
-1335988873 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnf.c
+1336330565 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnf.c
 	<stdlib.h>
 	<stdio.h>
 	<string.h>
-	<syslog.h>
 	<errno.h>
 	<math.h>
 	<pthread.h>
@@ -21,7 +20,7 @@
 	"ccnf_packet.h"
 	"net_lib.h"
 
-1336243460 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd.c
+1336348442 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd.c
 	<sys/prctl.h>
 	<sys/types.h>
 	<sys/stat.h>
@@ -31,7 +30,6 @@
 	<stdio.h>
 	<stdlib.h>
 	<string.h>
-	<syslog.h>
 	<unistd.h>
 	<math.h>
 	<sys/types.h>
@@ -53,11 +51,12 @@
 	"log.h"
 	"synch_queue.h"
 
-1336169982 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_cs.c
+1336359150 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_cs.c
 	<stdlib.h>
 	<string.h>
 	<math.h>
 	<pthread.h>
+	<assert.h>
 	"ccnfd_cs.h"
 	"hash.h"
 	"ccnfd_constants.h"
@@ -65,7 +64,7 @@
 	"linked_list.h"
 	"bitmap.h"
 
-1336255330 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_listener.c
+1336445849 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_listener.c
 	<string.h>
 	<stdlib.h>
 	<errno.h>
@@ -91,8 +90,9 @@
 	"thread_pool.h"
 	"ts.h"
 
-1336252720 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_net_broadcaster.c
+1336365105 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_net_broadcaster.c
 	<stdlib.h>
+	<stddef.h>
 	<string.h>
 	<stdio.h>
 	<errno.h>
@@ -122,7 +122,7 @@
 	"synch_queue.h"
 	"ts.h"
 
-1336258828 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_net_listener.c
+1336449929 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_net_listener.c
 	<errno.h>
 	<stdlib.h>
 	<string.h>
@@ -149,7 +149,7 @@
 	"net_lib.h"
 	"thread_pool.h"
 
-1336256868 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_pit.c
+1336451860 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_pit.c
 	<stdlib.h>
 	<sys/time.h>
 	<string.h>
@@ -267,7 +267,7 @@
 	"content.h"
 	"net_lib.h"
 
-1335988873 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_stats.c
+1336331402 source:/home/tom/projects/cs219_bfr/ccnflood/src/ccnfd_stats.c
 	<stdlib.h>
 	<string.h>
 	<pthread.h>

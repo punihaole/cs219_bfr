@@ -19,7 +19,7 @@ case "$HOST" in
 		;;
 	n2)
 		sleep 3
-		$MYDIR/../bin/cftp /unit1/file/map $MYDIR/../data/map_copy.jpg  -f
+		#$MYDIR/../bin/cftp /unit1/file/map $MYDIR/../data/map_copy.jpg  -f
 		;;
 	*)
 		exit 0

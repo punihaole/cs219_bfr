@@ -9,6 +9,20 @@
 #include <unistd.h>
 #include <math.h>
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/time.h>
+#include <sys/ioctl.h>
+
+//#include <netinet/in.h>
+#include <ifaddrs.h>
+#include <net/if.h>
+
+//#include <linux/if_packet.h>
+//#include <linux/if_ether.h>
+//#include <linux/if_arp.h>
+
 #include "ccnud_listener.h"
 #include "ccnud_net_broadcaster.h"
 #include "ccnud_net_listener.h"
@@ -31,6 +45,11 @@ uint32_t g_nodeId;
 int g_timeout_ms;
 int g_interest_attempts;
 pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
+
+int g_sockfd;
+struct sockaddr_ll g_eth_addr[MAX_INTERFACES];
+char g_face_name[IFNAMSIZ][MAX_INTERFACES];
+int g_faces;
 
 static pthread_t idp_listener;
 static pthread_t net_listener;
@@ -73,6 +92,47 @@ void signal_handler(int signal)
     }
 }
 
+static int net_init()
+{
+    memset(g_face_name, 0, sizeof(g_face_name));
+
+    struct ifaddrs * ifa, * p;
+
+    if (getifaddrs(&ifa) != 0) {
+        log_critical(g_log, "net_init: getifaddrs: %s", strerror(errno));
+        return -1;
+    }
+
+    g_faces = 0;
+    int family;
+    for (p = ifa; p != NULL; p = p->ifa_next) {
+        family = p->ifa_addr->sa_family;
+        if ((p == NULL) || (p->ifa_addr == NULL)) continue;
+        log_print(g_log, "net_init: found face: %s, address family: %d%s",
+                  p->ifa_name, family,
+                  (family == AF_PACKET) ? " (AF_PACKET)" :
+                  (family == AF_INET) ?   " (AF_INET)" :
+                  (family == AF_INET6) ?  " (AF_INET6)" : "");
+
+        if (family != AF_PACKET) continue;
+
+        if (strcmp(p->ifa_name, "lo") == 0) {
+            log_debug(g_log, "net_init: skipping lo");
+            continue;
+        }
+
+        g_sockfd = socket(AF_PACKET, SOCK_RAW, htons(CCNF_ETHER_PROTO));
+        if (g_sockfd < 0) {
+            log_critical(g_log, "net_init: socket: %s", strerror(errno));
+            return -1;
+        }
+    }
+
+    freeifaddrs(ifa);
+
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     pid_t pid, sid;
@@ -91,8 +151,10 @@ int main(int argc, char *argv[])
     signal(SIGINT, signal_handler);
     signal(SIGQUIT, signal_handler);
 
+    int logging_level = LOG_NORMAL;
+
     int c;
-    while ((c = getopt(argc, argv, "-h?tl:n:p:i:s:")) != -1) {
+    while ((c = getopt(argc, argv, "-h?tl:n:p:i:s:qv")) != -1) {
         switch (c) {
             case 'h':
                 print_usage(argv[0]);
@@ -141,6 +203,12 @@ int main(int argc, char *argv[])
                     exit(EXIT_FAILURE);
                 }
                 break;
+            case 'q':
+                logging_level = LOG_ERROR | LOG_CRITICAL;
+                break;
+            case 'v':
+                logging_level = LOG_DEVEL;
+                break;
             default:
                 print_usage(argv[0]);
                 exit(EXIT_SUCCESS);
@@ -162,7 +230,7 @@ int main(int argc, char *argv[])
     if (!log_file_set)
         snprintf(log_file, 256, "%s/log/ccnud_%u.log", home, g_nodeId);
 
-    if (log_init(log_name, log_file, g_log, LOG_OVERWRITE) < 0) {
+    if (log_init(log_name, log_file, g_log, LOG_OVERWRITE | logging_level) < 0) {
         fprintf(stderr, "ccnud log: %s failed to initalize!\n", log_file);
         exit(EXIT_FAILURE);
     }
@@ -214,6 +282,11 @@ int main(int argc, char *argv[])
 
     if (PIT_init() != 0) {
         log_print(g_log, "failed to create PIT! - EXITING");
+        exit(EXIT_FAILURE);
+    }
+
+    if (net_init() < 0) {
+        log_critical(g_log, "ccnfd net init failed.");
         exit(EXIT_FAILURE);
     }
 

@@ -24,6 +24,7 @@ struct CS_segment {
     struct content_obj ** chunks;
     int num_chunks;
     struct bitmap * valid;
+    pthread_mutex_t lock;
 };
 
 struct CS _cs;
@@ -82,7 +83,7 @@ int CS_init(evict_policy_t ep, double p)
     return 0;
 }
 
-static struct content_obj * content_copy(struct content_obj * orig)
+static inline struct content_obj * content_copy(struct content_obj * orig)
 {
     if (!orig) {
         return NULL;
@@ -101,37 +102,47 @@ static struct content_obj * content_copy(struct content_obj * orig)
 int CS_put(struct content_obj * content)
 {
     content = content_copy(content);
-    pthread_mutex_lock(&_cs.lock);
-    if (content_is_segmented(content->name)) {
-        struct CS_segment * segment = NULL;
-        segment = (struct CS_segment * ) hash_get(_cs.table, content_prefix(content->name));
-        if (!segment) {
-            /* don't store segmented chunks we haven't seen ? */
-            pthread_mutex_unlock(&_cs.lock);
-            return -1;
-        }
-        int seq_no = content_seq_no(content->name);
 
-        if (seq_no >= segment->num_chunks) {
-            segment->chunks = realloc(segment->chunks, sizeof(struct content_obj * ) * (seq_no + 1));
-            segment->num_chunks = seq_no + 1;
-            segment->chunks[seq_no] = content;
-            struct bitmap * larger = bit_create(segment->num_chunks);
-            memcpy(larger->map, segment->valid->map, segment->valid->num_words * 4);
-            bit_destroy(segment->valid);
-            segment->valid = larger;
-            bit_set(segment->valid, seq_no);
-        } else {
-            if (bit_test(segment->valid, seq_no)) {
-                content_obj_destroy(segment->chunks[seq_no]);
+    pthread_mutex_lock(&_cs.lock);
+    struct CS_segment * segment = (struct CS_segment * )
+        hash_get(_cs.table, content_prefix(content->name));
+    pthread_mutex_unlock(&_cs.lock);
+
+    int rv = 0;
+    if (content_is_segmented(content->name)) {
+
+        if (segment) {
+
+            pthread_mutex_lock(&segment->lock);
+
+            int seq_no = content_seq_no(content->name);
+            if (seq_no >= segment->num_chunks) {
+                segment->chunks = realloc(segment->chunks, sizeof(struct content_obj * ) * (seq_no + 1));
+                segment->num_chunks = seq_no + 1;
+                segment->chunks[seq_no] = content;
+                struct bitmap * larger = bit_create(segment->num_chunks);
+                memcpy(larger->map, segment->valid->map, segment->valid->num_words);
+                bit_destroy(segment->valid);
+                segment->valid = larger;
+                bit_set(larger, seq_no);
+            } else {
+                if (bit_test(segment->valid, seq_no)) {
+                    content_obj_destroy(segment->chunks[seq_no]);
+                }
+                segment->chunks[seq_no] = content;
+                bit_set(segment->valid, seq_no);
             }
-            segment->chunks[seq_no] = content;
-            bit_set(segment->valid, seq_no);
+
+            pthread_mutex_unlock(&segment->lock);
+
+        } else {
+            rv = -1;
         }
+
     } else {
-        struct CS_segment * segment;
-        segment = (struct CS_segment * ) hash_get(_cs.table, content_prefix(content->name));
+
         if (!segment) {
+
             segment = malloc(sizeof(struct CS_segment));
             /* this is a content matching a prefix */
             char * key = malloc(strlen(content->name->full_name));
@@ -140,17 +151,48 @@ int CS_put(struct content_obj * content)
             segment->chunks = NULL;
             segment->num_chunks = -1;
             segment->valid = bit_create(0);
-            hash_put(_cs.table, key, (void * ) segment);
+            pthread_mutex_init(&segment->lock, NULL);
+
+            pthread_mutex_lock(&_cs.lock);
+
+            struct CS_segment * safety_segment = (struct CS_segment * ) hash_get(_cs.table, key);
+
+            pthread_mutex_unlock(&_cs.lock);
+
+            if (safety_segment) {
+                // This segment already exists!
+                log_critical(g_log, "CS: CRITICAL ERROR, adding a segment that already exists!");
+
+                pthread_mutex_lock(&safety_segment->lock);
+
+                pthread_mutex_lock(&_cs.lock);
+                hash_put(_cs.table, key, (void * ) segment);
+                pthread_mutex_unlock(&_cs.lock);
+
+                pthread_mutex_unlock(&safety_segment->lock);
+
+            } else {
+
+                pthread_mutex_lock(&_cs.lock);
+                hash_put(_cs.table, key, (void * ) segment);
+                pthread_mutex_unlock(&_cs.lock);
+            }
+
         } else {
+
+            pthread_mutex_lock(&segment->lock);
+
             if (segment->index_chunk) {
                 content_obj_destroy(segment->index_chunk);
             }
             segment->index_chunk = content;
+
+            pthread_mutex_unlock(&segment->lock);
+
         }
     }
-    pthread_mutex_unlock(&_cs.lock);
 
-    return 0;
+    return rv;
 }
 
 int CS_putSegment(struct content_obj * prefix_obj, struct linked_list * content_chunks)
@@ -165,16 +207,39 @@ int CS_putSegment(struct content_obj * prefix_obj, struct linked_list * content_
     segment->num_chunks = content_chunks->len;
     segment->chunks = malloc(sizeof(struct content_obj * ) * segment->num_chunks);
     segment->valid = bit_create(segment->num_chunks);
+    pthread_mutex_init(&segment->lock, NULL);
 
-    int i;
-    for (i = 0; i < segment->num_chunks; i++) {
+    int i = 0;
+    while (content_chunks->len) {
         bit_set(segment->valid, i);
-        segment->chunks[i] = linked_list_remove(content_chunks, 0);
+        segment->chunks[i++] = linked_list_remove(content_chunks, 0);
     }
 
     pthread_mutex_lock(&_cs.lock);
-        hash_put(_cs.table, key, (void * ) segment);
+
+    struct CS_segment * safety_segment = (struct CS_segment * )
+        hash_get(_cs.table, content_prefix(prefix_obj->name));
+
     pthread_mutex_unlock(&_cs.lock);
+
+    if (safety_segment) {
+        // This segment already exists!
+        log_critical(g_log, "CS: CRITICAL ERROR, adding a segment that already exists!");
+
+        pthread_mutex_lock(&safety_segment->lock);
+
+        pthread_mutex_lock(&_cs.lock);
+        hash_put(_cs.table, key, (void * ) segment);
+        pthread_mutex_unlock(&_cs.lock);
+
+        pthread_mutex_unlock(&safety_segment->lock);
+
+    } else {
+        pthread_mutex_lock(&_cs.lock);
+        hash_put(_cs.table, key, (void * ) segment);
+        pthread_mutex_unlock(&_cs.lock);
+    }
+
     return 0;
 }
 
@@ -182,62 +247,89 @@ struct content_obj * CS_get(struct content_name * name)
 {
     if (!name) return NULL;
 
-    struct content_obj * ret = NULL;
     struct CS_segment * segment = NULL;
+    struct content_obj * copy = NULL;
 
     if (!content_is_segmented(name)) {
+
         pthread_mutex_lock(&_cs.lock);
-            segment = (struct CS_segment * ) hash_get(_cs.table, name->full_name);
-            if (segment) {
-                ret = content_copy(segment->index_chunk);
-            }
+
+        segment = (struct CS_segment * ) hash_get(_cs.table, name->full_name);
+
         pthread_mutex_unlock(&_cs.lock);
+
+        if (segment) {
+            pthread_mutex_lock(&segment->lock);
+
+            copy = content_copy(segment->index_chunk);
+
+            pthread_mutex_unlock(&segment->lock);
+        }
+
+        return copy;
+
     } else {
+
         int chunk = content_seq_no(name);
         char * prefix = content_prefix(name);
-        pthread_mutex_lock(&_cs.lock);
-            segment = (struct CS_segment * ) hash_get(_cs.table, prefix);
 
-            log_print(g_log, "requesting chunk    = %d", chunk);
-            log_print(g_log, "segment->num_chunks = %d", segment->num_chunks);
-            log_print(g_log, "valid(%d) = %d", chunk, bit_test(segment->valid, chunk));
-            if (segment && (segment->num_chunks >= chunk) && bit_test(segment->valid, chunk)) {
-                ret = content_copy(segment->chunks[chunk]);
-            }
+        pthread_mutex_lock(&_cs.lock);
+
+        segment = (struct CS_segment * ) hash_get(_cs.table, prefix);
+
         pthread_mutex_unlock(&_cs.lock);
 
-        free(prefix);
-    }
+        if ((segment) && (chunk < segment->num_chunks)) {
+            pthread_mutex_lock(&segment->lock);
 
-    return ret;
+            copy = content_copy(segment->chunks[chunk]);
+
+            pthread_mutex_unlock(&segment->lock);
+        }
+
+        free(prefix);
+
+        return copy;
+
+    }
 }
 
 struct content_obj * CS_getSegment(struct content_name * prefix)
 {
     if (!prefix) return NULL;
 
-    struct CS_segment * segment;
     pthread_mutex_lock(&_cs.lock);
-        segment = (struct CS_segment * ) hash_get(_cs.table, prefix->full_name);
+    struct CS_segment * segment =
+        (struct CS_segment * ) hash_get(_cs.table, prefix->full_name);
     pthread_mutex_unlock(&_cs.lock);
-    if (!segment || segment->num_chunks < 0) {
-        return NULL;
-    }
 
-    struct content_obj * all = malloc(sizeof(struct content_obj));
-    all->name = prefix;
-    all->publisher = segment->index_chunk->publisher;
-    all->timestamp = segment->index_chunk->timestamp;
-    all->data = malloc(CCNU_MAX_PACKET_SIZE * segment->num_chunks);
+    struct content_obj * all = NULL;
 
-    int i;
-    int size = 0;
-    for (i = 0; i < segment->num_chunks; i++) {
-        struct content_obj * chunk = segment->chunks[i];
-        memcpy(all->data + size, chunk->data, chunk->size);
-        size += chunk->size;
+    if (segment) {
+
+        pthread_mutex_lock(&segment->lock);
+
+        if (segment->num_chunks >= 0) {
+
+            struct content_obj * all = malloc(sizeof(struct content_obj));
+            all->name = prefix;
+            all->publisher = segment->index_chunk->publisher;
+            all->timestamp = segment->index_chunk->timestamp;
+            all->data = malloc(CCNU_MAX_PACKET_SIZE * segment->num_chunks);
+
+            int i;
+            int size = 0;
+            for (i = 0; i < segment->num_chunks; i++) {
+                struct content_obj * chunk = segment->chunks[i];
+                memcpy(all->data + size, chunk->data, chunk->size);
+                size += chunk->size;
+            }
+
+            all->size = size;
+        }
+
+        pthread_mutex_unlock(&segment->lock);
     }
-    all->size = size;
 
     return all;
 }

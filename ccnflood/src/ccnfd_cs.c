@@ -69,10 +69,10 @@ int CS_init(evict_policy_t ep, double p)
 
     if (!_cs.table) return -1;
 
-    /*     -n * ln(p)
-     * m = ----------
-     *      (ln(2))^2
-     */
+    /* -n * ln(p)
+* m = ----------
+* (ln(2))^2
+*/
     _cs.summary_size = ceil(-1.0 * (CS_SIZE * log(p))) / (pow(log(2.0),2.0));
     int rem = _cs.summary_size % 8;
     /* round to nearest 8 since this is the number of bits for bloom filter */
@@ -153,30 +153,8 @@ int CS_put(struct content_obj * content)
             pthread_mutex_init(&segment->lock, NULL);
 
             pthread_mutex_lock(&_cs.lock);
-
-            struct CS_segment * safety_segment = (struct CS_segment * )
-                hash_get(_cs.table, key);
-
+            hash_put(_cs.table, key, (void * ) segment);
             pthread_mutex_unlock(&_cs.lock);
-
-            if (safety_segment) {
-                // This segment already exists!
-                log_print(g_log, "CS: CRITICAL ERROR, adding a segment that already exists!");
-
-                pthread_mutex_lock(&safety_segment->lock);
-
-                pthread_mutex_lock(&_cs.lock);
-                hash_put(_cs.table, key, (void * ) segment);
-                pthread_mutex_unlock(&_cs.lock);
-
-                pthread_mutex_unlock(&safety_segment->lock);
-
-            } else {
-
-                pthread_mutex_lock(&_cs.lock);
-                hash_put(_cs.table, key, (void * ) segment);
-                pthread_mutex_unlock(&_cs.lock);
-            }
 
         } else {
 
@@ -216,29 +194,8 @@ int CS_putSegment(struct content_obj * prefix_obj, struct linked_list * content_
     }
 
     pthread_mutex_lock(&_cs.lock);
-
-    struct CS_segment * safety_segment = (struct CS_segment * )
-        hash_get(_cs.table, content_prefix(prefix_obj->name));
-
+    hash_put(_cs.table, key, (void * ) segment);
     pthread_mutex_unlock(&_cs.lock);
-
-    if (safety_segment) {
-        // This segment already exists!
-        log_print(g_log, "CS: CRITICAL ERROR, adding a segment that already exists!");
-
-        pthread_mutex_lock(&safety_segment->lock);
-
-        pthread_mutex_lock(&_cs.lock);
-        hash_put(_cs.table, key, (void * ) segment);
-        pthread_mutex_unlock(&_cs.lock);
-
-        pthread_mutex_unlock(&safety_segment->lock);
-
-    } else {
-        pthread_mutex_lock(&_cs.lock);
-        hash_put(_cs.table, key, (void * ) segment);
-        pthread_mutex_unlock(&_cs.lock);
-    }
 
     return 0;
 }
@@ -253,17 +210,15 @@ struct content_obj * CS_get(struct content_name * name)
     if (!content_is_segmented(name)) {
 
         pthread_mutex_lock(&_cs.lock);
-
         segment = (struct CS_segment * ) hash_get(_cs.table, name->full_name);
-
         pthread_mutex_unlock(&_cs.lock);
 
         if (segment) {
+
             pthread_mutex_lock(&segment->lock);
-
             copy = content_copy(segment->index_chunk);
-
             pthread_mutex_unlock(&segment->lock);
+
         }
 
         return copy;
@@ -274,17 +229,15 @@ struct content_obj * CS_get(struct content_name * name)
         char * prefix = content_prefix(name);
 
         pthread_mutex_lock(&_cs.lock);
-
         segment = (struct CS_segment * ) hash_get(_cs.table, prefix);
-
         pthread_mutex_unlock(&_cs.lock);
 
         if ((segment) && (chunk < segment->num_chunks)) {
+
             pthread_mutex_lock(&segment->lock);
-
             copy = content_copy(segment->chunks[chunk]);
-
             pthread_mutex_unlock(&segment->lock);
+
         }
 
         free(prefix);
@@ -329,6 +282,7 @@ struct content_obj * CS_getSegment(struct content_name * prefix)
         }
 
         pthread_mutex_unlock(&segment->lock);
+
     }
 
     return all;
