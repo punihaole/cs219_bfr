@@ -98,7 +98,7 @@ int ccnudnb_init()
 }
 
 int ccnudnb_express_interest(struct content_name * name, struct content_obj ** content_ptr,
-                             int use_opt, struct ccnudnb_options * opt)
+                             int use_opt, struct ccnu_options * opt)
 {
     if (!name || !content_ptr)
         return -1;
@@ -166,7 +166,7 @@ int ccnudnb_express_interest(struct content_name * name, struct content_obj ** c
      */
     pe = PIT_get_handle(name);
     if (!pe) {
-        log_print(g_log, "ccnudnb_express_interest: failed to create pit entry");
+        log_error(g_log, "ccnudnb_express_interest: failed to create pit entry");
         goto CLEANUP;
     }
 
@@ -223,12 +223,12 @@ uint16_t ccnudnb_gen_nonce()
     uint16_t rand;
 
     if (!fp) {
-        log_print(g_log, "read_rand: could not open %s.", dev);
+        log_error(g_log, "read_rand: could not open %s.", dev);
         return -1;
     }
 
     if (read(fp, &rand, sizeof(uint16_t)) != sizeof(uint16_t)) {
-        log_print(g_log, "read_rand: read failed - %s", strerror(errno));
+        log_error(g_log, "read_rand: read failed - %s", strerror(errno));
         close(fp);
         return -1;
     }
@@ -242,37 +242,52 @@ int ccnudnb_fwd_interest(struct ccnu_interest_pkt * interest)
     /* we just forward the thing. Whoever calls this upstream set the params */
     if (!interest || !interest->name) return -1;
 
-    struct net_buffer buf;
-    net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
+    unsigned char buf[CCNU_MAX_PACKET_SIZE + sizeof(struct ether_header)];
     ccnustat_sent_interest(interest);
+
+    uint16_t nonce = htons(interest->nonce);
+    uint8_t ttl = interest->ttl;
+    uint8_t orig_level = interest->orig_level;
+    uint16_t orig_cluster = htons(interest->orig_clusterId);
+    uint8_t dest_level = interest->dest_level;
+    uint16_t dest_cluster = htons(interest->dest_clusterId);
+    uint64_t distance = interest->distance; /* still host order */
+    uint32_t name_len = htonl(interest->name->len);
+
+    int n = sizeof(struct ether_header);
+    buf[n++] = PACKET_TYPE_INTEREST;
+    memcpy(buf+n, &nonce, sizeof(uint16_t));
+    n += sizeof(uint16_t);
+    buf[n++] = ttl;
+    buf[n++] = orig_level;
+    memcpy(buf+n, &orig_cluster, sizeof(uint16_t));
+    n += sizeof(uint16_t);
+    buf[n++] = dest_level;
+    memcpy(buf+n, &dest_cluster, sizeof(uint16_t));
+    n += sizeof(uint16_t);
+    putLong(buf+n, distance); /* copies into buffer and changes to network order */
+    n += sizeof(uint64_t);
+    memcpy(buf+n, &name_len, sizeof(uint32_t));
+    n += sizeof(uint32_t);
+    memcpy(buf+n, interest->name->full_name, interest->name->len);
+    n += interest->name->len;
 
     int i;
     for (i = 0; i < g_faces; i++) {
-        net_buffer_reset(&buf);
         /* ether header */
-        net_buffer_copyTo(&buf, &eh[i], sizeof(struct ether_header));
+        memcpy(buf, &eh[i], sizeof(struct ether_header));
+        int expected = MIN_INTEREST_PKT_SIZE + interest->name->len + sizeof(struct ether_header);
+        log_assert(g_log, n == expected, "n(%d) != expected(%d)!", n, expected);
 
-        net_buffer_putByte(&buf, PACKET_TYPE_INTEREST);
-        net_buffer_putShort(&buf, interest->nonce);
-        net_buffer_putByte(&buf, interest->ttl);
-        net_buffer_putByte(&buf, interest->orig_level);
-        net_buffer_putShort(&buf, interest->orig_clusterId);
-        net_buffer_putByte(&buf, interest->dest_level);
-        net_buffer_putShort(&buf, interest->dest_clusterId);
-        net_buffer_putLong(&buf, interest->distance);
-        net_buffer_putInt(&buf, interest->name->len);
-        net_buffer_copyTo(&buf, interest->name->full_name, interest->name->len);
-
-        int n = buf.buf_ptr - buf.buf;
-        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *) &g_eth_addr[i], sizeof(g_eth_addr[i]));
+        int sent = sendto(g_sockfd, buf, n, 0, (struct sockaddr *) &g_eth_addr[i], sizeof(g_eth_addr[i]));
         if (sent == -1) {
             log_error(g_log, "ccnudnb_fwd_interest: sendto(%d): %s", i, strerror(errno));
         } else if (sent != n) {
             log_warn(g_log, "ccnudnb_fwd_interest: warning sent %d bytes, expected %d!", sent, n);
+        } else {
+            log_debug(g_log, "ccnudnb_fwd_interest: sent %d bytes", n);
         }
     }
-
-    free(buf.buf);
 
     return 0;
 }
@@ -282,36 +297,49 @@ int ccnudnb_fwd_data(struct content_obj * content, int hops_taken)
     /* we just forward the thing. Whoever calls this upstream set the params */
     if (!content || !content->name || !content->data) return -1;
 
-    struct net_buffer buf;
-    net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
+    uint32_t publisher = htonl(content->publisher);
+    uint32_t name_len = htonl(content->name->len);
+    uint32_t timestamp = htonl(content->timestamp);
+    uint32_t size = htonl(content->size);
+
+    char buf[CCNU_MAX_PACKET_SIZE + sizeof(struct ether_header)];
+    int n = sizeof(struct ether_header);
+    buf[n++] = PACKET_TYPE_DATA;
+    buf[n++] = hops_taken;
+    memcpy(buf+n, &publisher, sizeof(uint32_t));
+    n += sizeof(uint32_t);
+    memcpy(buf+n, &name_len, sizeof(uint32_t));
+    n += sizeof(uint32_t);
+    memcpy(buf+n, content->name->full_name, content->name->len);
+    n += content->name->len;
+    memcpy(buf+n, &timestamp, sizeof(uint32_t));
+    n += sizeof(uint32_t);
+    memcpy(buf+n, &size, sizeof(uint32_t));
+    n += sizeof(uint32_t);
+    memcpy(buf+n, content->data, content->size);
+    n += content->size;
 
     ccnustat_sent_data(content);
 
+    log_debug(g_log, "ccnudnb_fwd_data: sending %s with %d bytes of data",
+              content->name->full_name, content->size);
     int i;
     for (i = 0; i < g_faces; i++) {
-        net_buffer_reset(&buf);
         /* ether header */
-        net_buffer_copyTo(&buf, &eh[i], sizeof(struct ether_header));
+        memcpy(buf, &eh[i], sizeof(struct ether_header));
 
-        net_buffer_putByte(&buf, PACKET_TYPE_DATA);
-        net_buffer_putByte(&buf, hops_taken);
-        net_buffer_putInt(&buf, content->publisher);
-        net_buffer_putInt(&buf, content->name->len);
-        net_buffer_copyTo(&buf, content->name->full_name, content->name->len);
-        net_buffer_putInt(&buf, content->timestamp);
-        net_buffer_putInt(&buf, content->size);
-        net_buffer_copyTo(&buf, content->data, content->size);
+        int expected = MIN_DATA_PKT_SIZE + content->name->len + content->size + sizeof(struct ether_header);
+        log_assert(g_log, n == expected, "n(%d) != expected(%d)!", n, expected);
 
-        int n = buf.buf_ptr - buf.buf;
-        int sent = sendto(g_sockfd, buf.buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
+        int sent = sendto(g_sockfd, buf, n, 0, (struct sockaddr *)&g_eth_addr[i], sizeof(g_eth_addr[i]));
         if (sent == -1) {
             log_error(g_log, "ccnudnb_fwd_data: sendto(%d): %s", i, strerror(errno));
         } else if (sent != n) {
             log_warn(g_log, "ccnudnb_fwd_data: warning sent %d bytes, expected %d!", sent, n);
+        } else {
+            log_debug(g_log, "ccnudnb_fwd_data: sent %d bytes", n);
         }
     }
-
-    free(buf.buf);
 
     return 0;
 }

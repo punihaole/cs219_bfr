@@ -7,6 +7,7 @@
 #define BITMAP_H_INCLUDED
 
 #define BITS_PER_BYTE 8
+#define BYTES_PER_WORD 4
 #define BITS_PER_WORD 32
 
 #define FAST_BITMAP /* skip bounds checking */

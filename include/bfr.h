@@ -22,13 +22,14 @@
 #define MSG_IPC_INTEREST_FWD_QUERY  1 /* query to forward an interest */
 #define MSG_IPC_INTEREST_DEST_QUERY 2 /*query where to forward an interest */
 #define MSG_IPC_DISTANCE_UPDATE     4 /*updates our distance table */
+#define MSG_IPC_DISTANCE_QUERY      5
 
 #define MSG_NET_CLUSTER_JOIN       1
 #define MSG_NET_CLUSTER_RESPONSE   2
 #define MSG_NET_BLOOMFILTER_UPDATE 3
 #define MSG_NET_SLEEPING_PILL      4
 
-#define BFR_MAX_PACKET_SIZE (1500 - 8 - 12) /* UDP+IP overhead of 20 bytes */
+#define BFR_MAX_PACKET_SIZE 1500
 
 #define HDR_SIZE (sizeof(uint8_t) + sizeof(uint32_t) + sizeof(uint32_t))
 struct bfr_hdr {
@@ -52,7 +53,11 @@ struct bloom_msg {
 	uint16_t nonce;
     uint8_t origin_level;
     uint16_t origin_clusterId;
+
+	union {
     uint8_t dest_level;
+	uint8_t ttl;
+	};
     uint16_t dest_clusterId;
 
     uint64_t lastHopDistance; /* ieee754 encoded double */
@@ -161,4 +166,8 @@ int bfr_sendWhere(struct content_name * name,
  * has traversed to the routing daemon. This allows us to update the distance table.
  **/
 int bfr_sendDistance(struct content_name * name, int hops);
+
+int bfr_queryDistance(unsigned orig_level, unsigned orig_clusterId,
+                      unsigned dest_level, unsigned dest_clusterId,
+                      double * distance);
 #endif // CRUST_H_INCLUDED

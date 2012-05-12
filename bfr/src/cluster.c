@@ -247,6 +247,7 @@ int clus_findCluster(struct content_name * name, unsigned * level, unsigned * cl
             struct bloom * filter = c->agg_filter;
             if (!filter) continue;
 
+
             log_print(g_log, "cluster = %d:%d, searching aggregate filter", c->level, c->id);
             if ((matches = search_bloom(filter, name)) > longest_match) {
                 log_print(g_log, "cluster: found matches = %d", matches);

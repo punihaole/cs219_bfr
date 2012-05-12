@@ -357,10 +357,12 @@ static void * publish_response(void * arg)
         log_print(g_log, "recv: %s.", strerror(errno));
         goto END_PUBLISH_RESP;
     }
-    log_print(g_log, "Successfully published content:");
-    log_print(g_log, "\tname = %s", name);
-    log_print(g_log, "\ttimestamp = %d", timestamp);
-    log_print(g_log, "\tdata size = %d", size);
+
+    log_print(g_log, "Successfully published content:\n"
+                 "\t\t\t\t\t\tname = %s\n"
+                 "\t\t\t\t\t\ttimestamp = %d\n"
+                 "\t\t\t\t\t\tsize = %d",
+          name, timestamp , size);
 
     END_PUBLISH_RESP:
 
@@ -525,10 +527,11 @@ static void * seq_publish(void * arg)
         goto END_PUBLISH_RESP;
     }
 
-    log_print(g_log, "Successfully published segment:");
-    log_print(g_log, "\tname = %s", index_chunk->name->full_name);
-    log_print(g_log, "\ttimestamp = %d", timestamp);
-    log_print(g_log, "\tnum chunks = %d", num_chunks);
+    log_print(g_log, "Successfully published segment:\n"
+                     "\t\t\t\t\t\tname = %s\n"
+                     "\t\t\t\t\t\ttimestamp = %d\n"
+                     "\t\t\t\t\t\tnum chunks = %d",
+              index_chunk->name->full_name, timestamp , num_chunks);
 
     END_PUBLISH_RESP:
 
@@ -687,8 +690,10 @@ static void * retrieve_response(void * arg)
 
 static int retrieve_segment(struct segment * seg)
 {
+    char proc[256];
+    snprintf(proc, 256, "rsg%u", g_nodeId);
+    prctl(PR_SET_NAME, proc, 0, 0, 0);
     int rv = -1;
-    prctl(PR_SET_NAME, "ret_seg", 0, 0, 0);
     log_print(g_log, "retrieve_segment: trying to retrieve segment %s[%d - %d].",
               seg->name->full_name, 0, seg->num_chunks-1);
 
@@ -743,7 +748,8 @@ static int retrieve_segment(struct segment * seg)
         tx = cwnd;
         window->num_bits = cwnd;
 
-        log_debug(g_log, "state = %d, cwnd = %d, ssthresh = %d rtt_est = %d", state, cwnd, ssthresh, rtt_est);
+        log_debug(g_log, "state = %d, cwnd = %d, ssthresh = %d rtt_est = %d",
+                  state, cwnd, ssthresh, rtt_est);
 
         while (tx && (current_chunk < seg->num_chunks)) {
             snprintf(comp, MAX_NAME_LENGTH - seg->name->len, "/%d", current_chunk);
@@ -804,46 +810,51 @@ static int retrieve_segment(struct segment * seg)
                 if (rtt_est > PIT_LIFETIME_MS)
                     rtt_est = PIT_LIFETIME_MS / 2;
             }
-        }
+        } else {
+            int pit_ages = 0;
+            int pits_fulfilled = 0;
+            while (seg_q.rcv_chunks->len > 0) {
+                PENTRY pe = linked_list_remove(seg_q.rcv_chunks, 0);
+                log_assert(g_log, pe != NULL, "invalid pit entry");
 
-        while (seg_q.rcv_chunks->len > 0) {
-            PENTRY pe = linked_list_remove(seg_q.rcv_chunks, 0);
-            log_assert(g_log, pe != NULL, "invalid pit entry");
+                pthread_mutex_lock(pe->mutex);
+                log_debug(g_log, "pit entry %s fulfilled", (*pe->obj)->name->full_name);
 
-            pthread_mutex_lock(pe->mutex);
-            log_debug(g_log, "pit entry %s fulfilled", (*pe->obj)->name->full_name);
+                int chunk_id = pit_to_chunk[pe->index];
+                log_assert(g_log, chunk_id >= 0, "invalid chunk id");
 
-            int chunk_id = pit_to_chunk[pe->index];
-            log_assert(g_log, chunk_id >= 0, "invalid chunk id");
+                if (chunk_window[chunk_id].seq_no == 0) {
+                    seg->obj->publisher = (*pe->obj)->publisher;
+                    seg->obj->timestamp = (*pe->obj)->timestamp;
+                    seg->chunk_size = (*pe->obj)->size;
+                }
+                int offset = chunk_window[chunk_id].seq_no * seg->chunk_size;
+                memcpy(&seg->obj->data[offset], (*pe->obj)->data, (*pe->obj)->size);
+                content_obj_destroy(*pe->obj);
 
-            if (chunk_window[chunk_id].seq_no == 0) {
-                seg->obj->publisher = (*pe->obj)->publisher;
-                seg->obj->timestamp = (*pe->obj)->timestamp;
-                seg->chunk_size = (*pe->obj)->size;
+                struct timespec now;
+                ts_fromnow(&now);
+                ts_addms(&now, PIT_LIFETIME_MS);
+                pit_ages += PIT_age(pe);
+				pits_fulfilled++;
+
+                pit_to_chunk[pe->index] = -1;
+                PIT_release(pe);
+                free(_pit_handles[chunk_id]);
+                _pit_handles[chunk_id] = NULL;
+                bit_clear(window, chunk_id);
+                bit_set(missing, chunk_window[chunk_id].seq_no);
+                log_debug(g_log, "retrieved chunk %s", chunk_window[chunk_id].intr.name->full_name);
+                content_name_delete(chunk_window[chunk_id].intr.name);
+                chunk_window[chunk_id].intr.name = NULL;
+                cwnd++;
+                if (state == CONG_AVOID)
+                    fullfilled++;
             }
-            int offset = chunk_window[chunk_id].seq_no * seg->chunk_size;
-            memcpy(&seg->obj->data[offset], (*pe->obj)->data, (*pe->obj)->size);
 
-            struct timespec now;
-            ts_fromnow(&now);
-            ts_addms(&now, PIT_LIFETIME_MS);
-            rtt_est = (int)((rtt_est + ts_mselapsed(&now, pe->expires)) / 2.0);
-            if (rtt_est < min_rtt_est) {
+            rtt_est -= floor(pit_ages / pits_fulfilled);
+            if (rtt_est < min_rtt_est)
                 rtt_est = min_rtt_est;
-            }
-
-            pit_to_chunk[pe->index] = -1;
-            PIT_release(pe);
-            free(_pit_handles[chunk_id]);
-            _pit_handles[chunk_id] = NULL;
-            bit_clear(window, chunk_id);
-            bit_set(missing, chunk_window[chunk_id].seq_no);
-            log_debug(g_log, "retrieved chunk %s", chunk_window[chunk_id].intr.name->full_name);
-            content_name_delete(chunk_window[chunk_id].intr.name);
-            chunk_window[chunk_id].intr.name = NULL;
-            cwnd++;
-            if (state == CONG_AVOID)
-                fullfilled++;
         }
 
         pthread_mutex_unlock(&seg_q.mutex);
@@ -858,7 +869,8 @@ static int retrieve_segment(struct segment * seg)
                     PIT_refresh(_pit_handles[i]);
                     chunk_window[i].retries--;
                     ccnfdnb_fwd_interest(&chunk_window[i].intr);
-                    log_debug(g_log, "rtx interest: %s", chunk_window[i].intr.name->full_name);
+                    log_debug(g_log, "rtx interest: %s (rtt = %d)",
+                              chunk_window[i].intr.name->full_name, rtt_est);
                     ssthresh = cwnd / 2 + 1;
                     cwnd = 1;
                     state = SLOW_START;

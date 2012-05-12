@@ -13,27 +13,13 @@
 #include "ccnud_constants.h"
 #include "ccnu_packet.h"
 #include "content.h"
+#include "ccnu.h"
 
 extern struct synch_queue g_pak_queue;
 
 int ccnudnb_init();
 
 int ccnudnb_close();
-
-/* used to specify options for the ccnudnb_express_interest function */
-#define CCNUDNB_USE_ROUTE          0x1
-#define CCNUDNB_USE_RETRIES        0x2
-#define CCNUDNB_USE_TIMEOUT        0x4
-#define CCNUDNB_USE_TTL            0x8
-typedef struct ccnudnb_options {
-	int mode;
-	double distance;
-    unsigned orig_level_u, orig_clusterId_u;
-    unsigned dest_level_u, dest_clusterId_u;
-    int retries; /* number of times to send an interest */
-    int timeout_ms;
-    int ttl;
-} ccnudnb_opt_t;
 
 /* this is a blocking call that blocks until the data is received, so call
  * from within a thread that can sleep.
@@ -60,7 +46,7 @@ typedef struct ccnudnb_options {
  *                   hops an interest stays alive.
  */
 int ccnudnb_express_interest(struct content_name * name, struct content_obj ** content_ptr,
-                             int use_opt, struct ccnudnb_options * opt);
+                             int use_opt, struct ccnu_options * opt);
 
 uint16_t ccnudnb_gen_nonce();
 

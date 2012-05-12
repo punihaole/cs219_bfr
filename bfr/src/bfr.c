@@ -448,3 +448,81 @@ int bfr_sendDistance(struct content_name * name, int hops)
     return 0;
 }
 
+int bfr_queryDistance(unsigned orig_level, unsigned orig_clusterId,
+                      unsigned dest_level, unsigned dest_clusterId,
+                      double * distance)
+{
+    int s, len;
+    struct sockaddr_un daemon;
+
+    if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        return -1;
+    }
+
+    daemon.sun_family = AF_UNIX;
+    char sock_path[256];
+    bfr_did2sockpath(IP4_to_nodeId(), sock_path, 256);
+    strcpy(daemon.sun_path, sock_path);
+    len = strlen(daemon.sun_path) + sizeof(daemon.sun_family);
+    if (connect(s, (struct sockaddr *)&daemon, len) == -1) {
+        perror("connect");
+        return -1;
+    }
+
+    struct bfr_hdr hdr;
+    hdr.type = MSG_IPC_DISTANCE_QUERY;
+    hdr.nodeId = 0;
+    hdr.payload_size = (4 * sizeof(unsigned));
+
+    /* send the header */
+    if (send(s, &(hdr.type), sizeof(uint8_t), 0) == -1) {
+        perror("send");
+        return -1;
+    }
+
+    if (send(s, &(hdr.nodeId), sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        return -1;
+    }
+
+    if (send(s, &(hdr.payload_size), sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        return -1;
+    }
+
+    /* wait for the response */
+    if (send(s, &orig_level, sizeof(unsigned), 0) < sizeof(unsigned)) {
+        perror("send");
+        return -1;
+    }
+
+    if (send(s, &orig_clusterId, sizeof(unsigned), 0) < sizeof(unsigned)) {
+        perror("send");
+        return -1;
+    }
+
+    if (send(s, &dest_level, sizeof(unsigned), 0) < sizeof(unsigned)) {
+        perror("send");
+        return -1;
+    }
+
+    if (send(s, &dest_clusterId, sizeof(unsigned), 0) < sizeof(unsigned)) {
+        perror("send");
+        return -1;
+    }
+
+    uint64_t new_dist_754;
+    if (recv(s, &new_dist_754, sizeof(uint64_t), 0) < sizeof(uint64_t)) {
+        perror("recv");
+        return -1;
+    }
+
+    double new_dist = unpack_ieee754_64(new_dist_754);
+
+    *distance = new_dist;
+
+    close(s);
+
+    return 0;
+}

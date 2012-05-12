@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include "bfr.h"
@@ -104,8 +103,10 @@ int main(int argc, char ** argv)
     signal(SIGUSR1, signal_handler);
     signal(SIGUSR2, signal_handler);
 
+    int logging_level = LOG_NORMAL;
+
     int c;
-    while ((c = getopt(argc, argv, "-h?tn:l:g:s:c:b:j:")) != -1) {
+    while ((c = getopt(argc, argv, "-h?tn:l:g:s:c:b:j:qv")) != -1) {
         switch (c) {
             case 'h':
             case '?':
@@ -160,6 +161,12 @@ int main(int argc, char ** argv)
                     exit(EXIT_SUCCESS);
                 else
                     exit(EXIT_FAILURE);
+            case 'q':
+                logging_level = LOG_ERROR | LOG_CRITICAL;
+                break;
+            case 'v':
+                logging_level = LOG_DEVEL;
+                break;
             default:
                 break;
 
@@ -188,7 +195,7 @@ int main(int argc, char ** argv)
     log_name[255] = '\0';
     log_file[255] = '\0';
 
-    if (log_init(log_name, log_file, g_log, LOG_OVERWRITE) < 0) {
+    if (log_init(log_name, log_file, g_log, LOG_OVERWRITE | logging_level) < 0) {
         fprintf(stderr, "bfr log: %s failed to initalize, exiting!", log_file);
         exit(EXIT_FAILURE);
     }

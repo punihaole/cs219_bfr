@@ -2,6 +2,8 @@
 #include <string.h>
 #include <math.h>
 #include <pthread.h>
+#include <assert.h>
+#include <errno.h>
 
 #include "ccnud_cs.h"
 #include "hash.h"
@@ -10,13 +12,10 @@
 #include "linked_list.h"
 #include "bitmap.h"
 
-extern uint32_t g_nodeId;
-
 struct CS {
-    pthread_mutex_t lock;
     struct hashtable * table;
     int summary_size;
-    uint32_t nodeId;
+    pthread_mutex_t lock;
 };
 
 struct CS_segment {
@@ -41,6 +40,8 @@ static void segment_destroy(struct CS_segment * seg)
     for (i = 0; i < seg->num_chunks; i++) {
         content_obj_destroy(seg->chunks[i]);
     }
+
+    pthread_mutex_destroy(&seg->lock);
     free(seg->chunks);
     free(seg);
 }
@@ -64,16 +65,15 @@ int CS_init(evict_policy_t ep, double p)
             break;
     }
 
-    _cs.nodeId = g_nodeId;
     _cs.table = hash_create(CS_SIZE, evict_fun, (delete_t)segment_destroy, BLOOM_ARGS);
     pthread_mutex_init(&_cs.lock, NULL);
 
     if (!_cs.table) return -1;
 
-    /*     -n * ln(p)
-     * m = ----------
-     *      (ln(2))^2
-     */
+    /* -n * ln(p)
+* m = ----------
+* (ln(2))^2
+*/
     _cs.summary_size = ceil(-1.0 * (CS_SIZE * log(p))) / (pow(log(2.0),2.0));
     int rem = _cs.summary_size % 8;
     /* round to nearest 8 since this is the number of bits for bloom filter */
@@ -88,7 +88,9 @@ static inline struct content_obj * content_copy(struct content_obj * orig)
     if (!orig) {
         return NULL;
     }
+
     struct content_obj * copy = malloc(sizeof(struct content_obj));
+    log_assert(g_log, copy != NULL, "CS: failed to allocate content");
     copy->publisher = orig->publisher;
     copy->name = content_name_create(orig->name->full_name);
     copy->timestamp = orig->timestamp;
@@ -102,6 +104,7 @@ static inline struct content_obj * content_copy(struct content_obj * orig)
 int CS_put(struct content_obj * content)
 {
     content = content_copy(content);
+    log_assert(g_log, content != NULL, "CS: failed to allocate content");
 
     pthread_mutex_lock(&_cs.lock);
     struct CS_segment * segment = (struct CS_segment * )
@@ -154,29 +157,8 @@ int CS_put(struct content_obj * content)
             pthread_mutex_init(&segment->lock, NULL);
 
             pthread_mutex_lock(&_cs.lock);
-
-            struct CS_segment * safety_segment = (struct CS_segment * ) hash_get(_cs.table, key);
-
+            hash_put(_cs.table, key, (void * ) segment);
             pthread_mutex_unlock(&_cs.lock);
-
-            if (safety_segment) {
-                // This segment already exists!
-                log_critical(g_log, "CS: CRITICAL ERROR, adding a segment that already exists!");
-
-                pthread_mutex_lock(&safety_segment->lock);
-
-                pthread_mutex_lock(&_cs.lock);
-                hash_put(_cs.table, key, (void * ) segment);
-                pthread_mutex_unlock(&_cs.lock);
-
-                pthread_mutex_unlock(&safety_segment->lock);
-
-            } else {
-
-                pthread_mutex_lock(&_cs.lock);
-                hash_put(_cs.table, key, (void * ) segment);
-                pthread_mutex_unlock(&_cs.lock);
-            }
 
         } else {
 
@@ -216,29 +198,8 @@ int CS_putSegment(struct content_obj * prefix_obj, struct linked_list * content_
     }
 
     pthread_mutex_lock(&_cs.lock);
-
-    struct CS_segment * safety_segment = (struct CS_segment * )
-        hash_get(_cs.table, content_prefix(prefix_obj->name));
-
+    hash_put(_cs.table, key, (void * ) segment);
     pthread_mutex_unlock(&_cs.lock);
-
-    if (safety_segment) {
-        // This segment already exists!
-        log_critical(g_log, "CS: CRITICAL ERROR, adding a segment that already exists!");
-
-        pthread_mutex_lock(&safety_segment->lock);
-
-        pthread_mutex_lock(&_cs.lock);
-        hash_put(_cs.table, key, (void * ) segment);
-        pthread_mutex_unlock(&_cs.lock);
-
-        pthread_mutex_unlock(&safety_segment->lock);
-
-    } else {
-        pthread_mutex_lock(&_cs.lock);
-        hash_put(_cs.table, key, (void * ) segment);
-        pthread_mutex_unlock(&_cs.lock);
-    }
 
     return 0;
 }
@@ -253,17 +214,15 @@ struct content_obj * CS_get(struct content_name * name)
     if (!content_is_segmented(name)) {
 
         pthread_mutex_lock(&_cs.lock);
-
         segment = (struct CS_segment * ) hash_get(_cs.table, name->full_name);
-
         pthread_mutex_unlock(&_cs.lock);
 
         if (segment) {
+
             pthread_mutex_lock(&segment->lock);
-
             copy = content_copy(segment->index_chunk);
-
             pthread_mutex_unlock(&segment->lock);
+
         }
 
         return copy;
@@ -274,17 +233,15 @@ struct content_obj * CS_get(struct content_name * name)
         char * prefix = content_prefix(name);
 
         pthread_mutex_lock(&_cs.lock);
-
         segment = (struct CS_segment * ) hash_get(_cs.table, prefix);
-
         pthread_mutex_unlock(&_cs.lock);
 
         if ((segment) && (chunk < segment->num_chunks)) {
+
             pthread_mutex_lock(&segment->lock);
-
             copy = content_copy(segment->chunks[chunk]);
-
             pthread_mutex_unlock(&segment->lock);
+
         }
 
         free(prefix);
@@ -294,6 +251,7 @@ struct content_obj * CS_get(struct content_name * name)
     }
 }
 
+/*
 struct content_obj * CS_getSegment(struct content_name * prefix)
 {
     if (!prefix) return NULL;
@@ -329,30 +287,30 @@ struct content_obj * CS_getSegment(struct content_name * prefix)
         }
 
         pthread_mutex_unlock(&segment->lock);
+
     }
 
     return all;
 }
+*/
 
 int CS_summary(struct bloom ** filter_ptr)
 {
     if (!filter_ptr) return -1;
 
     *filter_ptr = bloom_create(_cs.summary_size, BLOOM_ARGS);
+    int i;
+
     pthread_mutex_lock(&_cs.lock);
 
-
-    int i;
     for (i = 0; i < _cs.table->size; i++) {
         struct hash_entry * entry = _cs.table->entries[i];
         if (entry && entry->valid) {
-            struct CS_segment * segment = entry->data;
-            if (segment->index_chunk->publisher == _cs.nodeId) {
-                char * name = entry->key;
-                bloom_add(*filter_ptr, name);
-            }
+            char * name = entry->key;
+            bloom_add(*filter_ptr, name);
         }
     }
+
     pthread_mutex_unlock(&_cs.lock);
 
     return 0;

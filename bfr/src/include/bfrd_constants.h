@@ -36,4 +36,7 @@
 #define DEFAULT_BACKOFF_INTERVAL_MS 33
 #define RESPONSE_MAX_WAIT_TIME_MS 100
 
+/* don't geo-route BFR routing state messages */
+#define BFR_FLOOD_STATE
+
 #endif // CRUSTD_CONSTANTS_H_INCLUDED

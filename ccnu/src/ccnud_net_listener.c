@@ -37,6 +37,7 @@ struct ccnud_net_s {
     struct linked_list * segments;
     pthread_mutex_t nonce_lock;
     struct bitmap * seen_nonces;
+    thread_pool_t nonce_pool;
 };
 
 struct ccnud_net_s _net;
@@ -56,12 +57,18 @@ int ccnudnl_init(int pipeline_size)
     pthread_mutex_init(&_net.nonce_lock, NULL);
     _net.seen_nonces = bit_create(65535);
 
+    if (tpool_create(&_net.nonce_pool, 50) < 0) {
+        log_print(g_log, "tpool_create: could not create nonce thread pool!");
+        return -1;
+    }
+
     return 0;
 }
 
 int ccnudnl_close()
 {
     tpool_shutdown(&_net.packet_pipeline);
+    tpool_shutdown(&_net.nonce_pool);
     return 0;
 }
 
@@ -73,7 +80,7 @@ void * ccnudnl_service(void * arg)
 
     int rcvd;
     struct net_buffer buf;
-    net_buffer_init(CCNU_MAX_PACKET_SIZE, &buf);
+    net_buffer_init(CCNU_MAX_PACKET_SIZE + sizeof(struct ether_header), &buf);
 	while (1) {
 	    net_buffer_reset(&buf);
         rcvd = recvfrom(g_sockfd, buf.buf, buf.size, 0, NULL, NULL);
@@ -82,10 +89,11 @@ void * ccnudnl_service(void * arg)
         struct ether_header eh;
         net_buffer_copyFrom(&buf, &eh, sizeof(eh));
 
-        log_debug(g_log, "ccnfdnl_service: rcvd %d bytes from %02x:%02x:%02x:%02x:%02x:%02x",
+        /*log_debug(g_log, "ccnfdnl_service: rcvd %d bytes from %02x:%02x:%02x:%02x:%02x:%02x",
                   rcvd,
                   eh.ether_shost[0], eh.ether_shost[1], eh.ether_shost[2],
                   eh.ether_shost[3], eh.ether_shost[4], eh.ether_shost[5]);
+        */
 
         if (rcvd <= 0) {
             log_error(g_log, "ccnfdnl_service: recv failed -- trying to stay alive!");
@@ -97,6 +105,7 @@ void * ccnudnl_service(void * arg)
 
         if (type == PACKET_TYPE_INTEREST) {
             uint16_t nonce = net_buffer_getShort(&buf);
+            #ifdef CCNU_NONCE_DETECT
             pthread_mutex_lock(&_net.nonce_lock);
             int seen = bit_test(_net.seen_nonces, nonce);
             if (!seen) {
@@ -109,6 +118,7 @@ void * ccnudnl_service(void * arg)
             } else {
                 log_print(g_log, "ccnudnl_service: adding interest with nonce (%u)", nonce);
             }
+            #endif
             struct ccnu_interest_pkt * interest = malloc(sizeof(struct ccnu_interest_pkt));
             interest->nonce = nonce;
             interest->ttl = net_buffer_getByte(&buf);
@@ -125,11 +135,16 @@ void * ccnudnl_service(void * arg)
             str[name_len] = '\0';
             interest->name = content_name_create(str);
 
-            tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_interest, interest, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
+            tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_interest, interest,
+                          TPOOL_FREE_ARG | TPOOL_NO_RV, (delete_t)ccnu_interest_destroy, NULL);
         } else if (type == PACKET_TYPE_DATA) {
             struct ccnu_data_pkt * data = malloc(sizeof(struct ccnu_data_pkt));
             data->hops = net_buffer_getByte(&buf);
             data->publisher_id = net_buffer_getInt(&buf);
+            if (data->publisher_id == g_nodeId) {
+                free(data);
+                continue;
+            }
             int name_len = net_buffer_getInt(&buf);
             char str[MAX_NAME_LENGTH];
             if (name_len > MAX_NAME_LENGTH)
@@ -139,12 +154,11 @@ void * ccnudnl_service(void * arg)
             data->name = content_name_create(str);
             data->timestamp = net_buffer_getInt(&buf);
             data->payload_len = net_buffer_getInt(&buf);
-            data->payload = malloc(sizeof(uint8_t) * data->payload_len);
-
+            data->payload = malloc(data->payload_len);
             net_buffer_copyFrom(&buf, data->payload, data->payload_len);
-            if (data->publisher_id != g_nodeId) {
-                tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_data, data, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
-            }
+
+            tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_data, data,
+                          TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
         } else {
             log_print(g_log, "ccnudnl_service: recvd unknown msg type - %u", type);
             sleep(1);
@@ -178,19 +192,21 @@ static _segment_q_t * match_segment(struct content_name * name)
     return NULL;
 }
 
+#ifdef CCNU_NONCE_DETECT
 static void * unregister_nonce(void * arg)
 {
     uint16_t nonce;
     memcpy(&nonce, arg, sizeof(uint16_t));
     free(arg);
 
-    msleep(100);
+    msleep(500);
     pthread_mutex_lock(&_net.nonce_lock);
         bit_clear(_net.seen_nonces, nonce);
     pthread_mutex_unlock(&_net.nonce_lock);
 
     return NULL;
 }
+#endif
 
 static void * handle_interest(struct ccnu_interest_pkt * interest)
 {
@@ -203,10 +219,10 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
     *nonce = interest->nonce;
 
 	ccnustat_rcvd_interest(interest);
-    log_debug(g_log, "handle_interest: %s from %u:%u->%u:%u %5.5f, %d",
+    log_debug(g_log, "handle_interest: %s from %u:%u->%u:%u %5.5f",
               interest->name->full_name, interest->orig_level, interest->orig_clusterId,
               interest->dest_level, interest->dest_clusterId,
-              unpack_ieee754_64(interest->distance), interest->distance);
+              unpack_ieee754_64(interest->distance));
 
     PENTRY pe = PIT_exact_match(interest->name);
     if (pe) {
@@ -221,7 +237,6 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
             ccnudnb_fwd_interest(interest);
         }
         PIT_refresh(pe);
-
         /* we already saw this interest...drop it */
         PIT_close(pe);
 
@@ -234,11 +249,12 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
 
             log_debug(g_log, "handle_interest: %s (responded)", interest->name->full_name);
             ccnudnb_fwd_data(content, 1);
+            content_obj_destroy(content);
 
         } else {
 
             /* see if we can satisfy this interest */
-            log_print(g_log, "handle_interest: checking if should fwd: %s\n", interest->name->full_name);
+            log_print(g_log, "handle_interest: checking if should fwd: %s", interest->name->full_name);
             /* ask routing daemon if we should forward the interest */
             double last_hop_distance = unpack_ieee754_64(interest->distance);
             int need_fwd = 0;
@@ -257,18 +273,13 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
 
             if (need_fwd == 1) {
                 interest->ttl--;
-                /* we fwded the interest, add it to the pit */
-                rv = PIT_add_entry(interest->name);
-                if (rv != 0) goto END;
 
-                if ((rv = ccnudnb_fwd_interest(interest)) < 0) {
-                    log_print(g_log, "handle_interest: ccnudnb_fwd_interest failed name - %s",
-                              interest->name->full_name);
-                    goto END;
-                }
-
+                ccnudnb_fwd_interest(interest);
                 log_print(g_log, "handle_interest: %s forwarding.",
                           interest->name->full_name);
+                /* we fwded the interest, add it to the pit */
+                PIT_add_entry(interest->name);
+
             } else {
                 log_print(g_log, "handle_interest: %s dropping.", interest->name->full_name);
                 /* drop interest */
@@ -276,9 +287,9 @@ static void * handle_interest(struct ccnu_interest_pkt * interest)
         }
     }
 
-
-    END:
-    tpool_add_job(&_net.packet_pipeline, (job_fun_t)unregister_nonce, nonce, TPOOL_NO_RV, NULL, NULL);
+#ifdef CCNU_NONCE_DETECT
+    tpool_add_job(&_net.nonce_pool, (job_fun_t)unregister_nonce, nonce, TPOOL_NO_RV, NULL, NULL);
+#endif
     log_print(g_log, "handle_interest: done");
 
     return NULL;
@@ -293,30 +304,29 @@ static void * handle_data(struct ccnu_data_pkt * data)
     log_print(g_log, "handle_data: name: (%s), publisher: %u, timestamp: %u, size: %u",
               data->name->full_name, data->publisher_id, data->timestamp, data->payload_len);
 
-    struct content_obj * obj = NULL;
-    obj = (struct content_obj *) malloc(sizeof(struct content_obj));
-
-    obj->publisher = data->publisher_id;
-    obj->name = data->name;
-    obj->timestamp = data->timestamp;
-    obj->size = data->payload_len;
-    obj->data = data->payload;
-
     /* check if it fulfills a registered interest */
-    PENTRY pe = PIT_exact_match(obj->name);
+    PENTRY pe = PIT_exact_match(data->name);
     if (!pe) {
         ccnustat_rcvd_data_unsolicited(data);
-        log_print(g_log, "%s unsolicited data", obj->name->full_name);
+        log_print(g_log, "%s unsolicited data", data->name->full_name);
         /* unsolicited data */
     } else {
+        struct content_obj * obj;
+        obj = malloc(sizeof(struct content_obj));
+        obj->publisher = data->publisher_id;
+        obj->name = data->name;
+        obj->timestamp = data->timestamp;
+        obj->size = data->payload_len;
+        obj->data = malloc(data->payload_len);
+        memcpy(obj->data, data->payload, data->payload_len);
+
         /* update the forwarding table in the routing daemon (if prefix) */
         if (!content_is_segmented(obj->name)) {
             bfr_sendDistance(obj->name, data->hops);
         }
 
-        CS_put(obj);
         ccnustat_rcvd_data(data);
-
+        CS_put(obj);
         if (!*pe->obj) {
             *pe->obj = obj; /* hand them the data and wake them up*/
         }
@@ -327,7 +337,6 @@ static void * handle_data(struct ccnu_data_pkt * data)
             /* no need to lock the pe, the pit_longest_match did it for us */
             _segment_q_t * seg = match_segment(obj->name);
             if (seg) {
-                log_print(g_log, "%s is segmented content", obj->name->full_name);
                 /* already locked */
                 pthread_mutex_unlock(pe->mutex);
                 linked_list_append(seg->rcv_chunks, pe);
@@ -354,7 +363,7 @@ static void * handle_data(struct ccnu_data_pkt * data)
         }
     }
 
-    //log_print(g_log, "handle_data: done");
+    log_print(g_log, "handle_data: done");
 
     return NULL;
 }

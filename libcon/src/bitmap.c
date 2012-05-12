@@ -10,7 +10,7 @@ struct bitmap * bit_create(int size)
            int bit will be partially used */
         map->num_words = (size / BITS_PER_WORD) + (((size % BITS_PER_WORD) > 0) ? 1 : 0);
         map->num_bits = size;
-        map->map = (unsigned int *) calloc(map->num_words, sizeof(unsigned int));
+        map->map = calloc(map->num_words, sizeof(unsigned int));
 
         return map;
 }

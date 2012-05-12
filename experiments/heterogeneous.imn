@@ -11,7 +11,7 @@ node n1 {
     }
     canvas c1
     iconcoords {510.6666666666667 686.6666666666666}
-    labelcoords {510.6666666666667 718.6666666666666}
+    labelcoords {470.6666666666667 687.6666666666666}
     interface-peer {eth0 n12}
 }
 
@@ -27,8 +27,8 @@ node n2 {
 	!
     }
     canvas c1
-    iconcoords {466.0 740.0}
-    labelcoords {466.0 772.0}
+    iconcoords {465.0 740.0}
+    labelcoords {428.0 775.0}
     interface-peer {eth0 n12}
 }
 
@@ -72,6 +72,10 @@ node n5 {
     network-config {
 	hostname n5
 	!
+	interface eth1
+	 ipv6 address 2001:1::1/128
+	 ip address 10.0.1.1/24
+	!
 	interface eth0
 	 ipv6 address 2001:0::5/128
 	 ip address 10.0.0.5/8
@@ -81,6 +85,7 @@ node n5 {
     iconcoords {676.0 696.0}
     labelcoords {676.0 728.0}
     interface-peer {eth0 n12}
+    interface-peer {eth1 n13}
 }
 
 node n6 {
@@ -88,6 +93,10 @@ node n6 {
     model ccn
     network-config {
 	hostname n6
+	!
+	interface eth1
+	 ipv6 address 2001:1::2/128
+	 ip address 10.0.1.2/24
 	!
 	interface eth0
 	 ipv6 address 2001:0::6/128
@@ -98,6 +107,7 @@ node n6 {
     iconcoords {1425.3333333333333 620.0}
     labelcoords {1425.3333333333333 652.0}
     interface-peer {eth0 n12}
+    interface-peer {eth1 n13}
 }
 
 node n7 {
@@ -105,6 +115,10 @@ node n7 {
     model ccn
     network-config {
 	hostname n7
+	!
+	interface eth1
+	 ipv6 address 2001:1::3/128
+	 ip address 10.0.1.3/24
 	!
 	interface eth0
 	 ipv6 address 2001:0::7/128
@@ -115,6 +129,7 @@ node n7 {
     iconcoords {1848.0 1300.0}
     labelcoords {1848.0 1332.0}
     interface-peer {eth0 n12}
+    interface-peer {eth1 n13}
 }
 
 node n8 {
@@ -163,8 +178,8 @@ node n10 {
 	!
     }
     canvas c1
-    iconcoords {1940.6666666666667 1394.0}
-    labelcoords {1940.6666666666667 1426.0}
+    iconcoords {1942.0 1394.0}
+    labelcoords {1942.0 1426.0}
     interface-peer {eth0 n12}
 }
 
@@ -334,6 +349,39 @@ node n12 {
     interface-peer {e16 n23}
 }
 
+node n13 {
+    type wlan
+    network-config {
+	hostname wlan13
+	!
+	interface wireless
+	 ipv6 address 2001:1::0/128
+	 ip address 10.0.1.0/24
+	!
+	mobmodel
+	coreapi
+	basic_range
+	!
+    }
+    custom-config {
+	custom-config-id basic_range
+	custom-command {3 3 9 9 9}
+	config {
+	1000
+	54000000
+	0
+	20000
+	0
+	}
+    }
+    canvas c1
+    iconcoords {727.0 1209.0}
+    labelcoords {727.0 1241.0}
+    interface-peer {e0 n5}
+    interface-peer {e1 n6}
+    interface-peer {e2 n7}
+}
+
 link l1 {
     nodes {n12 n1}
 }
@@ -400,6 +448,18 @@ link l16 {
 
 link l17 {
     nodes {n12 n23}
+}
+
+link l18 {
+    nodes {n13 n5}
+}
+
+link l19 {
+    nodes {n13 n6}
+}
+
+link l20 {
+    nodes {n13 n7}
 }
 
 canvas c1 {

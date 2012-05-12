@@ -41,6 +41,7 @@ struct bfr_listener _listener;
 
 static void * fwd_query_response(void * arg);
 static void * dest_query_response(void * arg);
+static void * dist_query_response(void * arg);
 
 int bfr_listener_init()
 {
@@ -123,7 +124,9 @@ int bfr_accept(struct bfr_msg * msg)
     }
 
     /* these need a response so we schedule a handler from the pool */
-    if (hdr->type == MSG_IPC_INTEREST_FWD_QUERY || hdr->type == MSG_IPC_INTEREST_DEST_QUERY) {
+    if ((hdr->type == MSG_IPC_INTEREST_FWD_QUERY) ||
+        (hdr->type == MSG_IPC_INTEREST_DEST_QUERY) ||
+        (hdr->type == MSG_IPC_DISTANCE_QUERY)) {
         void * handler = NULL;
         switch (hdr->type) {
             case MSG_IPC_INTEREST_FWD_QUERY:
@@ -131,6 +134,9 @@ int bfr_accept(struct bfr_msg * msg)
                 break;
             case MSG_IPC_INTEREST_DEST_QUERY:
                 handler = dest_query_response;
+                break;
+            case MSG_IPC_DISTANCE_QUERY:
+                handler = dist_query_response;
                 break;
             default:
                 log_print(g_log, "bfr_accept: Should never be here!");
@@ -206,7 +212,9 @@ void * bfr_listener_service(void * arg)
 		    continue;
 		}
 
-        if (msg->hdr.type == MSG_IPC_INTEREST_FWD_QUERY || msg->hdr.type == MSG_IPC_INTEREST_DEST_QUERY) {
+        if ((msg->hdr.type == MSG_IPC_INTEREST_FWD_QUERY) ||
+            (msg->hdr.type == MSG_IPC_INTEREST_DEST_QUERY) ||
+            (msg->hdr.type == MSG_IPC_DISTANCE_QUERY)) {
             /* it's already been handled, just delete the msg */
             free(msg);
             continue;
@@ -292,7 +300,7 @@ static void * fwd_query_response(void * arg)
         double y = g_bfr.y;
         unsigned my_leaf = clus_leaf_clusterId();
         unsigned num_levels = g_bfr.num_levels;
-        bool_t am_dest_cluster_head = amClusterHead(dest_level);
+        //bool_t am_dest_cluster_head = amClusterHead(dest_level);
 	pthread_mutex_unlock(&g_bfr.bfr_lock);
 
     struct content_name * name = content_name_create(full_name);
@@ -575,5 +583,51 @@ static void * dest_query_response(void * arg)
 
     close(sock2);
     if (name) content_name_delete(name);
+    return NULL;
+}
+
+static void * dist_query_response(void * arg)
+{
+    char proc[256];
+    snprintf(proc, 256, "dist_qry_resp%u", g_bfr.nodeId);
+    prctl(PR_SET_NAME, proc, 0, 0, 0);
+
+    int sock2;
+    memcpy(&sock2, (int * )arg, sizeof(int));
+    free(arg);
+
+    unsigned orig_level, orig_clusterId, dest_level, dest_clusterId;
+    if (recv(sock2, &orig_level, sizeof(unsigned), 0) < sizeof(unsigned)) {
+        log_print(g_log, "recv: %s.", strerror(errno));
+        goto END_DIST_QRY;
+    }
+    if (recv(sock2, &orig_clusterId, sizeof(unsigned), 0) < sizeof(unsigned)) {
+        log_print(g_log, "recv: %s.", strerror(errno));
+        goto END_DIST_QRY;
+    }
+    if (recv(sock2, &dest_level, sizeof(unsigned), 0) < sizeof(unsigned)) {
+        log_print(g_log, "recv: %s.", strerror(errno));
+        goto END_DIST_QRY;
+    }
+    if (recv(sock2, &dest_clusterId, sizeof(unsigned), 0) < sizeof(unsigned)) {
+        log_print(g_log, "recv: %s.", strerror(errno));
+        goto END_DIST_QRY;
+    }
+
+    double x, y;
+    double distance = 0;
+    if (grid_center(orig_level, orig_clusterId, &x, &y) == 0) {
+        grid_distance(dest_level, dest_clusterId, x, y, &distance);
+    }
+
+    uint64_t distance_754 = pack_ieee754_64(distance);
+    if (send(sock2, &distance_754, sizeof(uint64_t), 0) == -1) {
+        log_print(g_log, "send: %s", strerror(errno));
+        goto END_DIST_QRY;
+    }
+
+    END_DIST_QRY:
+
+    close(sock2);
     return NULL;
 }

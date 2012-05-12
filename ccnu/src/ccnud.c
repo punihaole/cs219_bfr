@@ -78,16 +78,16 @@ void signal_handler(int signal)
 {
     switch(signal) {
         case SIGHUP:
-            log_print(g_log, "Received SIGHUP signal.");
+            log_important(g_log, "Received SIGHUP signal.");
             break;
         case SIGTERM:
-            log_print(g_log, "Received SIGTERM signal.");
+            log_important(g_log, "Received SIGTERM signal.");
             log_close(g_log);
             ccnustat_done();
             exit(EXIT_SUCCESS);
             break;
         default:
-            log_print(g_log, "Unhandled signal (%d) %s", signal, strsignal(signal));
+            log_warn(g_log, "Unhandled signal (%d) %s", signal, strsignal(signal));
             break;
     }
 }
@@ -270,18 +270,18 @@ int main(int argc, char *argv[])
     close(STDERR_FILENO);
     /* change the current working directory (after log is inited) */
     if ((chdir("/")) < 0) {
-        log_print(g_log, "chdir: %s.", strerror(errno));
+        log_critical(g_log, "chdir: %s.", strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     /* initalize CS, PIT, FIB */
     if (CS_init(OLDEST, p) != 0) {
-        log_print(g_log, "failed to create CS! - EXITING");
+        log_critical(g_log, "failed to create CS! - EXITING");
         exit(EXIT_FAILURE);
     }
 
     if (PIT_init() != 0) {
-        log_print(g_log, "failed to create PIT! - EXITING");
+        log_critical(g_log, "failed to create PIT! - EXITING");
         exit(EXIT_FAILURE);
     }
 
@@ -291,17 +291,17 @@ int main(int argc, char *argv[])
     }
 
     if (ccnudl_init(interest_pipeline) < 0) {
-        log_print(g_log, "ccnud listener failed to initalize.");
+        log_critical(g_log, "ccnud listener failed to initalize.");
         exit(EXIT_FAILURE);
     }
 
     if (ccnudnl_init(interest_pipeline * 2) < 0) {
-        log_print(g_log, "ccnud net listener failed to initalize.");
+        log_critical(g_log, "ccnud net listener failed to initalize.");
         exit(EXIT_FAILURE);
     }
 
     if (ccnudnb_init() < 0) {
-        log_print(g_log, "ccnud net broadcaster failed to initalize.");
+        log_critical(g_log, "ccnud net broadcaster failed to initalize.");
         exit(EXIT_FAILURE);
     }
 
@@ -330,24 +330,24 @@ int main(int argc, char *argv[])
             switch (msg->type) {
                 case MSG_IPC_TIMEOUT:
                     if (msg->payload_size != sizeof(uint32_t)) {
-                        log_print(g_log, "ccnud: malformed MSG_IPC_TIMEOUT");
+                        log_error(g_log, "ccnud: malformed MSG_IPC_TIMEOUT");
                     }
                     pthread_mutex_lock(&g_lock);
                     memcpy(&g_timeout_ms, msg->payload, sizeof(uint32_t));
                     pthread_mutex_unlock(&g_lock);
-                    log_print(g_log, "ccnud: updating interest timeout = %d", g_timeout_ms);
+                    log_important(g_log, "ccnud: updating interest timeout = %d", g_timeout_ms);
                     break;
                 case MSG_IPC_RETRIES:
                     if (msg->payload_size != sizeof(uint32_t)) {
-                        log_print(g_log, "ccnud: malformed MSG_IPC_TIMEOUT");
+                        log_error(g_log, "ccnud: malformed MSG_IPC_TIMEOUT");
                     }
                     pthread_mutex_lock(&g_lock);
                     memcpy(&g_interest_attempts, msg->payload, sizeof(uint32_t));
                     pthread_mutex_unlock(&g_lock);
-                    log_print(g_log, "ccnud: updating interest retries = %d", g_interest_attempts);
+                    log_important(g_log, "ccnud: updating interest retries = %d", g_interest_attempts);
                     break;
                 default:
-                    log_print(g_log, "ccnud: unknown IPC message: %d", msg->type);
+                    log_error(g_log, "ccnud: unknown IPC message: %d", msg->type);
                     break;
             }
 

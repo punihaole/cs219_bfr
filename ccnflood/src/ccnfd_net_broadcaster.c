@@ -228,9 +228,9 @@ int ccnfdnb_fwd_interest(struct ccnf_interest_pkt * interest)
             log_error(g_log, "ccnfdnb_fwd_interest: sendto(%d): %s", i, strerror(errno));
         } else if (sent != n) {
             log_warn(g_log, "ccnfdnb_fwd_interest: warning sent %d bytes, expected %d!", sent, n);
-        }
-
-        log_debug(g_log, "ccnfdnb_fwd_interest: sent %d bytes", sent);
+        } else {
+	        log_debug(g_log, "ccnfdnb_fwd_interest: sent %d bytes", sent);
+		}
     }
 
     return 0;
@@ -280,6 +280,8 @@ int ccnfdnb_fwd_data(struct content_obj * content, int hops_taken)
             log_error(g_log, "ccnfdnb_fwd_data: sendto(%d): %s", i, strerror(errno));
         } else if (sent != n) {
             log_warn(g_log, "ccnfdnb_fwd_data: warning sent %d bytes, expected %d!", sent, n);
+        } else {
+            log_debug(g_log, "ccnfdnb_fwd_data: sent %d bytes", n);
         }
     }
 

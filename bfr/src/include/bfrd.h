@@ -18,7 +18,6 @@
 #include <net/if.h>
 #include <netinet/ether.h>
 
-
 #include "linked_list.h"
 #include "content_name.h"
 #include "bfrd_constants.h"

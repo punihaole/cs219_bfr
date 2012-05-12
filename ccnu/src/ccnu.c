@@ -700,6 +700,223 @@ int ccnu_retrieveSeq(struct content_name * baseName, int chunks, int file_len, s
     return rv;
 }
 
+int ccnu_retrieveSeq_opts(struct content_name * baseName, int chunks, int file_len,
+                     	  struct content_obj ** content_ptr, ccnu_opt_t * opts)
+{
+    if (!content_ptr || !baseName) {
+        fprintf(stderr, "ccnu_retrive: content pointer/name invalid! -- IGNORING");
+        return -1;
+    }
+
+    int s;
+    struct sockaddr_un daemon;
+
+    if ((s = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+        close (s);
+        return -1;
+    }
+
+    daemon.sun_family = AF_UNIX;
+    char sock_path[256];
+    ccnu_did2sockpath(IP4_to_nodeId(), sock_path, 256);
+    strcpy(daemon.sun_path, sock_path);
+    int len = strlen(daemon.sun_path) + sizeof(daemon.sun_family);
+    if (connect(s, (struct sockaddr * ) &daemon, len) == -1) {
+        perror("connect");
+        close (s);
+        return -1;
+    }
+
+    uint8_t type = MSG_IPC_RETRIEVE_OPT;
+    uint32_t msg_size = baseName->len + 4 * sizeof(uint32_t);
+    /* send the req */
+    if (send(s, &type, sizeof(uint8_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &msg_size, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &baseName->len, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, baseName->full_name, baseName->len, 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &chunks, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &file_len, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+
+    uint32_t mode = opts->mode;
+    uint64_t dist = pack_ieee754_64(opts->distance);
+    uint32_t orig_level = opts->orig_level_u;
+    uint32_t orig_clusterId = opts->orig_clusterId_u;
+    uint32_t dest_level = opts->dest_level_u;
+    uint32_t dest_clusterId = opts->dest_clusterId_u;
+    uint32_t retries = opts->retries;
+    uint32_t timeout = opts->timeout_ms;
+    uint32_t ttl = opts->ttl;
+
+    if (send(s, &mode, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &dist, sizeof(uint64_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &orig_level, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &orig_clusterId, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &dest_level, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &dest_clusterId, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &retries, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &timeout, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+    if (send(s, &ttl, sizeof(uint32_t), 0) == -1) {
+        perror("send");
+        close (s);
+        return -1;
+    }
+
+
+    /* structure  of sequence response msg:
+     * rv : int
+     * publisher : int
+     * name_len : int
+     * name : char[name_len]
+     * timestamp : int
+     * size : int
+     * data : byte[size]
+     */
+
+    /* get the response */
+    int rv;
+    if (recv(s, &rv, sizeof(int), 0) < sizeof(uint32_t)) {
+        perror("recv");
+        close (s);
+        return -1;
+    }
+
+    if (rv != 0) {
+        /* the content retrieve failed in the daemon! -- don't continue */
+        close(s);
+        return rv;
+    }
+
+    *content_ptr = (struct content_obj *) malloc(sizeof(struct content_obj));
+    uint32_t publisher;
+    struct content_obj * content = *content_ptr;
+    content->name = NULL;
+    uint32_t name_len;
+    char * str = NULL;
+    uint32_t timestamp;
+    uint32_t size;
+    uint8_t * data = NULL;
+
+    if (recv(s, &publisher, sizeof(uint32_t), 0) < sizeof(uint32_t)) {
+        perror("recv");
+        rv = -1;
+        goto END_RETRIEVE;
+    }
+
+    if (recv(s, &name_len, sizeof(uint32_t), 0) < sizeof(uint32_t)) {
+        perror("recv");
+        rv = -1;
+        goto END_RETRIEVE;
+    }
+
+    str = (char * ) malloc(name_len + 1);
+    if (recv(s, str, name_len, 0) < name_len) {
+        perror("recv");
+        rv = -1;
+        goto END_RETRIEVE;
+    }
+    str[name_len] = '\0';
+
+    content->name = content_name_create(str);
+    free(str);
+
+    if (recv(s, &timestamp, sizeof(uint32_t), 0) < sizeof(uint32_t)) {
+        perror("recv");
+        rv = -1;
+        goto END_RETRIEVE;
+    }
+    content->timestamp = timestamp;
+
+    if (recv(s, &size, sizeof(uint32_t), 0) < sizeof(uint32_t)) {
+        perror("recv");
+        rv = -1;
+        goto END_RETRIEVE;
+    }
+    content->size = size;
+
+    data = (uint8_t * ) malloc(size);
+    int total = 0;
+    int left = size;
+    int n = -1;
+
+    while (total < size) {
+        n = recv(s, data+total, left, 0);
+        if (n == -1) break;
+        total += n;
+        left -= n;
+    }
+
+    content->data = data;
+
+    END_RETRIEVE:
+    if (rv != 0) {
+        /* error */
+        if (data) free(data);
+        if (content->name) content_name_delete(content->name);
+        free(content);
+    }
+
+    close(s);
+
+    return rv;
+}
+
 int ccnu_cs_summary(struct bloom ** bloom_ptr)
 {
     if (!bloom_ptr) {
@@ -743,22 +960,29 @@ int ccnu_cs_summary(struct bloom ** bloom_ptr)
         return -1;
     }
     /* retrieve the response */
-    uint32_t size = 1;
+    uint32_t size_bits = 1;
     int n;
-    if ((n = recv(s, &size, sizeof(uint32_t), 0)) < sizeof(uint32_t)) {
+    if ((n = recv(s, &size_bits, sizeof(uint32_t), 0)) < sizeof(uint32_t)) {
         perror("recv");
         close (s);
         return -1;
     }
 
-    uint32_t * vector = (uint32_t * ) calloc(size, sizeof(uint32_t));
-    if ((n = recv(s, vector, size * sizeof(uint32_t), 0)) < size * sizeof(uint32_t)) {
+    uint32_t size_words = 0;
+    if ((n = recv(s, &size_words, sizeof(uint32_t), 0)) < sizeof(uint32_t)) {
         perror("recv");
         close (s);
         return -1;
     }
 
-    int bits = size * BITS_PER_WORD;
+    uint32_t * vector = (uint32_t * ) calloc(size_words, sizeof(uint32_t));
+    if ((n = recv(s, vector, size_words * sizeof(uint32_t), 0)) < size_words * sizeof(uint32_t)) {
+        perror("recv");
+        close (s);
+        return -1;
+    }
+
+    int bits = size_bits;
     *bloom_ptr = bloom_createFromVector(bits, vector, BLOOM_ARGS);
     free(vector);
     close (s);

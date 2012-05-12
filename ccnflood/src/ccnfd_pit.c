@@ -35,6 +35,7 @@ int PIT_init()
 {
     g_pit.pit_table_valid = bit_create(PIT_SIZE);
     g_pit.pit_lifetime_ms = PIT_LIFETIME_MS;
+    log_debug(g_log, "PIT: PIT timeout = %d", g_pit.pit_lifetime_ms);
     if (pthread_mutex_init(&g_pit.pit_lock, NULL) != 0) return -1;
 
     int i;
@@ -123,7 +124,8 @@ PENTRY PIT_get_handle(struct content_name * name)
     pe->obj = &g_pit.pit_table[index].obj;
 
     ts_fromnow(&g_pit.pit_table[index].created);
-    g_pit.pit_table[index].expires = g_pit.pit_table[index].created;
+    memcpy(&g_pit.pit_table[index].expires, &g_pit.pit_table[index].created,
+           sizeof(struct timespec));
     ts_addms(&g_pit.pit_table[index].expires, g_pit.pit_lifetime_ms);
     pe->expires = &g_pit.pit_table[index].expires;
 
@@ -165,7 +167,9 @@ int PIT_add_entry(struct content_name * name)
             g_pit.pit_table[index].name = NULL;
         }
     }
-    ts_fromnow(&g_pit.pit_table[index].expires);
+    ts_fromnow(&g_pit.pit_table[index].created);
+    memcpy(&g_pit.pit_table[index].expires, &g_pit.pit_table[index].created,
+           sizeof(struct timespec));
     ts_addms(&g_pit.pit_table[index].expires, g_pit.pit_lifetime_ms);
     g_pit.pit_table[index].name = content_name_create(name->full_name);
     g_pit.pit_table[index].registered = 0;
@@ -192,17 +196,20 @@ PENTRY PIT_exact_match(struct content_name * name)
         }
     }
 
-    struct timespec now;
-    ts_fromnow(&now);
-
-    int valid = 1;
     if (match) {
         pthread_mutex_lock(&g_pit.pit_table[i].mutex);
 
-        if (ts_compare(&g_pit.pit_table[i].expires, &now) >= 0) {
-            valid = 1;
-        } else if (g_pit.pit_table[i].available == 0) {
-            valid = 1;
+        struct timespec now;
+        ts_fromnow(&now);
+        if (ts_compare(&g_pit.pit_table[i].expires, &now) < 0) {
+            pthread_mutex_unlock(&g_pit.pit_table[i].mutex);
+            pthread_mutex_unlock(&g_pit.pit_lock);
+            return NULL;
+        }
+        if (g_pit.pit_table[i].available == 0) {
+            pthread_mutex_unlock(&g_pit.pit_table[i].mutex);
+            pthread_mutex_unlock(&g_pit.pit_lock);
+            return NULL;
         }
 
         PENTRY pe = (PENTRY) malloc(sizeof(_pit_entry_s));
@@ -211,18 +218,11 @@ PENTRY PIT_exact_match(struct content_name * name)
         pe->obj = &g_pit.pit_table[i].obj;
         pe->index = i;
         pe->registered = g_pit.pit_table[i].registered;
-        pe->expires = &g_pit.pit_table[i].expires;
         g_pit.pit_table[i].available = 0;
 
         pthread_mutex_unlock(&g_pit.pit_lock);
 
-        if (valid) {
-            return pe;
-        } else {
-             pthread_mutex_unlock(&g_pit.pit_table[i].mutex);
-             free(pe);
-             return NULL;
-        }
+        return pe;
     } else {
         pthread_mutex_unlock(&g_pit.pit_lock);
         return NULL;
@@ -306,7 +306,6 @@ void PIT_refresh(PENTRY _pe)
 
 void PIT_close(PENTRY _pe)
 {
-    memset(&g_pit.pit_table[_pe->index].expires, 0, sizeof(struct timespec));
     pthread_mutex_unlock(_pe->mutex);
     pthread_mutex_lock(&g_pit.pit_lock);
         g_pit.pit_table[_pe->index].available = 1;
@@ -331,7 +330,7 @@ long PIT_age(PENTRY _pe)
     struct timespec now;
     ts_fromnow(&now);
 
-    long ms = ts_mselapsed(&g_pit.pit_table[_pe->index].created, &now);
+    long ms = ts_mselapsed(&now, &g_pit.pit_table[_pe->index].created);
     return ms;
 }
 
@@ -347,3 +346,4 @@ void PIT_print()
         }
     pthread_mutex_unlock(&g_pit.pit_lock);
 }
+

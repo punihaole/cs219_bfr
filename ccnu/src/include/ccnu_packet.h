@@ -11,6 +11,7 @@
 
 /**
  * Packet formats on the wire
+ * All fields are in host byte order.
  *
  * Interest
  *     +packet_type = 0 : byte
@@ -35,7 +36,7 @@
  *     +payload : byte[size]
  **/
 
-#define MIN_INTEREST_PKT_SIZE 24 /* bytes */
+#define MIN_INTEREST_PKT_SIZE 22 /* bytes */
 struct ccnu_interest_pkt {
     uint16_t nonce;
     uint8_t ttl;
@@ -48,6 +49,13 @@ struct ccnu_interest_pkt {
     struct content_name * name;
 };
 
+static inline void ccnu_interest_destroy(struct ccnu_interest_pkt * pkt)
+{
+    content_name_delete(pkt->name);
+    pkt->name = NULL;
+    free(pkt);
+}
+
 #define MIN_DATA_PKT_SIZE 18 /* bytes */
 struct ccnu_data_pkt {
     uint8_t hops;
@@ -57,5 +65,14 @@ struct ccnu_data_pkt {
 	uint32_t payload_len;
 	void * payload;
 };
+
+static inline void ccnu_data_destroy(struct ccnu_data_pkt * pkt)
+{
+    content_name_delete(pkt->name);
+    pkt->name = NULL;
+    free(pkt->payload);
+    pkt->payload = NULL;
+    free(pkt);
+}
 
 #endif // CCNU_PACKET_H_INCLUDED

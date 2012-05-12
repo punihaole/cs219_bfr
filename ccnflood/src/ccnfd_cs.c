@@ -3,6 +3,7 @@
 #include <math.h>
 #include <pthread.h>
 #include <assert.h>
+#include <errno.h>
 
 #include "ccnfd_cs.h"
 #include "hash.h"
@@ -87,7 +88,9 @@ static inline struct content_obj * content_copy(struct content_obj * orig)
     if (!orig) {
         return NULL;
     }
+
     struct content_obj * copy = malloc(sizeof(struct content_obj));
+    log_assert(g_log, copy != NULL, "CS: failed to allocate content");
     copy->publisher = orig->publisher;
     copy->name = content_name_create(orig->name->full_name);
     copy->timestamp = orig->timestamp;
@@ -101,6 +104,7 @@ static inline struct content_obj * content_copy(struct content_obj * orig)
 int CS_put(struct content_obj * content)
 {
     content = content_copy(content);
+    log_assert(g_log, content != NULL, "CS: failed to allocate content");
 
     pthread_mutex_lock(&_cs.lock);
     struct CS_segment * segment = (struct CS_segment * )
@@ -247,6 +251,7 @@ struct content_obj * CS_get(struct content_name * name)
     }
 }
 
+/*
 struct content_obj * CS_getSegment(struct content_name * prefix)
 {
     if (!prefix) return NULL;
@@ -268,7 +273,7 @@ struct content_obj * CS_getSegment(struct content_name * prefix)
             all->name = prefix;
             all->publisher = segment->index_chunk->publisher;
             all->timestamp = segment->index_chunk->timestamp;
-            all->data = malloc(CCNF_MAX_PACKET_SIZE * segment->num_chunks);
+            all->data = malloc(CCNU_MAX_PACKET_SIZE * segment->num_chunks);
 
             int i;
             int size = 0;
@@ -287,6 +292,7 @@ struct content_obj * CS_getSegment(struct content_name * prefix)
 
     return all;
 }
+*/
 
 int CS_summary(struct bloom ** filter_ptr)
 {

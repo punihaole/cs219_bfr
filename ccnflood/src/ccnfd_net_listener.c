@@ -148,7 +148,7 @@ void * ccnfdnl_service(void * arg)
 
     int rcvd;
     struct net_buffer buf;
-    net_buffer_init(CCNF_MAX_PACKET_SIZE, &buf);
+    net_buffer_init(CCNF_MAX_PACKET_SIZE + sizeof(struct ether_header), &buf);
 	while (1) {
 	    net_buffer_reset(&buf);
         //rcvd = recvfrom(g_sockfd[face], buf.buf, buf.size, 0, NULL, NULL);
@@ -181,12 +181,17 @@ void * ccnfdnl_service(void * arg)
             net_buffer_copyFrom(&buf, str, name_len);
             str[name_len] = '\0';
             interest->name = content_name_create(str);
-            tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_interest,
-                          interest, TPOOL_FREE_ARG | TPOOL_NO_RV, (delete_t)interest_destroy, NULL);
+            tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_interest, interest,
+                          TPOOL_FREE_ARG | TPOOL_NO_RV, (delete_t)ccnf_interest_destroy, NULL);
+
         } else if (type == PACKET_TYPE_DATA) {
             struct ccnf_data_pkt * data = malloc(sizeof(struct ccnf_data_pkt));
             data->hops = net_buffer_getByte(&buf);
             data->publisher_id = net_buffer_getInt(&buf);
+            if (data->publisher_id == g_nodeId) {
+                free(data);
+                continue;
+            }
             int name_len = net_buffer_getInt(&buf);
             char str[MAX_NAME_LENGTH];
             if (name_len > MAX_NAME_LENGTH)
@@ -196,13 +201,11 @@ void * ccnfdnl_service(void * arg)
             data->name = content_name_create(str);
             data->timestamp = net_buffer_getInt(&buf);
             data->payload_len = net_buffer_getInt(&buf);
-            data->payload = malloc(sizeof(uint8_t) * data->payload_len);
-
+            data->payload = malloc(data->payload_len);
             net_buffer_copyFrom(&buf, data->payload, data->payload_len);
-            if (data->publisher_id != g_nodeId) {
-                tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_data,
-                              data, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
-            }
+
+            tpool_add_job(&_net.packet_pipeline, (job_fun_t)handle_data,
+                          data, TPOOL_FREE_ARG | TPOOL_NO_RV, free, NULL);
         } else {
             log_warn(g_log, "ccnfdnl_service: recvd unknown msg type - %u", type);
             sleep(1);
@@ -257,6 +260,8 @@ static void * handle_interest(struct ccnf_interest_pkt * interest)
         if (PIT_age(pe) >= timeout) {
             log_debug(g_log, "handle_interest: %s refreshing.", interest->name->full_name);
             ccnfdnb_fwd_interest(interest);
+        } else {
+            log_debug(g_log, "handle_interest: %s dropping.", interest->name->full_name);
         }
         PIT_refresh(pe);
         /* we already saw this interest...drop it */
@@ -304,16 +309,14 @@ static void * handle_data(struct ccnf_data_pkt * data)
         log_debug(g_log, "%s unsolicited data", data->name->full_name);
         /* unsolicited data */
 		ccnfstat_rcvd_data_unsolicited(data);
-		free(data->payload);
     } else {
-        struct content_obj * obj;
-        obj = (struct content_obj *) malloc(sizeof(struct content_obj));
-
+        struct content_obj * obj = malloc(sizeof(struct content_obj));
         obj->publisher = data->publisher_id;
         obj->name = data->name;
         obj->timestamp = data->timestamp;
         obj->size = data->payload_len;
-        obj->data = data->payload;
+        obj->data = malloc(data->payload_len);
+        memcpy(obj->data, data->payload, data->payload_len);
 
 		ccnfstat_rcvd_data(data);
         CS_put(obj);

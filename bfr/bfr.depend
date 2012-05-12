@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1333471676 source:/home/tom/projects/cs219_bfr/bfr/src/bfr.c
+1336595215 source:/home/tom/projects/cs219_bfr/bfr/src/bfr.c
 	<stdlib.h>
 	<stdio.h>
 	<string.h>
@@ -19,7 +19,7 @@
 	"bfrd.h"
 	"net_lib.h"
 
-1333636368 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_listener.c
+1336595914 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_listener.c
 	<errno.h>
 	<errno.h>
 	<pthread.h>
@@ -102,7 +102,7 @@
 	"ccnu.h"
 	"distance_table.h"
 
-1335988873 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd_main.c
+1336582821 source:/home/tom/projects/cs219_bfr/bfr/src/bfrd_main.c
 	<sys/types.h>
 	<sys/stat.h>
 	<errno.h>
@@ -113,7 +113,6 @@
 	<stdio.h>
 	<stdlib.h>
 	<string.h>
-	<syslog.h>
 	<unistd.h>
 	"bfr.h"
 	"bfr_stats.h"
@@ -127,7 +126,7 @@
 	"strategy.h"
 	"synch_queue.h"
 
-1335988873 source:/home/tom/projects/cs219_bfr/bfr/src/cluster.c
+1336591311 source:/home/tom/projects/cs219_bfr/bfr/src/cluster.c
 	<math.h>
 	"cluster.h"
 	"bloom_filter.h"
@@ -157,20 +156,28 @@
 	<stdlib.h>
 	"log.h"
 
-1335988873 source:/home/tom/projects/cs219_bfr/bfr/src/strategy.c
+1336621419 source:/home/tom/projects/cs219_bfr/bfr/src/strategy.c
 	<stdlib.h>
 	<string.h>
 	<stdio.h>
 	<errno.h>
-	<fcntl.h>
 	<unistd.h>
-	<sys/prctl.h>
-	<sys/time.h>
+	<pthread.h>
+	<fcntl.h>
+	<math.h>
 	<sys/types.h>
 	<sys/socket.h>
 	<sys/un.h>
-	<netinet/in.h>
-	<math.h>
+	<sys/time.h>
+	<sys/ioctl.h>
+	<sys/prctl.h>
+	<arpa/inet.h>
+	<net/if.h>
+	<netinet/ip.h>
+	<netinet/udp.h>
+	<netinet/ether.h>
+	<linux/if_packet.h>
+	<ifaddrs.h>
 	"cluster.h"
 	"bfr.h"
 	"bfrd.h"
@@ -215,7 +222,7 @@
 	"bloom_filter.h"
 	"hash.h"
 
-1333221826 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_stats.c
+1336578565 source:/home/tom/projects/cs219_bfr/bfr/src/bfr_stats.c
 	<stdlib.h>
 	<string.h>
 	<pthread.h>

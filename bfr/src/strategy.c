@@ -79,6 +79,7 @@ struct strategy {
     int summary_size; /* num bits in our Bloom filters, calcualted by bfrd */
 
     thread_pool_t handler_pool;
+    thread_pool_t nonce_pool;
 
     pthread_mutex_t nonce_lock;
     struct bitmap * seen_nonces;
@@ -114,12 +115,16 @@ static int create_bloom_msg(struct bloom_msg * msg,
 static int broadcast_bloom_msg(struct bloom_msg * msg);
 static int broadcast_join_msg(struct cluster_join_msg * msg);
 static int broadcast_cluster_msg(struct cluster_msg * msg);
+#ifdef BFR_USE_SLEEPING_PILLS
 static int broadcast_pill_msg(struct sleeping_pill_msg * msg);
+#endif
 
 static int parse_as_bloom_msg(struct bfr_msg * msg, struct bloom_msg * bmsg);
 static int parse_as_cluster_msg(struct bfr_msg * msg, struct cluster_msg * target);
 static int parse_as_join_msg(struct bfr_msg * msg, struct cluster_join_msg * target);
+#ifdef BFR_USE_SLEEPING_PILLS
 static int parse_as_pill_msg(struct bfr_msg * msg, struct sleeping_pill_msg * target);
+#endif
 
 static void filter_msgs(struct linked_list * putIn, uint8_t type);
 
@@ -154,8 +159,13 @@ int strategy_init(unsigned num_levels, int bloom_interval_ms, int cluster_interv
 
     struct node * my_node = &g_bfr.my_node;
     _strategy.summary_size = my_node->filter->vector->num_bits;
+    log_print(g_log, "strategy_init: summary size = %d", _strategy.summary_size);
 
     if (tpool_create(&_strategy.handler_pool, DEFAULT_HANDLER_POOL) < 0) {
+        return -1;
+    }
+
+    if (tpool_create(&_strategy.nonce_pool, DEFAULT_HANDLER_POOL) < 0) {
         return -1;
     }
 
@@ -166,7 +176,7 @@ int strategy_init(unsigned num_levels, int bloom_interval_ms, int cluster_interv
     struct ifaddrs * ifa, * p;
 
     if (getifaddrs(&ifa) != 0) {
-        log_critical(g_log, "net_init: getifaddrs: %s", strerror(errno));
+        log_critical(g_log, "strategy_init: getifaddrs: %s", strerror(errno));
         return -1;
     }
 
@@ -181,7 +191,7 @@ int strategy_init(unsigned num_levels, int bloom_interval_ms, int cluster_interv
         memset(&if_mac, 0, sizeof(struct ifreq));
         strncpy(if_mac.ifr_name, p->ifa_name, IFNAMSIZ-1);
         if (ioctl(g_sockfd, SIOCGIFHWADDR, &if_mac) < 0) {
-            log_critical(g_log, "net_init: ioctl: %s", strerror(errno));
+            log_critical(g_log, "strategy_init: ioctl: %s", strerror(errno));
             return -1;
         }
 
@@ -258,7 +268,7 @@ void * strategy_service(void * ignore)
     next_event = calc_next_event(events);
     time_t rawtime;
 	time(&rawtime);
-	unsigned long diff = next_event->tv_sec - rawtime;
+	//unsigned long diff = next_event->tv_sec - rawtime;
 	//log_print(g_log, "strategy_service: scheduled next event in %u seconds", diff);
 
     int rv;
@@ -294,7 +304,7 @@ void * strategy_service(void * ignore)
             next_event = calc_next_event(events);
 			time_t rawtime;
 			time(&rawtime);
-			unsigned long diff = next_event->tv_sec - rawtime;
+			//unsigned long diff = next_event->tv_sec - rawtime;
 			//log_print(g_log, "strategy_service: scheduled next event in %u seconds", diff);
 
             /* check if we got any messages as well */
@@ -321,7 +331,7 @@ void * strategy_service(void * ignore)
                     if (!seen) {
                         tpool_add_job(&_strategy.handler_pool, handle_bloom_msg, barg, TPOOL_NO_RV, NULL, NULL);
                     } else {
-                        //log_print(g_log, "strategy_service: dropping bloom with duplicate nonce (%u)", barg->bmsg.nonce);
+                        log_debug(g_log, "strategy_service: dropping bloom with duplicate nonce (%u)", barg->bmsg.nonce);
                     }
                 }
             } else if (msg->hdr.type == MSG_NET_CLUSTER_JOIN) {
@@ -609,6 +619,7 @@ static int bloom()
                 }
             }
 
+            #ifndef BFR_FLOOD_STATE
             //Send to neighboring cluster Ids
             unsigned neighbors[3];
             grid_3neighbors(level, clusterId, neighbors);
@@ -619,12 +630,18 @@ static int bloom()
                               level, neighbors[k]);
                     continue;
                 }
-                //log_print(g_log, "bloom: forwarding aggregate filter to neighbor %u:%u", level, neighbors[k]);
+                log_print(g_log, "bloom: forwarding aggregate filter to neighbor %u:%u", level, neighbors[k]);
                 create_bloom_msg(&msg, level, clusterId, level, neighbors[k], distance, _cluster->agg_filter);
                 broadcast_bloom_msg(&msg);
                 free(msg.vector);
                 msg.vector = NULL;
             }
+            #else
+            //destination is treated as TTL
+            create_bloom_msg(&msg, level, clusterId, 5, 0, distance, _cluster->agg_filter);
+            broadcast_bloom_msg(&msg);
+            free(msg.vector);
+            #endif
         } else {
             /* I am not the cluster head */
             if (bit_allClear(filter->vector)) {
@@ -764,6 +781,7 @@ static int parse_as_cluster_msg(struct bfr_msg * msg,
     return 0;
 }
 
+#ifdef BFR_USE_SLEEPING_PILLS
 static int parse_as_pill_msg(struct bfr_msg * msg, struct sleeping_pill_msg * target)
 {
 	if (!msg || !target) return -1;
@@ -781,6 +799,7 @@ static int parse_as_pill_msg(struct bfr_msg * msg, struct sleeping_pill_msg * ta
 
 	return 0;
 }
+#endif
 
 static int create_bloom_msg(struct bloom_msg * msg,
                             unsigned origin_level, unsigned origin_clusterId,
@@ -973,6 +992,7 @@ static int broadcast_cluster_msg(struct cluster_msg * msg)
     return rv;
 }
 
+#ifdef BFR_USE_SLEEPING_PILLS
 static int broadcast_pill_msg(struct sleeping_pill_msg * msg)
 {
 	if (!msg) {
@@ -1016,6 +1036,7 @@ static int broadcast_pill_msg(struct sleeping_pill_msg * msg)
 
     return rv;
 }
+#endif
 
 static void filter_msgs(struct linked_list * putIn, uint8_t type)
 {
@@ -1067,32 +1088,28 @@ static void * handle_bloom_msg(void * arg)
     *nonce = msg->nonce;
 
     bfrstat_rcvd_bloom(msg);
-    /*log_print(g_log, "handle_bloom_msg: from %u@%u:%u for (%u:%u), lhd = %5.2f.",
+    log_print(g_log, "handle_bloom_msg: from %u@%u:%u for (%u:%u), lhd = %5.2f.",
               origin_nodeId, msg->origin_level, msg->origin_clusterId,
               msg->dest_level, msg->dest_clusterId,
-              unpack_ieee754_64(msg->lastHopDistance));*/
+              unpack_ieee754_64(msg->lastHopDistance));
     struct bloom * filter = bloom_createFromVector(msg->vector_bits, msg->vector, BLOOM_ARGS);
-    if (!filter) goto CLEANUP;
 
-    /*
-    //log_print(g_log, "filter->size = %d", filter->size);
-    //log_print(g_log, "filter->vector->num_words = %d", filter->vector->num_words);
-    //log_print(g_log, "filter->vector->num_bits = %d", filter->vector->num_bits);
-    //log_print(g_log, "\torigin_level=%d", msg->origin_level);
-    //log_print(g_log, "\torigin_clusterId=%d", msg->origin_clusterId);
-    //log_print(g_log, "\tdest_level=%d", msg->dest_level);
-    //log_print(g_log, "\tdest_clusterId=%d", msg->dest_clusterId);
-    //log_print(g_log, "\tlastHopDistance=%6.5f", msg->vector_bits);
-    int words = ceil(msg->vector_bits/32);
-    char str[words];
+    log_print(g_log, "filter->size = %d", filter->size);
+    log_print(g_log, "filter->vector->num_words = %d", filter->vector->num_words);
+    log_print(g_log, "filter->vector->num_bits = %d", filter->vector->num_bits);
+    log_print(g_log, "\torigin_level=%d", msg->origin_level);
+    log_print(g_log, "\torigin_clusterId=%d", msg->origin_clusterId);
+    log_print(g_log, "\tdest_level=%d", msg->dest_level);
+    log_print(g_log, "\tdest_clusterId=%d", msg->dest_clusterId);
+    log_print(g_log, "\tlastHopDistance=%6.5f", msg->vector_bits);
+    int words = filter->vector->num_words;
+    char str[256];
+    str[0] = 0;
     int i;
     for (i = 0; i < words; i++) {
-        sprintf(str+i, "%d", msg->vector[i]);
+        sprintf(str, "%s %04X", str, msg->vector[i]);
     }
-    str[words-1] = '\0';
-    //log_print(g_log, "\tvector = ");
-    //log_print(g_log, "%s", str);
-    */
+    log_print(g_log, "\tvector = %s", str);
 
     /* we use overhead bloom filters */
     struct cluster * clus = NULL;
@@ -1149,6 +1166,7 @@ static void * handle_bloom_msg(void * arg)
         //log_print(g_log, "handle_bloom_msg: previously seen cluster.");
     }
 
+    #ifndef BFR_FLOOD_STATE
     /* figure out if we need to forward */
     if (msg->dest_clusterId == clus_get_clusterId(msg->dest_level)) {
         /* we are in the local cluster */
@@ -1194,6 +1212,14 @@ static void * handle_bloom_msg(void * arg)
             fwd = TRUE;
         }
     }
+    #else
+    if (msg->ttl > 0) {
+        fwd = 1;
+        msg->ttl--;
+    } else {
+        fwd = 0;
+    }
+    #endif
 
     pthread_mutex_unlock(&g_bfr.bfr_lock);
 
@@ -1205,7 +1231,7 @@ static void * handle_bloom_msg(void * arg)
     }
 
     CLEANUP:
-    tpool_add_job(&_strategy.handler_pool, (job_fun_t)unregister_nonce, nonce, TPOOL_NO_RV, NULL, NULL);
+    tpool_add_job(&_strategy.nonce_pool, (job_fun_t)unregister_nonce, nonce, TPOOL_NO_RV, NULL, NULL);
     free(msg->vector);
 
     return NULL;

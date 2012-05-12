@@ -20,7 +20,10 @@ int CS_putSegment(struct content_obj * prefix_obj, struct linked_list * content_
 
 int CS_put(struct content_obj * content);
 
-struct content_obj * CS_getSegment(struct content_name * prefix);
+/**
+ * @deprecated CS_getSegment
+ **/
+//struct content_obj * CS_getSegment(struct content_name * prefix);
 
 struct content_obj * CS_get(struct content_name * name);
 

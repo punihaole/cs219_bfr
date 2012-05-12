@@ -21,6 +21,22 @@
 #define MSG_IPC_CS_SUMMARY_REQ 5
 #define MSG_IPC_TIMEOUT        6
 #define MSG_IPC_RETRIES        7
+#define MSG_IPC_RETRIEVE_OPT   8
+
+/* used to specify options for the ccnudnb_express_interest function */
+#define CCNUDNB_USE_ROUTE          0x1
+#define CCNUDNB_USE_RETRIES        0x2
+#define CCNUDNB_USE_TIMEOUT        0x4
+#define CCNUDNB_USE_TTL            0x8
+typedef struct ccnu_options {
+	int mode;
+	double distance;
+    unsigned orig_level_u, orig_clusterId_u;
+    unsigned dest_level_u, dest_clusterId_u;
+    int retries; /* number of times to send an interest */
+    int timeout_ms;
+    int ttl;
+} ccnu_opt_t;
 
 inline void ccnu_did2sockpath(uint32_t daemonId, char * str, int size);
 
@@ -58,13 +74,13 @@ int ccnu_publish(struct content_obj * content);
 
 /**
  * ccnu_publishSeq
- *      Publish a piece of segmented piece of content. The index_obj stores 
+ *      Publish a piece of segmented piece of content. The index_obj stores
  *      application specific metadata for the segment. The chunks list is a
  *      list of chunks making up the segment.
  *      The name of the index_obj is a prefix, which all the chunks should
  *      share (although we don't check this right now!). The chunks have
  *      an additional conent name component which is the sequence number.
- *      i.e. /prefix/0, /prefix/1, ... /prefix/N 
+ *      i.e. /prefix/0, /prefix/1, ... /prefix/N
  * returns 0 on success
  **/
 int ccnu_publishSeq(struct content_obj * index_obj, struct linked_list * chunks);
@@ -86,8 +102,11 @@ int ccnu_retrieve(struct content_name * name, struct content_obj ** content_ptr)
  *      The file will be stored in segments in the CS, but will be returned as
  *      a single content obj to the caller.
  **/
-int ccnu_retrieveSeq(struct content_name * baseName, int chunks, int file_len, 
+int ccnu_retrieveSeq(struct content_name * baseName, int chunks, int file_len,
                      struct content_obj ** content_ptr);
+
+int ccnu_retrieveSeq_opts(struct content_name * baseName, int chunks, int file_len,
+                     	  struct content_obj ** content_ptr, ccnu_opt_t * opts);
 /**
  * ccnu_cs_summary
  *      Requests the ccnu daemon hash the content names in the CS and put their

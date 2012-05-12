@@ -23,7 +23,7 @@ int CS_putSegment(struct content_obj * prefix_obj, struct linked_list * content_
 int CS_put(struct content_obj * content);
 
 /* Returns a copy of the segment collapsed into one content object */
-struct content_obj * CS_getSegment(struct content_name * prefix);
+//struct content_obj * CS_getSegment(struct content_name * prefix);
 
 /* Returns a copy of the given content */
 struct content_obj * CS_get(struct content_name * name);
